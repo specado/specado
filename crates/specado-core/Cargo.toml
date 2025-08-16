@@ -9,4 +9,7 @@ documentation.workspace = true
 description = "Core translation engine for Specado - spec-driven LLM prompt compilation"
 
 [dependencies]
-# Dependencies will be added as needed in future issues
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
