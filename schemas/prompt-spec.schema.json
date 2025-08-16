@@ -212,8 +212,11 @@
             "maxLength": 1024
           },
           "json_schema": {
-            "description": "JSON Schema for the tool's parameters",
-            "type": "object"
+            "description": "JSON Schema for the tool's parameters (object for parameters, boolean for parameter-less)",
+            "oneOf": [
+              { "type": "object" },
+              { "type": "boolean" }
+            ]
           }
         }
       }

@@ -191,11 +191,13 @@
                 "properties": {
                   "content_path": { 
                     "description": "JSONPath to response content",
-                    "type": "string" 
+                    "type": "string",
+                    "pattern": "^[\\w\\[\\]\\.]+$"
                   },
                   "finish_reason_path": { 
                     "description": "JSONPath to finish reason",
-                    "type": "string" 
+                    "type": "string",
+                    "pattern": "^[\\w\\[\\]\\.]+$"
                   },
                   "finish_reason_map": {
                     "description": "Map provider finish reasons to uniform ones",
@@ -211,9 +213,9 @@
                 "required": ["protocol", "event_selector"],
                 "properties": {
                   "protocol": { 
-                    "description": "Streaming protocol",
+                    "description": "Streaming technology (over transport protocol)",
                     "type": "string",
-                    "enum": ["sse", "websocket", "http2"]
+                    "enum": ["sse", "websocket", "ndjson", "http2-stream"]
                   },
                   "event_selector": {
                     "description": "Event routing rules",
@@ -223,7 +225,8 @@
                     "properties": {
                       "type_path": { 
                         "description": "JSONPath to event type",
-                        "type": "string" 
+                        "type": "string",
+                        "pattern": "^[\\w\\[\\]\\.]+$"
                       },
                       "routes": {
                         "description": "Event routing configuration",
@@ -233,11 +236,27 @@
                           "additionalProperties": false,
                           "required": ["when", "emit"],
                           "properties": {
-                            "when": { "type": "string" },
-                            "emit": { "type": "string" },
-                            "text_path": { "type": "string" },
-                            "name_path": { "type": "string" },
-                            "args_path": { "type": "string" }
+                            "when": { 
+                              "description": "Event type to match",
+                              "type": "string" 
+                            },
+                            "emit": { 
+                              "description": "Event to emit",
+                              "type": "string",
+                              "enum": ["start", "delta", "tool", "stop", "error"]
+                            },
+                            "text_path": { 
+                              "type": "string",
+                              "pattern": "^[\\w\\[\\]\\.]+$"
+                            },
+                            "name_path": { 
+                              "type": "string",
+                              "pattern": "^[\\w\\[\\]\\.]+$"
+                            },
+                            "args_path": { 
+                              "type": "string",
+                              "pattern": "^[\\w\\[\\]\\.]+$"
+                            }
                           }
                         }
                       }
@@ -267,7 +286,7 @@
             "pattern": "^/.*" 
           },
           "protocol": {
-            "description": "Communication protocol",
+            "description": "Transport protocol",
             "type": "string",
             "enum": ["http", "https", "ws", "wss"]
           },
