@@ -1,0 +1,23 @@
+[workspace]
+members = [
+    "crates/specado-core",
+    "crates/specado-schemas",
+    "crates/specado-providers",
+    "crates/specado-cli",
+    "crates/specado-ffi",
+    "crates/specado-wasm",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Specado Team"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/specado/specado"
+homepage = "https://github.com/specado/specado"
+documentation = "https://docs.rs/specado"
+keywords = ["llm", "ai", "translation", "provider", "spec-driven"]
+categories = ["api-bindings", "command-line-utilities", "development-tools"]
+
+# Workspace dependencies will be added as needed in future issues

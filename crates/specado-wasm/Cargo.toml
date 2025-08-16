@@ -1,0 +1,15 @@
+[package]
+name = "specado-wasm"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+description = "WebAssembly bindings for Specado - browser and edge runtime support"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Dependencies will be added as needed in L5 (optional)

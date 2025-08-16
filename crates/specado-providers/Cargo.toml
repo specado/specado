@@ -1,0 +1,12 @@
+[package]
+name = "specado-providers"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+description = "Provider specification files and utilities for OpenAI, Anthropic, and others"
+
+[dependencies]
+# Dependencies will be added as needed in future issues

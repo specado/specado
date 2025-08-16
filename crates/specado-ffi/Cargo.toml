@@ -1,0 +1,15 @@
+[package]
+name = "specado-ffi"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+description = "FFI bindings for Node.js and Python - Specado language bindings"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Dependencies will be added as needed in L5

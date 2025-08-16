@@ -1,0 +1,70 @@
+# Rust
+target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+
+# Test artifacts
+tarpaulin-report.html
+cobertura.xml
+coverage/
+
+# Build artifacts
+dist/
+build/
+*.wasm
+pkg/
+
+# Node.js (for FFI)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Python (for FFI)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Documentation
+docs/_build/
+docs/.doctrees/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
+
+# Credentials (never commit these)
+*.key
+*.pem
+*.cert
+credentials.json
+secrets.yaml
+
+# LLM context files (internal documentation)
+llmcontext/
+CLAUDE.md

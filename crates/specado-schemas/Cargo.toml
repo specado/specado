@@ -1,0 +1,12 @@
+[package]
+name = "specado-schemas"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+description = "JSON Schema definitions and validators for PromptSpec and ProviderSpec"
+
+[dependencies]
+# Dependencies will be added as needed in future issues

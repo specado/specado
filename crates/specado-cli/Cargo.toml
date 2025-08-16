@@ -1,0 +1,16 @@
+[package]
+name = "specado-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+description = "Command-line interface for Specado - validate, preview, run, and stream LLM requests"
+
+[[bin]]
+name = "specado"
+path = "src/main.rs"
+
+[dependencies]
+# Dependencies will be added as needed in future issues

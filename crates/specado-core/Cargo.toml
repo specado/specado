@@ -1,0 +1,12 @@
+[package]
+name = "specado-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+description = "Core translation engine for Specado - spec-driven LLM prompt compilation"
+
+[dependencies]
+# Dependencies will be added as needed in future issues
