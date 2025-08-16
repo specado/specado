@@ -9,4 +9,7 @@ documentation.workspace = true
 description = "JSON Schema definitions and validators for PromptSpec and ProviderSpec"
 
 [dependencies]
-# Dependencies will be added as needed in future issues
+jsonschema = "0.32.1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
