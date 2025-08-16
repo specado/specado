@@ -15,7 +15,7 @@
       "provider": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "base_url", "headers"],
+        "required": ["name", "base_url", "headers", "auth"],
         "properties": {
           "name": { "type": "string", "minLength": 1 },
           "base_url": { "type": "string", "format": "uri" },
@@ -23,6 +23,55 @@
             "type": "object",
             "description": "Static headers; values may include ${ENV:VAR} placeholders.",
             "additionalProperties": { "type": "string" }
+          },
+          "auth": {
+            "description": "Authentication configuration",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "header_name"],
+            "properties": {
+              "type": { 
+                "description": "Authentication type",
+                "type": "string", 
+                "enum": ["bearer", "api-key", "basic", "custom"] 
+              },
+              "header_name": { 
+                "description": "Header name for authentication",
+                "type": "string", 
+                "default": "Authorization" 
+              },
+              "value_template": { 
+                "description": "Template for auth value (e.g., 'Bearer ${ENV:API_KEY}')",
+                "type": "string" 
+              }
+            }
+          },
+          "capabilities": {
+            "description": "Provider-wide capabilities",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "supports_rag": { 
+                "description": "Supports retrieval-augmented generation",
+                "type": "boolean", 
+                "default": false 
+              },
+              "supports_conversation_persistence": { 
+                "description": "Supports persistent conversation IDs",
+                "type": "boolean", 
+                "default": false 
+              },
+              "supports_live_sessions": { 
+                "description": "Supports live/streaming sessions",
+                "type": "boolean", 
+                "default": false 
+              },
+              "supports_multimodal_output": { 
+                "description": "Can generate non-text outputs",
+                "type": "boolean", 
+                "default": false 
+              }
+            }
           }
         }
       },
@@ -31,6 +80,11 @@
         "type": "array",
         "minItems": 1,
         "items": { "$ref": "#/$defs/Model" }
+      },
+      
+      "notes": {
+        "description": "Additional notes about provider requirements or limitations",
+        "type": "string"
       }
     },
   
@@ -75,7 +129,22 @@
             "properties": {
               "messages": { "type": "boolean" },
               "single_text": { "type": "boolean" },
-              "images": { "type": "boolean" }
+              "images": { "type": "boolean" },
+              "audio": { 
+                "description": "Supports audio input",
+                "type": "boolean",
+                "default": false
+              },
+              "video": { 
+                "description": "Supports video input",
+                "type": "boolean",
+                "default": false
+              },
+              "documents": { 
+                "description": "Supports document/file input",
+                "type": "boolean",
+                "default": false
+              }
             }
           },
   
@@ -87,6 +156,19 @@
               "tools_supported": { "type": "boolean" },
               "parallel_tool_calls_default": { "type": "boolean" },
               "can_disable_parallel_tool_calls": { "type": "boolean" },
+              "tool_choice_modes": {
+                "description": "Supported tool choice modes",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["auto", "none", "required", "any", "specific"]
+                }
+              },
+              "strict_tools_support": {
+                "description": "Supports strict tool schema validation",
+                "type": "boolean",
+                "default": false
+              },
               "disable_switch": {
                 "type": "object",
                 "additionalProperties": false,
@@ -125,7 +207,7 @@
               "system_prompt_location": { 
                 "description": "Where system prompts are placed",
                 "type": "string", 
-                "enum": ["top_level", "message_role"] 
+                "enum": ["top_level", "message_role", "preamble"] 
               },
               "forbid_unknown_top_level_fields": { 
                 "description": "Whether unknown fields cause errors",
@@ -144,6 +226,26 @@
                 "description": "Conflict resolution order",
                 "type": "array",
                 "items": { "type": "string" }
+              },
+              "prompt_truncation": {
+                "description": "Prompt truncation strategy",
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "default_mode": {
+                    "description": "Default truncation mode",
+                    "type": "string",
+                    "enum": ["OFF", "AUTO", "AUTO_PRESERVE_ORDER"]
+                  },
+                  "supported_modes": {
+                    "description": "List of supported truncation modes",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["OFF", "AUTO", "AUTO_PRESERVE_ORDER", "START", "END"]
+                    }
+                  }
+                }
               },
               "limits": {
                 "description": "Size limits for various fields",
@@ -173,6 +275,51 @@
                 "description": "Feature flags and their mappings",
                 "type": "object",
                 "additionalProperties": true
+              }
+            }
+          },
+
+          "rag_config": {
+            "description": "Retrieval-augmented generation configuration",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "connector_param": {
+                "description": "Parameter name for RAG connectors",
+                "type": "string"
+              },
+              "document_param": {
+                "description": "Parameter name for documents",
+                "type": "string"
+              },
+              "search_queries_param": {
+                "description": "Parameter name for search queries only mode",
+                "type": "string"
+              },
+              "web_search_connector": {
+                "description": "Identifier for web search connector",
+                "type": "string"
+              }
+            }
+          },
+
+          "conversation_management": {
+            "description": "Conversation persistence configuration",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "conversation_id_param": {
+                "description": "Parameter name for conversation ID",
+                "type": "string"
+              },
+              "history_param": {
+                "description": "Parameter name for chat history",
+                "type": "string"
+              },
+              "supports_branching": {
+                "description": "Whether conversations can branch",
+                "type": "boolean",
+                "default": false
               }
             }
           },

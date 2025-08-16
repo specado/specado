@@ -10,7 +10,16 @@
       "model_class": {
         "description": "Model capability class determining behavior",
         "type": "string",
-        "enum": ["Chat", "ReasoningChat"]
+        "enum": [
+          "Chat",
+          "ReasoningChat",
+          "VisionChat",
+          "AudioChat", 
+          "MultimodalChat",
+          "RAGChat",
+          "Completion",
+          "Embedding"
+        ]
       },
   
       "messages": {
@@ -18,6 +27,87 @@
         "type": "array",
         "minItems": 1,
         "items": { "$ref": "#/$defs/Message" }
+      },
+  
+      "rag": {
+        "description": "Retrieval-augmented generation configuration",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "documents": {
+            "description": "A corpus of documents for the model to retrieve from during RAG operations",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "content"],
+              "properties": {
+                "id": { 
+                  "description": "Document identifier",
+                  "type": "string" 
+                },
+                "content": { 
+                  "description": "Document content",
+                  "type": "string" 
+                },
+                "metadata": { 
+                  "description": "Document metadata",
+                  "type": "object" 
+                }
+              }
+            }
+          },
+          "connectors": {
+            "description": "RAG connectors to use",
+            "type": "array",
+            "items": { 
+              "type": "string",
+              "description": "Connector identifier (e.g., web_search, database, file_system)"
+            }
+          },
+          "search_queries": {
+            "description": "Search queries for retrieval",
+            "type": "array",
+            "items": { 
+              "type": "string" 
+            }
+          },
+          "citations_required": {
+            "description": "Whether to include citations in response",
+            "type": "boolean",
+            "default": false
+          },
+          "max_results": {
+            "description": "Maximum number of results to retrieve",
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+  
+      "conversation": {
+        "description": "Conversation management settings",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "conversation_id": {
+            "description": "Persistent conversation identifier",
+            "type": "string"
+          },
+          "parent_message_id": {
+            "description": "Parent message ID for conversation branching",
+            "type": "string"
+          },
+          "preserve_history": {
+            "description": "Whether to preserve conversation history",
+            "type": "boolean",
+            "default": true
+          },
+          "branch_from": {
+            "description": "Message ID to branch conversation from",
+            "type": "string"
+          }
+        }
       },
   
       "tools": {
@@ -30,7 +120,9 @@
         "description": "Tool selection strategy",
         "oneOf": [
           { "const": "auto" },
+          { "const": "none" },
           { "const": "required" },
+          { "const": "any" },
           {
             "type": "object",
             "additionalProperties": false,
@@ -153,11 +245,110 @@
           },
           "input_audio": { 
             "description": "Audio input configuration",
-            "type": "object"
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "url": { 
+                "description": "Audio file URL",
+                "type": "string" 
+              },
+              "data": { 
+                "description": "Base64 encoded audio data",
+                "type": "string" 
+              },
+              "format": { 
+                "description": "Audio format (e.g., mp3, wav, m4a)",
+                "type": "string" 
+              }
+            }
+          },
+          "input_video": {
+            "description": "Video input configuration",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "url": { 
+                "description": "Video file URL",
+                "type": "string" 
+              },
+              "data": { 
+                "description": "Base64 encoded video data",
+                "type": "string" 
+              },
+              "format": { 
+                "description": "Video format (e.g., mp4, webm, mov)",
+                "type": "string" 
+              },
+              "duration_seconds": {
+                "description": "Video duration in seconds",
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "input_documents": {
+            "description": "Documents to be included directly in the prompt's context (not for retrieval)",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "content"],
+              "properties": {
+                "name": { 
+                  "description": "Document name/filename",
+                  "type": "string" 
+                },
+                "content": { 
+                  "description": "Document content (text or base64)",
+                  "type": "string" 
+                },
+                "mime_type": { 
+                  "description": "MIME type of the document",
+                  "type": "string" 
+                },
+                "encoding": {
+                  "description": "Content encoding (text, base64)",
+                  "type": "string",
+                  "enum": ["text", "base64"],
+                  "default": "text"
+                }
+              }
+            }
           },
           "output_audio": { 
             "description": "Audio output configuration",
             "type": "object"
+          }
+        }
+      },
+  
+      "preferences": {
+        "description": "User preferences for translation behavior",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "prompt_truncation": {
+            "description": "How to handle prompts that exceed token limits",
+            "type": "string",
+            "enum": ["OFF", "AUTO", "AUTO_PRESERVE_ORDER"],
+            "default": "AUTO"
+          },
+          "fallback_behavior": {
+            "description": "How to handle unsupported features",
+            "type": "string",
+            "enum": ["strict", "adaptive", "permissive"],
+            "default": "adaptive"
+          },
+          "citation_format": {
+            "description": "Preferred citation format for RAG responses",
+            "type": "string",
+            "enum": ["inline", "footnote", "bibliography"],
+            "default": "inline"
+          },
+          "parallel_tool_calls": {
+            "description": "Preference for parallel tool execution",
+            "type": "boolean",
+            "default": true
           }
         }
       },
@@ -180,7 +371,7 @@
           "role": { 
             "description": "Role of the message sender",
             "type": "string", 
-            "enum": ["system", "user", "assistant"]
+            "enum": ["system", "user", "assistant", "tool"]
           },
           "content": { 
             "description": "Message content",
