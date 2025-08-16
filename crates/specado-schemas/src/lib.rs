@@ -67,6 +67,7 @@
 //! Licensed under the Apache-2.0 license
 
 pub mod validation;
+pub mod loader;
 
 // Re-export commonly used types for convenience
 pub use validation::{
@@ -76,3 +77,32 @@ pub use validation::{
     create_prompt_spec_validator, create_provider_spec_validator,
     ValidationConfig, validate_prompt_specs_batch, validate_provider_specs_batch,
 };
+
+pub use loader::{
+    SchemaLoader, LoaderError, LoaderResult,
+    SchemaCache, CacheEntry, Format, SchemaParser,
+    ReferenceResolver, ResolverContext,
+};
+
+/// Create a schema loader with default configuration
+pub fn create_schema_loader() -> SchemaLoader {
+    SchemaLoader::new()
+}
+
+/// Create a schema loader with custom cache size
+pub fn create_schema_loader_with_cache(max_entries: usize) -> SchemaLoader {
+    use loader::cache::CacheConfig;
+    use loader::schema_loader::LoaderConfig;
+    
+    let cache_config = CacheConfig {
+        max_entries,
+        ..Default::default()
+    };
+    
+    let loader_config = LoaderConfig {
+        cache: cache_config,
+        ..Default::default()
+    };
+    
+    SchemaLoader::with_config(loader_config)
+}
