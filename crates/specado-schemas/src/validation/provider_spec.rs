@@ -6,19 +6,51 @@
 use crate::validation::base::{SchemaValidator, ValidationContext, ValidationHelpers};
 use crate::validation::error::{ValidationError, ValidationResult};
 use serde_json::Value;
+use std::path::Path;
+
+// Embed the schema at compile time for reliability
+const PROVIDER_SPEC_SCHEMA: &str = include_str!("../../../../schemas/provider-spec.schema.json");
 
 /// ProviderSpec validator with custom rules
 pub struct ProviderSpecValidator {
-    // For now, we'll implement basic validation without JSON Schema
+    schema: Value,
 }
 
 impl ProviderSpecValidator {
-    /// Create a new ProviderSpec validator
+    /// Create a new ProviderSpec validator using embedded schema
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(Self {})
+        // Try to load from environment variable first (for development)
+        let schema = if let Ok(schema_path) = std::env::var("PROVIDER_SPEC_SCHEMA_PATH") {
+            // Load from disk if path is provided
+            let path = Path::new(&schema_path);
+            if path.exists() {
+                let content = std::fs::read_to_string(path)?;
+                serde_json::from_str(&content)?
+            } else {
+                // Fall back to embedded schema
+                serde_json::from_str(PROVIDER_SPEC_SCHEMA)?
+            }
+        } else {
+            // Use embedded schema by default
+            serde_json::from_str(PROVIDER_SPEC_SCHEMA)?
+        };
+        
+        Ok(Self { schema })
+    }
+    
+    /// Load schema from a specific path (useful for testing)
+    pub fn from_path(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
+        let content = std::fs::read_to_string(path)?;
+        let schema: Value = serde_json::from_str(&content)?;
+        Ok(Self { schema })
     }
 
     /// Get the JSON Schema definition for ProviderSpec
+    pub fn schema(&self) -> &Value {
+        &self.schema
+    }
+    
+    #[allow(dead_code)]
     fn get_schema_definition() -> Value {
         serde_json::json!({
             "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -591,8 +623,17 @@ impl Default for ProviderSpecValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::validation::base::ValidationMode;
+    
     use serde_json::json;
+    
+    #[test]
+    fn test_embedded_schema_loading() {
+        let validator = ProviderSpecValidator::new().unwrap();
+        let schema = validator.schema();
+        assert!(schema.is_object());
+        assert_eq!(schema.get("title").and_then(|v| v.as_str()), Some("ProviderSpec"));
+        assert_eq!(schema.get("$schema").and_then(|v| v.as_str()), Some("https://json-schema.org/draft/2020-12/schema"));
+    }
 
     fn create_basic_provider_spec() -> Value {
         json!({

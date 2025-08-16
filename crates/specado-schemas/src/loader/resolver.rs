@@ -554,7 +554,7 @@ mod tests {
     #[test]
     fn test_env_var_expansion() -> LoaderResult<()> {
         let dir = tempdir().unwrap();
-        let mut context = ResolverContext::for_testing(
+        let context = ResolverContext::for_testing(
             dir.path().to_path_buf(),
             [("TEST_VAR".to_string(), "test_value".to_string())]
                 .iter()
