@@ -298,6 +298,110 @@
         },
         "models": [
           {
+            "id": "gpt-5",
+            "aliases": ["gpt-5-latest", "gpt-5-chat"],
+            "family": "gpt-5",
+            "endpoints": {
+              "chat_completion": { 
+                "method": "POST", 
+                "path": "/v1/chat/completions",
+                "protocol": "https"
+              },
+              "streaming_chat_completion": { 
+                "method": "POST", 
+                "path": "/v1/chat/completions",
+                "protocol": "https",
+                "query": { "stream": "true" }
+              }
+            },
+            "input_modes": { 
+              "messages": true, 
+              "single_text": false, 
+              "images": true 
+            },
+            "tooling": {
+              "tools_supported": true,
+              "parallel_tool_calls_default": true,
+              "can_disable_parallel_tool_calls": true,
+              "disable_switch": { 
+                "path": "parallel_tool_calls", 
+                "value": false 
+              }
+            },
+            "json_output": { 
+              "native_param": true, 
+              "strategy": "json_schema"
+            },
+            "parameters": {
+              "temperature": {
+                "path": "temperature",
+                "range": { "min": 0.0, "max": 2.0 }
+              },
+              "top_p": {
+                "path": "top_p",
+                "range": { "min": 0.0, "max": 1.0 }
+              },
+              "max_tokens": {
+                "path": "max_tokens"
+              },
+              "response_format": {
+                "path": "response_format"
+              },
+              "reasoning_effort": {
+                "path": "reasoning.effort",
+                "enum": ["low", "medium", "high"]
+              }
+            },
+            "constraints": {
+              "system_prompt_location": "message_role",
+              "forbid_unknown_top_level_fields": false,
+              "mutually_exclusive": [],
+              "resolution_preferences": ["temperature", "top_p"],
+              "limits": {
+                "max_tool_schema_bytes": 150000,
+                "max_system_prompt_bytes": 100000
+              }
+            },
+            "mappings": {
+              "paths": {
+                "model_class": "model",
+                "messages": "messages",
+                "tools": "tools",
+                "tool_choice": "tool_choice",
+                "sampling.temperature": "temperature",
+                "sampling.top_p": "top_p",
+                "limits.max_output_tokens": "max_tokens",
+                "limits.reasoning_tokens": "reasoning.tokens"
+              },
+              "flags": {}
+            },
+            "response_normalization": {
+              "sync": {
+                "content_path": "choices[0].message.content",
+                "finish_reason_path": "choices[0].finish_reason",
+                "finish_reason_map": {
+                  "stop": "stop",
+                  "length": "length",
+                  "tool_calls": "tool_call",
+                  "content_filter": "other"
+                }
+              },
+              "stream": {
+                "protocol": "sse",
+                "event_selector": {
+                  "type_path": "object",
+                  "routes": [
+                    {
+                      "when": "chat.completion.chunk",
+                      "emit": "delta",
+                      "text_path": "choices[0].delta.content"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
             "id": "gpt-4-turbo",
             "aliases": ["gpt-4-turbo-preview"],
             "family": "gpt-4",
@@ -412,9 +516,9 @@
         },
         "models": [
           {
-            "id": "claude-3-opus-20240229",
-            "aliases": ["claude-3-opus"],
-            "family": "claude-3",
+            "id": "claude-opus-4-1-20250805",
+            "aliases": ["claude-opus-4-1", "opus-4.1", "claude-opus-4.1"],
+            "family": "opus-4.1",
             "endpoints": {
               "chat_completion": { 
                 "method": "POST", 
@@ -465,6 +569,11 @@
               },
               "system": {
                 "path": "system"
+              },
+              "thinking": {
+                "path": "thinking",
+                "type": "boolean",
+                "description": "Enable extended thinking mode for Opus 4.1"
               }
             },
             "constraints": {
