@@ -1,0 +1,318 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://specado.com/schemas/prompt-spec.schema.json",
+    "title": "PromptSpec",
+    "description": "Uniform prompt specification for LLM providers",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["model_class", "messages", "strict_mode"],
+    "properties": {
+      "model_class": {
+        "description": "Model capability class determining behavior",
+        "type": "string",
+        "enum": ["Chat", "ReasoningChat"]
+      },
+  
+      "messages": {
+        "description": "Conversation messages",
+        "type": "array",
+        "minItems": 1,
+        "items": { "$ref": "#/$defs/Message" }
+      },
+  
+      "tools": {
+        "description": "Available tools for the model to use",
+        "type": "array",
+        "items": { "$ref": "#/$defs/Tool" }
+      },
+  
+      "tool_choice": {
+        "description": "Tool selection strategy",
+        "oneOf": [
+          { "const": "auto" },
+          { "const": "required" },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": { 
+                "description": "Specific tool to use",
+                "type": "string", 
+                "minLength": 1 
+              }
+            }
+          }
+        ]
+      },
+  
+      "response_format": {
+        "description": "Expected response format",
+        "oneOf": [
+          { "const": "text" },
+          { "const": "json_object" },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["json_schema"],
+            "properties": {
+              "json_schema": {
+                "description": "JSON Schema for structured output",
+                "type": "object"
+              },
+              "strict": { 
+                "description": "Enforce strict schema validation",
+                "type": "boolean", 
+                "default": false 
+              }
+            }
+          }
+        ]
+      },
+  
+      "sampling": {
+        "description": "Sampling parameters for generation",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "temperature": { 
+            "type": "number", 
+            "minimum": 0, 
+            "maximum": 2,
+            "description": "Controls randomness (0=deterministic, 2=very random)" 
+          },
+          "top_p": { 
+            "type": "number", 
+            "minimum": 0, 
+            "maximum": 1,
+            "description": "Nucleus sampling threshold" 
+          },
+          "top_k": { 
+            "type": "integer", 
+            "minimum": 1,
+            "description": "Top-k sampling parameter" 
+          },
+          "frequency_penalty": { 
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "Penalize frequently used tokens" 
+          },
+          "presence_penalty": { 
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "Penalize tokens that have appeared" 
+          }
+        }
+      },
+  
+      "limits": {
+        "description": "Token and output limits",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "max_output_tokens": { 
+            "type": "integer", 
+            "minimum": 1,
+            "description": "Maximum tokens in response" 
+          },
+          "reasoning_tokens": { 
+            "type": "integer", 
+            "minimum": 1,
+            "description": "Tokens for reasoning (ReasoningChat models)" 
+          },
+          "max_prompt_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum tokens in prompt"
+          }
+        }
+      },
+  
+      "media": {
+        "description": "Media inputs and outputs",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "input_images": { 
+            "description": "Images to include in prompt",
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Base64 encoded image or URL"
+                },
+                {
+                  "type": "object",
+                  "description": "Image with metadata"
+                }
+              ]
+            }
+          },
+          "input_audio": { 
+            "description": "Audio input configuration",
+            "type": "object"
+          },
+          "output_audio": { 
+            "description": "Audio output configuration",
+            "type": "object"
+          }
+        }
+      },
+  
+      "strict_mode": {
+        "description": "Strictness policy for translation",
+        "type": "string",
+        "enum": ["Strict", "Warn", "Coerce"],
+        "default": "Warn"
+      }
+    },
+  
+    "$defs": {
+      "Message": {
+        "description": "A message in the conversation",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "content"],
+        "properties": {
+          "role": { 
+            "description": "Role of the message sender",
+            "type": "string", 
+            "enum": ["system", "user", "assistant"]
+          },
+          "content": { 
+            "description": "Message content",
+            "type": "string" 
+          },
+          "metadata": {
+            "description": "Optional metadata for the message",
+            "type": "object"
+          }
+        }
+      },
+  
+      "Tool": {
+        "description": "Tool definition for function calling",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "json_schema"],
+        "properties": {
+          "name": { 
+            "description": "Tool name (must be valid identifier)",
+            "type": "string", 
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "description": { 
+            "description": "Human-readable description of what the tool does",
+            "type": "string",
+            "maxLength": 1024
+          },
+          "json_schema": {
+            "description": "JSON Schema for the tool's parameters",
+            "type": "object"
+          }
+        }
+      }
+    },
+  
+    "examples": [
+      {
+        "model_class": "Chat",
+        "messages": [
+          { "role": "user", "content": "What is the capital of France?" }
+        ],
+        "strict_mode": "Warn"
+      },
+      {
+        "model_class": "Chat",
+        "messages": [
+          { "role": "system", "content": "You are a helpful assistant." },
+          { "role": "user", "content": "Explain quantum computing in simple terms." }
+        ],
+        "sampling": { "temperature": 0.7, "top_p": 0.9 },
+        "limits": { "max_output_tokens": 500 },
+        "strict_mode": "Strict"
+      },
+      {
+        "model_class": "Chat",
+        "messages": [
+          { "role": "user", "content": "What's the weather like?" }
+        ],
+        "tools": [
+          {
+            "name": "get_weather",
+            "description": "Get the current weather for a location",
+            "json_schema": {
+              "type": "object",
+              "properties": {
+                "location": { "type": "string" },
+                "unit": { "type": "string", "enum": ["celsius", "fahrenheit"] }
+              },
+              "required": ["location"]
+            }
+          }
+        ],
+        "tool_choice": "auto",
+        "strict_mode": "Warn"
+      },
+      {
+        "model_class": "Chat",
+        "messages": [
+          { "role": "user", "content": "Generate a JSON object with name and age" }
+        ],
+        "response_format": "json_object",
+        "strict_mode": "Coerce"
+      },
+      {
+        "model_class": "Chat",
+        "messages": [
+          { "role": "user", "content": "Parse this data" }
+        ],
+        "response_format": {
+          "json_schema": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "age": { "type": "integer" },
+              "email": { "type": "string", "format": "email" }
+            },
+            "required": ["name", "age"]
+          },
+          "strict": true
+        },
+        "strict_mode": "Strict"
+      },
+      {
+        "model_class": "ReasoningChat",
+        "messages": [
+          { "role": "user", "content": "Solve this complex math problem step by step..." }
+        ],
+        "limits": { 
+          "max_output_tokens": 2000, 
+          "reasoning_tokens": 8000 
+        },
+        "strict_mode": "Warn"
+      },
+      {
+        "model_class": "Chat",
+        "messages": [
+          { 
+            "role": "user", 
+            "content": "Describe this image",
+            "metadata": { "has_image": true }
+          }
+        ],
+        "media": {
+          "input_images": [
+            "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+          ]
+        },
+        "strict_mode": "Warn"
+      }
+    ]
+  }
+  
