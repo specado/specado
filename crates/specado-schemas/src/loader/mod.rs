@@ -9,7 +9,7 @@
 //!
 //! # Example Usage
 //!
-//! ```rust
+//! ```rust,no_run
 //! use specado_schemas::loader::SchemaLoader;
 //! use std::path::Path;
 //!

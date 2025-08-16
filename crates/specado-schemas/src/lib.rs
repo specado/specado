@@ -68,6 +68,8 @@
 
 pub mod validation;
 pub mod loader;
+pub mod versioning;
+pub mod documentation;
 
 // Re-export commonly used types for convenience
 pub use validation::{
@@ -82,6 +84,15 @@ pub use loader::{
     SchemaLoader, LoaderError, LoaderResult,
     SchemaCache, CacheEntry, Format, SchemaParser,
     ReferenceResolver, ResolverContext,
+};
+
+pub use versioning::{
+    SchemaVersion, VersionRange, CompatibilityChecker, CompatibilityMode,
+    MigrationHint, MigrationRegistry,
+};
+
+pub use documentation::{
+    DocGenerator, GeneratorConfig, create_doc_generator, generate_docs,
 };
 
 /// Create a schema loader with default configuration

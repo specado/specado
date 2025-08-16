@@ -123,6 +123,7 @@ impl ResolverContext {
 pub struct ReferenceResolver {
     parser: Arc<SchemaParser>,
     cache: HashMap<PathBuf, Value>,
+    sensitive_patterns: Vec<String>,
 }
 
 impl ReferenceResolver {
@@ -131,6 +132,7 @@ impl ReferenceResolver {
         Self {
             parser: Arc::new(SchemaParser::new()),
             cache: HashMap::new(),
+            sensitive_patterns: Self::default_sensitive_patterns(),
         }
     }
 
@@ -139,6 +141,40 @@ impl ReferenceResolver {
         Self {
             parser,
             cache: HashMap::new(),
+            sensitive_patterns: Self::default_sensitive_patterns(),
+        }
+    }
+    
+    /// Get default sensitive patterns for redaction
+    fn default_sensitive_patterns() -> Vec<String> {
+        vec![
+            "API_KEY".to_string(),
+            "SECRET".to_string(),
+            "PASSWORD".to_string(),
+            "TOKEN".to_string(),
+            "CREDENTIAL".to_string(),
+            "PRIVATE_KEY".to_string(),
+            "ACCESS_KEY".to_string(),
+        ]
+    }
+    
+    /// Check if a variable name contains sensitive patterns
+    pub fn is_sensitive(&self, var_name: &str) -> bool {
+        let var_upper = var_name.to_uppercase();
+        self.sensitive_patterns.iter().any(|pattern| var_upper.contains(pattern))
+    }
+    
+    /// Redact a sensitive value for logging
+    pub fn redact_value(&self, var_name: &str, value: &str) -> String {
+        if self.is_sensitive(var_name) {
+            // Show first 3 chars if long enough, otherwise fully redact
+            if value.len() > 8 {
+                format!("{}***", &value[..3])
+            } else {
+                "[REDACTED]".to_string()
+            }
+        } else {
+            value.to_string()
         }
     }
 
@@ -384,7 +420,17 @@ impl ReferenceResolver {
         let mut chars = s.chars().peekable();
 
         while let Some(ch) = chars.next() {
-            if ch == '$' && chars.peek() == Some(&'{') {
+            // Handle escaped sequences: \${ becomes literal ${
+            if ch == '\\' && chars.peek() == Some(&'$') {
+                chars.next(); // consume '$'
+                if chars.peek() == Some(&'{') {
+                    chars.next(); // consume '{'
+                    result.push_str("${");
+                } else {
+                    result.push('\\');
+                    result.push('$');
+                }
+            } else if ch == '$' && chars.peek() == Some(&'{') {
                 chars.next(); // consume '{'
                 
                 // Look for ENV: prefix
@@ -411,15 +457,27 @@ impl ReferenceResolver {
                     ));
                 }
 
-                // Parse ENV:VAR_NAME format
-                if let Some(var_name) = var_spec.strip_prefix("ENV:") {
+                // Parse ENV:VAR_NAME or ENV:VAR_NAME:default format
+                if let Some(var_spec_without_prefix) = var_spec.strip_prefix("ENV:") {
+                    // Check for default value after the variable name
+                    let (var_name, default_value) = if let Some(colon_pos) = var_spec_without_prefix.find(':') {
+                        let var_name = &var_spec_without_prefix[..colon_pos];
+                        let default = &var_spec_without_prefix[colon_pos + 1..];
+                        (var_name, Some(default))
+                    } else {
+                        (var_spec_without_prefix, None)
+                    };
+                    
                     if let Some(var_value) = context.get_env_var(var_name) {
                         result.push_str(&var_value);
+                    } else if let Some(default) = default_value {
+                        // Use default value if environment variable is not found
+                        result.push_str(default);
                     } else {
                         return Err(LoaderError::environment_error(
                             var_name.to_string(),
                             context.base_dir.clone(),
-                            "Environment variable not found".to_string(),
+                            "Environment variable not found and no default provided".to_string(),
                         ));
                     }
                 } else {
@@ -620,6 +678,75 @@ mod tests {
         assert_eq!(expanded_nested["config"]["database"]["password"], "test_value");
 
         Ok(())
+    }
+    
+    #[test]
+    fn test_env_var_with_defaults() -> LoaderResult<()> {
+        let dir = tempdir().unwrap();
+        let context = ResolverContext::for_testing(
+            dir.path().to_path_buf(),
+            [("EXISTING_VAR".to_string(), "exists".to_string())]
+                .iter()
+                .cloned()
+                .collect(),
+        );
+
+        let resolver = ReferenceResolver::new();
+
+        // Test default value when var doesn't exist
+        let value = json!({
+            "missing": "${ENV:MISSING_VAR:default_value}",
+            "existing": "${ENV:EXISTING_VAR:not_used}",
+            "complex_default": "${ENV:NOT_SET:http://localhost:8080}"
+        });
+
+        let expanded = resolver.expand_env_vars(value, &context)?;
+        assert_eq!(expanded["missing"], "default_value");
+        assert_eq!(expanded["existing"], "exists");
+        assert_eq!(expanded["complex_default"], "http://localhost:8080");
+
+        Ok(())
+    }
+    
+    #[test]
+    fn test_escaping() -> LoaderResult<()> {
+        let dir = tempdir().unwrap();
+        let context = ResolverContext::for_testing(
+            dir.path().to_path_buf(),
+            HashMap::new(),
+        );
+
+        let resolver = ReferenceResolver::new();
+
+        // Test escaped sequences
+        let value = json!({
+            "literal": "\\${ENV:NOT_EXPANDED}",
+            "mixed": "prefix \\${literal} and ${ENV:TEST:expanded}"
+        });
+
+        let expanded = resolver.expand_env_vars(value, &context)?;
+        assert_eq!(expanded["literal"], "${ENV:NOT_EXPANDED}");
+        assert_eq!(expanded["mixed"], "prefix ${literal} and expanded");
+
+        Ok(())
+    }
+    
+    #[test]
+    fn test_sensitive_value_redaction() {
+        let resolver = ReferenceResolver::new();
+        
+        // Test sensitive patterns
+        assert!(resolver.is_sensitive("API_KEY"));
+        assert!(resolver.is_sensitive("DATABASE_PASSWORD"));
+        assert!(resolver.is_sensitive("SECRET_TOKEN"));
+        assert!(resolver.is_sensitive("auth_token"));
+        assert!(!resolver.is_sensitive("USERNAME"));
+        assert!(!resolver.is_sensitive("DATABASE_HOST"));
+        
+        // Test redaction
+        assert_eq!(resolver.redact_value("API_KEY", "sk-1234567890abcdef"), "sk-***");
+        assert_eq!(resolver.redact_value("PASSWORD", "short"), "[REDACTED]");
+        assert_eq!(resolver.redact_value("USERNAME", "john_doe"), "john_doe");
     }
 
     #[test]

@@ -35,7 +35,8 @@ pub use provider_spec::ProviderSpecValidator;
 ///     "spec_version": "1.0",
 ///     "id": "test-123",
 ///     "model_class": "Chat",
-///     "messages": [{"role": "user", "content": "Hello"}]
+///     "messages": [{"role": "user", "content": "Hello"}],
+///     "strict_mode": false
 /// });
 ///
 /// assert!(validator.validate(&spec).is_ok());
@@ -55,15 +56,16 @@ pub fn create_prompt_spec_validator() -> Result<PromptSpecValidator, Box<dyn std
 /// let validator = create_provider_spec_validator().unwrap();
 /// let spec = json!({
 ///     "spec_version": "1.0",
-///     "provider_id": "test-provider",
-///     "base_url": "https://api.test.com",
-///     "authentication": {"type": "api_key"},
-///     "capabilities": {
-///         "supports_tools": false,
-///         "supports_rag": false,
-///         "supports_streaming": true,
-///         "model_families": ["chat"]
-///     }
+///     "provider": {
+///         "name": "test-provider",
+///         "base_url": "https://api.test.com",
+///         "headers": {},
+///         "auth": {
+///             "type": "api_key",
+///             "header_name": "X-API-Key"
+///         }
+///     },
+///     "models": []
 /// });
 ///
 /// assert!(validator.validate(&spec).is_ok());
