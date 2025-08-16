@@ -262,20 +262,17 @@ mod tests {
         let specs = vec![
             json!({
                 "spec_version": "1.0",
-                "provider_id": "test-1",
-                "base_url": "https://api.test.com",
-                "authentication": {"type": "api_key"},
-                "capabilities": {
-                    "supports_tools": false,
-                    "supports_rag": false,
-                    "supports_streaming": true,
-                    "model_families": ["chat"]
-                }
+                "provider": {
+                    "id": "test-1",
+                    "name": "Test Provider 1",
+                    "organization": "Test Org"
+                },
+                "models": []
             }),
             json!({
                 "spec_version": "1.0",
-                "provider_id": "test-2",
-                // Missing required fields
+                // Missing required provider field
+                "models": []
             }),
         ];
 
@@ -283,8 +280,9 @@ mod tests {
         let result = validate_provider_specs_batch(&specs, &config);
         assert!(result.is_err());
 
+        // For basic validation, only the second spec should fail (missing required field)
         let config = ValidationConfig::basic();
         let result = validate_provider_specs_batch(&specs, &config);
-        assert!(result.is_err()); // Still fails basic schema validation
+        assert!(result.is_err()); // Should fail because second spec is missing provider field
     }
 }

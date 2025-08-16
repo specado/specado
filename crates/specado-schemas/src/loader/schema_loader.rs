@@ -104,8 +104,16 @@ impl SchemaLoader {
             let mut context = ResolverContext::new(base_dir);
             context.max_depth = self.config.max_resolution_depth;
             context.allow_env_expansion = self.config.allow_env_expansion;
+            
+            // Add the current file to the resolution stack for same-file references
+            if let Ok(canonical_path) = path.canonicalize() {
+                context.push_path(canonical_path)?;
+            }
 
             schema = self.resolver.resolve(schema, &mut context)?;
+            
+            // Remove from stack after resolution
+            context.pop_path();
         }
 
         // Cache the result

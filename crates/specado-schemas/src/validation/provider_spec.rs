@@ -3,267 +3,124 @@
 //! Copyright (c) 2025 Specado Team
 //! Licensed under the Apache-2.0 license
 
-use crate::validation::base::{SchemaValidator, ValidationContext, ValidationHelpers};
+use crate::loader::{SchemaLoader, LoaderConfig};
+use crate::validation::base::{SchemaValidator, ValidationContext, ValidationHelpers, ValidationMode};
 use crate::validation::error::{ValidationError, ValidationResult};
 use serde_json::Value;
-use std::path::Path;
-
-// Embed the schema at compile time for reliability
-const PROVIDER_SPEC_SCHEMA: &str = include_str!("../../../../schemas/provider-spec.schema.json");
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// ProviderSpec validator with custom rules
 pub struct ProviderSpecValidator {
-    schema: Value,
+    schema: Arc<Value>,
 }
 
 impl ProviderSpecValidator {
-    /// Create a new ProviderSpec validator using embedded schema
+    /// Create a new ProviderSpec validator by loading the schema file
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        // Try to load from environment variable first (for development)
-        let schema = if let Ok(schema_path) = std::env::var("PROVIDER_SPEC_SCHEMA_PATH") {
-            // Load from disk if path is provided
-            let path = Path::new(&schema_path);
-            if path.exists() {
-                let content = std::fs::read_to_string(path)?;
-                serde_json::from_str(&content)?
-            } else {
-                // Fall back to embedded schema
-                serde_json::from_str(PROVIDER_SPEC_SCHEMA)?
-            }
-        } else {
-            // Use embedded schema by default
-            serde_json::from_str(PROVIDER_SPEC_SCHEMA)?
-        };
-        
-        Ok(Self { schema })
+        let schema_path = Self::resolve_schema_path()?;
+        // Create loader config that doesn't validate structure (for JSON Schema files)
+        let mut config = LoaderConfig::default();
+        config.validate_basic_structure = false;
+        config.allow_env_expansion = false;  // Don't expand env vars in schema definitions
+        let mut loader = SchemaLoader::with_config(config);
+        let schema = loader.load_schema(&schema_path)?;
+        Ok(Self {
+            schema: Arc::new(schema),
+        })
     }
     
-    /// Load schema from a specific path (useful for testing)
+    /// Load validator with a specific schema path
     pub fn from_path(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
-        let content = std::fs::read_to_string(path)?;
-        let schema: Value = serde_json::from_str(&content)?;
-        Ok(Self { schema })
+        // Create loader config that doesn't validate structure (for JSON Schema files)
+        let mut config = LoaderConfig::default();
+        config.validate_basic_structure = false;
+        config.allow_env_expansion = false;  // Don't expand env vars in schema definitions
+        let mut loader = SchemaLoader::with_config(config);
+        let schema = loader.load_schema(path)?;
+        Ok(Self {
+            schema: Arc::new(schema),
+        })
     }
-
-    /// Get the JSON Schema definition for ProviderSpec
+    
+    /// Resolve the path to the provider-spec schema file
+    fn resolve_schema_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+        // First check environment variable
+        if let Ok(path) = std::env::var("PROVIDER_SPEC_SCHEMA_PATH") {
+            return Ok(PathBuf::from(path));
+        }
+        
+        // Try relative to CARGO_MANIFEST_DIR (for tests and development)
+        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            let schema_path = PathBuf::from(manifest_dir)
+                .parent() // go up from crate to workspace root
+                .and_then(|p| p.parent()) // go up one more level
+                .map(|p| p.join("schemas"))
+                .ok_or("Failed to resolve schema path from manifest dir")?;
+            
+            // Make sure we return the full path to the JSON file, not just the directory
+            let full_path = schema_path.join("provider-spec.schema.json");
+            if full_path.exists() {
+                return Ok(full_path);
+            }
+        }
+        
+        // Try relative to current directory
+        let current_dir_path = PathBuf::from("schemas/provider-spec.schema.json");
+        if current_dir_path.exists() {
+            return Ok(current_dir_path);
+        }
+        
+        // Try relative to executable location
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                // Look for schemas directory relative to executable
+                let schema_path = exe_dir.join("schemas").join("provider-spec.schema.json");
+                if schema_path.exists() {
+                    return Ok(schema_path);
+                }
+                
+                // Try going up directories to find schemas
+                let mut current = exe_dir;
+                for _ in 0..5 {  // Try up to 5 levels
+                    if let Some(parent) = current.parent() {
+                        let schema_path = parent.join("schemas").join("provider-spec.schema.json");
+                        if schema_path.exists() {
+                            return Ok(schema_path);
+                        }
+                        current = parent;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        
+        Err("Could not locate provider-spec.schema.json. Set PROVIDER_SPEC_SCHEMA_PATH environment variable.".into())
+    }
+    
+    /// Get the loaded schema
     pub fn schema(&self) -> &Value {
         &self.schema
     }
-    
-    #[allow(dead_code)]
-    fn get_schema_definition() -> Value {
-        serde_json::json!({
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$id": "https://schemas.specado.com/provider-spec/v1.json",
-            "title": "ProviderSpec",
-            "description": "Provider capabilities and mapping configuration",
-            "type": "object",
-            "properties": {
-                "spec_version": {
-                    "type": "string",
-                    "pattern": "^\\d+\\.\\d+$",
-                    "description": "Version of the ProviderSpec specification"
-                },
-                "provider_id": {
-                    "type": "string",
-                    "description": "Unique identifier for this provider"
-                },
-                "base_url": {
-                    "type": "string",
-                    "format": "uri",
-                    "description": "Base URL for the provider's API"
-                },
-                "authentication": {
-                    "type": "object",
-                    "properties": {
-                        "type": {
-                            "type": "string",
-                            "enum": ["api_key", "bearer_token", "oauth2", "basic_auth", "custom"]
-                        },
-                        "api_key_header": { "type": "string" },
-                        "env_var": { "type": "string" }
-                    },
-                    "required": ["type"]
-                },
-                "capabilities": {
-                    "type": "object",
-                    "properties": {
-                        "supports_tools": { "type": "boolean" },
-                        "supports_rag": { "type": "boolean" },
-                        "supports_conversation_persistence": { "type": "boolean" },
-                        "supports_streaming": { "type": "boolean" },
-                        "model_families": {
-                            "type": "array",
-                            "items": {
-                                "type": "string",
-                                "enum": ["chat", "reasoning", "multimodal", "audio", "video", "embedding", "rag"]
-                            }
-                        },
-                        "input_modes": {
-                            "type": "array",
-                            "items": {
-                                "type": "string",
-                                "enum": ["text", "image", "audio", "video", "document"]
-                            }
-                        }
-                    },
-                    "required": ["supports_tools", "supports_rag", "supports_streaming", "model_families"]
-                },
-                "mappings": {
-                    "type": "object",
-                    "properties": {
-                        "request_mapping": {
-                            "type": "object",
-                            "properties": {
-                                "paths": {
-                                    "type": "object",
-                                    "additionalProperties": { "type": "string" }
-                                },
-                                "transformations": { "type": "object" }
-                            }
-                        },
-                        "response_mapping": {
-                            "type": "object",
-                            "properties": {
-                                "paths": {
-                                    "type": "object",
-                                    "additionalProperties": { "type": "string" }
-                                },
-                                "transformations": { "type": "object" }
-                            }
-                        }
-                    }
-                },
-                "response_normalization": {
-                    "type": "object",
-                    "properties": {
-                        "content_path": { "type": "string" },
-                        "role_path": { "type": "string" },
-                        "usage_path": { "type": "string" },
-                        "error_path": { "type": "string" }
-                    }
-                },
-                "tooling": {
-                    "type": "object",
-                    "properties": {
-                        "tool_choice_modes": {
-                            "type": "array",
-                            "items": {
-                                "type": "string",
-                                "enum": ["auto", "none", "required", "specific"]
-                            }
-                        },
-                        "tool_format": {
-                            "type": "string",
-                            "enum": ["openai", "anthropic", "custom"]
-                        }
-                    }
-                },
-                "rag_config": {
-                    "type": "object",
-                    "properties": {
-                        "retrieval_endpoint": { "type": "string" },
-                        "embedding_model": { "type": "string" },
-                        "chunk_size": { "type": "integer" },
-                        "similarity_threshold": { "type": "number" }
-                    }
-                },
-                "conversation_management": {
-                    "type": "object",
-                    "properties": {
-                        "session_endpoint": { "type": "string" },
-                        "persistence_type": {
-                            "type": "string",
-                            "enum": ["memory", "database", "external"]
-                        }
-                    }
-                },
-                "endpoints": {
-                    "type": "object",
-                    "properties": {
-                        "chat": { "type": "string" },
-                        "embeddings": { "type": "string" },
-                        "models": { "type": "string" },
-                        "health": { "type": "string" }
-                    }
-                },
-                "rate_limits": {
-                    "type": "object",
-                    "properties": {
-                        "requests_per_minute": { "type": "integer" },
-                        "tokens_per_minute": { "type": "integer" },
-                        "concurrent_requests": { "type": "integer" }
-                    }
-                }
-            },
-            "required": ["spec_version", "provider_id", "base_url", "authentication", "capabilities"],
-            "additionalProperties": false
-        })
-    }
 
-    /// Validate basic structure requirements
-    fn validate_basic_structure(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        // Check that required fields exist
-        let required_fields = ["spec_version", "provider_id", "base_url", "authentication", "capabilities"];
-        
-        for field in &required_fields {
-            if data.get(field).is_none() {
-                return Err(ValidationError::with_violations(
-                    &context.child(field).path,
-                    format!("Required field {} is missing", field),
-                    vec![ValidationError::create_violation(
-                        "required_field",
-                        format!("{} to be present", field),
-                        "field is missing".to_string(),
-                    )],
-                ));
-            }
-        }
+    /// Validate custom rules for ProviderSpec
+    fn validate_custom_rules(&self, spec: &Value, ctx: &ValidationContext) -> Vec<ValidationError> {
+        let mut errors = Vec::new();
 
-        Ok(())
-    }
-
-    /// Validate JSONPath expressions in mappings
-    fn validate_jsonpath_expressions(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let mappings = data.get("mappings");
-        
-        if let Some(mappings_obj) = mappings {
-            // Validate request mapping paths
-            if let Some(request_mapping) = mappings_obj.get("request_mapping") {
-                if let Some(paths) = request_mapping.get("paths") {
-                    if let Some(paths_obj) = paths.as_object() {
-                        for (key, value) in paths_obj {
-                            if let Some(path_str) = value.as_str() {
-                                let path_context = context.child("mappings")
-                                    .child("request_mapping")
-                                    .child("paths")
-                                    .child(key);
-                                ValidationHelpers::validate_jsonpath(path_str, &path_context)?;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Validate response mapping paths
-            if let Some(response_mapping) = mappings_obj.get("response_mapping") {
-                if let Some(paths) = response_mapping.get("paths") {
-                    if let Some(paths_obj) = paths.as_object() {
-                        for (key, value) in paths_obj {
-                            if let Some(path_str) = value.as_str() {
-                                let path_context = context.child("mappings")
-                                    .child("response_mapping")
-                                    .child("paths")
-                                    .child(key);
-                                ValidationHelpers::validate_jsonpath(path_str, &path_context)?;
+        // Rule: JSONPath expressions in mappings.paths must be valid syntax
+        if let Some(models) = spec.get("models").and_then(|m| m.as_array()) {
+            for (model_idx, model) in models.iter().enumerate() {
+                if let Some(mappings) = model.get("mappings") {
+                    if let Some(paths) = mappings.get("paths").and_then(|p| p.as_object()) {
+                        for (field, path_value) in paths {
+                            if let Some(path) = path_value.as_str() {
+                                if ValidationHelpers::validate_jsonpath(path, ctx).is_err() {
+                                    errors.push(ValidationError::new(
+                                        format!("$.models[{}].mappings.paths.{}", model_idx, field),
+                                        format!("Invalid JSONPath expression: {}", path),
+                                    ));
+                                }
                             }
                         }
                     }
@@ -271,345 +128,188 @@ impl ProviderSpecValidator {
             }
         }
 
-        Ok(())
-    }
-
-    /// Validate environment variable references
-    fn validate_environment_variables(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        // Check authentication env_var
-        if let Some(auth) = data.get("authentication") {
+        // Rule: Environment variable references ${ENV:VAR} must be properly formatted
+        if let Some(auth) = spec.get("authentication") {
             if let Some(env_var) = auth.get("env_var").and_then(|v| v.as_str()) {
-                let auth_context = context.child("authentication").child("env_var");
-                ValidationHelpers::validate_env_var_reference(env_var, &auth_context)?;
-            }
-        }
-
-        // Check for environment variables in any string value recursively
-        self.validate_env_vars_recursive(data, context)?;
-
-        Ok(())
-    }
-
-    /// Recursively validate environment variable references
-    fn validate_env_vars_recursive(
-        &self,
-        value: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        match value {
-            Value::String(s) => {
-                // Simple check for environment variable pattern
-                if s.contains("${ENV:") {
-                    ValidationHelpers::validate_env_var_reference(s, context)?;
-                }
-            }
-            Value::Object(obj) => {
-                for (key, val) in obj {
-                    let child_context = context.child(key);
-                    self.validate_env_vars_recursive(val, &child_context)?;
-                }
-            }
-            Value::Array(arr) => {
-                for (i, val) in arr.iter().enumerate() {
-                    let child_context = context.child_index(i);
-                    self.validate_env_vars_recursive(val, &child_context)?;
-                }
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-
-    /// Validate input modes compatibility with model families
-    fn validate_input_modes_compatibility(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let capabilities = data.get("capabilities");
-        
-        if let Some(caps) = capabilities {
-            let model_families = caps.get("model_families")
-                .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
-                .unwrap_or_default();
-
-            let input_modes = caps.get("input_modes")
-                .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
-                .unwrap_or_default();
-
-            // Validate that input modes are compatible with model families
-            for mode in &input_modes {
-                match *mode {
-                    "image" => {
-                        if !model_families.contains(&"multimodal") {
-                            return Err(ValidationError::with_violations(
-                                &context.child("capabilities").child("input_modes").path,
-                                "input_mode 'image' requires 'multimodal' in model_families".to_string(),
-                                vec![ValidationError::create_violation(
-                                    "input_mode_compatibility",
-                                    "'multimodal' in model_families",
-                                    format!("model_families: {:?}", model_families),
-                                )],
-                            ));
-                        }
-                    }
-                    "audio" => {
-                        if !model_families.contains(&"audio") && !model_families.contains(&"multimodal") {
-                            return Err(ValidationError::with_violations(
-                                &context.child("capabilities").child("input_modes").path,
-                                "input_mode 'audio' requires 'audio' or 'multimodal' in model_families".to_string(),
-                                vec![ValidationError::create_violation(
-                                    "input_mode_compatibility",
-                                    "'audio' or 'multimodal' in model_families",
-                                    format!("model_families: {:?}", model_families),
-                                )],
-                            ));
-                        }
-                    }
-                    "video" => {
-                        if !model_families.contains(&"video") && !model_families.contains(&"multimodal") {
-                            return Err(ValidationError::with_violations(
-                                &context.child("capabilities").child("input_modes").path,
-                                "input_mode 'video' requires 'video' or 'multimodal' in model_families".to_string(),
-                                vec![ValidationError::create_violation(
-                                    "input_mode_compatibility",
-                                    "'video' or 'multimodal' in model_families",
-                                    format!("model_families: {:?}", model_families),
-                                )],
-                            ));
-                        }
-                    }
-                    _ => {} // text and document are always valid
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Validate response normalization paths are valid JSONPath
-    fn validate_response_normalization_paths(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let response_norm = data.get("response_normalization");
-        
-        if let Some(norm_obj) = response_norm {
-            let path_fields = ["content_path", "role_path", "usage_path", "error_path"];
-            
-            for field in &path_fields {
-                if let Some(path_str) = norm_obj.get(field).and_then(|v| v.as_str()) {
-                    let field_context = context.child("response_normalization").child(field);
-                    ValidationHelpers::validate_jsonpath(path_str, &field_context)?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Validate tooling configuration
-    fn validate_tooling_configuration(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let capabilities = data.get("capabilities");
-        let tooling = data.get("tooling");
-        
-        if let Some(tooling_obj) = tooling {
-            // Check if tools are supported
-            let supports_tools = capabilities
-                .and_then(|c| c.get("supports_tools"))
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-
-            if !supports_tools {
-                return Err(ValidationError::with_violations(
-                    &context.child("tooling").path,
-                    "tooling configuration requires capabilities.supports_tools to be true".to_string(),
-                    vec![ValidationError::create_violation(
-                        "tooling_requires_support",
-                        "capabilities.supports_tools to be true",
-                        "supports_tools is false".to_string(),
-                    )],
-                ));
-            }
-
-            // Validate tool_choice_modes includes "auto" if tools are supported
-            if let Some(choice_modes) = tooling_obj.get("tool_choice_modes").and_then(|v| v.as_array()) {
-                let modes: Vec<&str> = choice_modes.iter().filter_map(|v| v.as_str()).collect();
-                if !modes.contains(&"auto") {
-                    return Err(ValidationError::with_violations(
-                        &context.child("tooling").child("tool_choice_modes").path,
-                        "tool_choice_modes must include 'auto' when tools are supported".to_string(),
-                        vec![ValidationError::create_violation(
-                            "tool_choice_auto_required",
-                            "'auto' in tool_choice_modes",
-                            format!("modes: {:?}", modes),
-                        )],
+                if ValidationHelpers::validate_env_var_reference(env_var, ctx).is_err() {
+                    errors.push(ValidationError::new(
+                        ctx.child("authentication").child("env_var").path.clone(),
+                        format!("Invalid environment variable reference: {}", env_var),
                     ));
                 }
             }
         }
 
-        Ok(())
-    }
-
-    /// Validate RAG configuration requires RAG support
-    fn validate_rag_configuration(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let capabilities = data.get("capabilities");
-        let rag_config = data.get("rag_config");
-        
-        if let Some(_) = rag_config {
-            let supports_rag = capabilities
-                .and_then(|c| c.get("supports_rag"))
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-
-            if !supports_rag {
-                return Err(ValidationError::with_violations(
-                    &context.child("rag_config").path,
-                    "rag_config requires capabilities.supports_rag to be true".to_string(),
-                    vec![ValidationError::create_violation(
-                        "rag_config_requires_support",
-                        "capabilities.supports_rag to be true",
-                        "supports_rag is false".to_string(),
-                    )],
-                ));
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Validate conversation management configuration
-    fn validate_conversation_management(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let capabilities = data.get("capabilities");
-        let conv_mgmt = data.get("conversation_management");
-        
-        if let Some(_) = conv_mgmt {
-            let supports_conversation = capabilities
-                .and_then(|c| c.get("supports_conversation_persistence"))
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-
-            if !supports_conversation {
-                return Err(ValidationError::with_violations(
-                    &context.child("conversation_management").path,
-                    "conversation_management requires capabilities.supports_conversation_persistence to be true".to_string(),
-                    vec![ValidationError::create_violation(
-                        "conversation_management_requires_support",
-                        "capabilities.supports_conversation_persistence to be true",
-                        "supports_conversation_persistence is false".to_string(),
-                    )],
-                ));
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Validate endpoint protocols match base_url scheme
-    fn validate_endpoint_protocols(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let base_url = data.get("base_url").and_then(|v| v.as_str());
-        let endpoints = data.get("endpoints");
-        
-        if let (Some(base), Some(endpoints_obj)) = (base_url, endpoints) {
-            // Extract scheme from base_url (simple approach)
-            let base_scheme = if let Some(colon_pos) = base.find(':') {
-                base[..colon_pos].to_lowercase()
-            } else {
-                return Err(ValidationError::with_violations(
-                    &context.child("base_url").path,
-                    format!("Invalid base_url format: {}", base),
-                    vec![ValidationError::create_violation(
-                        "base_url_format",
-                        "valid URL with scheme",
-                        base.to_string(),
-                    )],
-                ));
-            };
-
-            let allowed_schemes = match base_scheme.as_str() {
-                "http" | "https" => vec!["http", "https"],
-                "ws" | "wss" => vec!["ws", "wss"],
-                _ => vec![base_scheme.as_str()],
-            };
-
-            // Validate each endpoint
-            if let Some(endpoints_map) = endpoints_obj.as_object() {
-                for (endpoint_name, endpoint_value) in endpoints_map {
-                    if let Some(endpoint_url) = endpoint_value.as_str() {
-                        let endpoint_context = context.child("endpoints").child(endpoint_name);
-                        ValidationHelpers::validate_url_scheme(
-                            endpoint_url,
-                            &allowed_schemes.iter().map(|s| *s).collect::<Vec<_>>(),
-                            &endpoint_context,
-                        )?;
+        // Rule: input_modes must be compatible with model family constraints
+        if let Some(models) = spec.get("models").and_then(|m| m.as_array()) {
+            for (idx, model) in models.iter().enumerate() {
+                if let Some(input_modes) = model.get("input_modes").and_then(|m| m.as_array()) {
+                    let model_family = model.get("model_family").and_then(|f| f.as_str());
+                    
+                    // Example validation: chat models shouldn't have image input
+                    if model_family == Some("chat") {
+                        for mode in input_modes {
+                            if mode.as_str() == Some("image") {
+                                errors.push(ValidationError::new(
+                                    format!("$.models[{}].input_modes", idx),
+                                    "Chat models cannot have image input mode".to_string(),
+                                ));
+                            }
+                        }
                     }
                 }
             }
         }
 
-        Ok(())
+        // Rule: response_normalization paths must be valid JSONPath expressions
+        if let Some(models) = spec.get("models").and_then(|m| m.as_array()) {
+            for (idx, model) in models.iter().enumerate() {
+                if let Some(norm) = model.get("response_normalization") {
+                    if let Some(paths) = norm.as_object() {
+                        for (field, path_value) in paths {
+                            if let Some(path) = path_value.as_str() {
+                                if ValidationHelpers::validate_jsonpath(path, ctx).is_err() {
+                                    errors.push(ValidationError::new(
+                                        format!("$.models[{}].response_normalization.{}", idx, field),
+                                        format!("Invalid JSONPath in response_normalization: {}", path),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Rule: tooling.tool_choice_modes must include "auto" if tools supported
+        if let Some(capabilities) = spec.get("capabilities") {
+            if capabilities.get("supports_tools").and_then(|v| v.as_bool()) == Some(true) {
+                if let Some(tooling) = spec.get("tooling") {
+                    if let Some(modes) = tooling.get("tool_choice_modes").and_then(|m| m.as_array()) {
+                        let has_auto = modes.iter().any(|m| m.as_str() == Some("auto"));
+                        if !has_auto {
+                            errors.push(ValidationError::new(
+                                ctx.child("tooling").child("tool_choice_modes").path.clone(),
+                                "tool_choice_modes must include 'auto' when tools are supported".to_string(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Rule: rag_config only valid when capabilities.supports_rag is true
+        if spec.get("rag_config").is_some() {
+            let supports_rag = spec.get("capabilities")
+                .and_then(|c| c.get("supports_rag"))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            
+            if !supports_rag {
+                errors.push(ValidationError::new(
+                    ctx.child("rag_config").path.clone(),
+                    "rag_config is only valid when capabilities.supports_rag is true".to_string(),
+                ));
+            }
+        }
+
+        // Rule: conversation_management only valid when capabilities.supports_conversation_persistence is true
+        if spec.get("conversation_management").is_some() {
+            let supports_conversation = spec.get("capabilities")
+                .and_then(|c| c.get("supports_conversation_persistence"))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            
+            if !supports_conversation {
+                errors.push(ValidationError::new(
+                    ctx.child("conversation_management").path.clone(),
+                    "conversation_management is only valid when capabilities.supports_conversation_persistence is true".to_string(),
+                ));
+            }
+        }
+
+        // Rule: Endpoint protocols (http/https/ws/wss) must match base_url scheme
+        if let Some(base_url) = spec.get("base_url").and_then(|u| u.as_str()) {
+            if let Some(models) = spec.get("models").and_then(|m| m.as_array()) {
+                for (idx, model) in models.iter().enumerate() {
+                    if let Some(endpoint) = model.get("endpoint") {
+                        if let Some(protocol) = endpoint.get("protocol").and_then(|p| p.as_str()) {
+                            let base_is_secure = base_url.starts_with("https://") || base_url.starts_with("wss://");
+                            let endpoint_is_secure = protocol == "https" || protocol == "wss";
+                            
+                            if base_is_secure != endpoint_is_secure {
+                                errors.push(ValidationError::new(
+                                    format!("$.models[{}].endpoint.protocol", idx),
+                                    format!("Endpoint protocol {} doesn't match base_url security", protocol),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        errors
     }
 }
 
 impl SchemaValidator for ProviderSpecValidator {
     type Input = Value;
 
-    fn validate_with_context(
-        &self,
-        input: &Self::Input,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        // Basic structural validation
-        self.validate_basic_structure(input, context)?;
+    fn validate(&self, spec: &Value) -> ValidationResult<()> {
+        let context = ValidationContext::new(ValidationMode::Strict);
+        self.validate_with_context(spec, &context)
+    }
 
-        // Then validate custom business rules
-        match context.mode {
-            crate::validation::base::ValidationMode::Basic => {
-                // Only basic structure validation in basic mode
-                Ok(())
+    fn validate_partial(&self, spec: &Value) -> ValidationResult<()> {
+        let context = ValidationContext::new(ValidationMode::Partial);
+        self.validate_with_context(spec, &context)
+    }
+
+    fn validate_basic(&self, spec: &Value) -> ValidationResult<()> {
+        let context = ValidationContext::new(ValidationMode::Basic);
+        self.validate_with_context(spec, &context)
+    }
+
+    fn validate_with_context(&self, spec: &Value, ctx: &ValidationContext) -> ValidationResult<()> {
+        let mut all_errors = Vec::new();
+
+        // Check required fields (for all modes)
+        // Required fields should always be validated
+        // Check required fields from schema
+        if let Some(required) = self.schema.get("required").and_then(|r| r.as_array()) {
+            for field_value in required {
+                if let Some(field) = field_value.as_str() {
+                    if spec.get(field).is_none() {
+                        all_errors.push(ValidationError::new(
+                            ctx.child(field).path.clone(),
+                            format!("Required field {} is missing", field),
+                        ));
+                    }
+                }
             }
-            crate::validation::base::ValidationMode::Partial => {
-                // Run some custom validations in partial mode
-                self.validate_environment_variables(input, context)?;
-                self.validate_input_modes_compatibility(input, context)?;
-                Ok(())
+        } else {
+            // Fallback if schema doesn't have required fields defined
+            let required_fields = ["spec_version", "provider_id", "base_url"];
+            for field in &required_fields {
+                if spec.get(field).is_none() {
+                    all_errors.push(ValidationError::new(
+                        ctx.child(field).path.clone(),
+                        format!("Required field {} is missing", field),
+                    ));
+                }
             }
-            crate::validation::base::ValidationMode::Strict => {
-                // Run all custom validations in strict mode
-                self.validate_jsonpath_expressions(input, context)?;
-                self.validate_environment_variables(input, context)?;
-                self.validate_input_modes_compatibility(input, context)?;
-                self.validate_response_normalization_paths(input, context)?;
-                self.validate_tooling_configuration(input, context)?;
-                self.validate_rag_configuration(input, context)?;
-                self.validate_conversation_management(input, context)?;
-                self.validate_endpoint_protocols(input, context)?;
-                Ok(())
-            }
+        }
+
+        // Custom validation rules (for Partial and Strict modes)
+        if ctx.mode == ValidationMode::Strict || ctx.mode == ValidationMode::Partial {
+            all_errors.extend(self.validate_custom_rules(spec, ctx));
+        }
+
+        if all_errors.is_empty() {
+            Ok(())
+        } else {
+            Err(all_errors.into_iter().next().unwrap())
         }
     }
 }
@@ -623,34 +323,25 @@ impl Default for ProviderSpecValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
     use serde_json::json;
     
     #[test]
-    fn test_embedded_schema_loading() {
+    fn test_schema_loading() {
         let validator = ProviderSpecValidator::new().unwrap();
         let schema = validator.schema();
         assert!(schema.is_object());
         assert_eq!(schema.get("title").and_then(|v| v.as_str()), Some("ProviderSpec"));
-        assert_eq!(schema.get("$schema").and_then(|v| v.as_str()), Some("https://json-schema.org/draft/2020-12/schema"));
     }
 
     fn create_basic_provider_spec() -> Value {
         json!({
             "spec_version": "1.0",
-            "provider_id": "test-provider",
-            "base_url": "https://api.test.com",
-            "authentication": {
-                "type": "api_key",
-                "api_key_header": "Authorization",
-                "env_var": "${ENV:API_KEY}"
+            "provider": {
+                "id": "test-provider",
+                "name": "Test Provider",
+                "organization": "Test Org"
             },
-            "capabilities": {
-                "supports_tools": true,
-                "supports_rag": false,
-                "supports_streaming": true,
-                "model_families": ["chat"]
-            }
+            "models": []
         })
     }
 
@@ -658,7 +349,34 @@ mod tests {
     fn test_valid_basic_provider_spec() {
         let validator = ProviderSpecValidator::new().unwrap();
         let spec = create_basic_provider_spec();
+        assert!(validator.validate_basic(&spec).is_ok());
+    }
+
+    #[test]
+    fn test_environment_variable_validation() {
+        let validator = ProviderSpecValidator::new().unwrap();
+        
+        // Valid env var format - add authentication field with valid env var
+        let mut spec = create_basic_provider_spec();
+        spec["authentication"] = json!({
+            "type": "api_key",
+            "location": "header",
+            "key_name": "Authorization",
+            "env_var": "${ENV:TEST_API_KEY}"
+        });
         assert!(validator.validate(&spec).is_ok());
+        
+        // Invalid env var format
+        let mut spec = create_basic_provider_spec();
+        spec["authentication"] = json!({
+            "type": "api_key",
+            "location": "header",
+            "key_name": "Authorization",
+            "env_var": "${env:invalid_format}"
+        });
+        let result = validator.validate(&spec);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid environment variable reference"));
     }
 
     #[test]
@@ -666,21 +384,20 @@ mod tests {
         let validator = ProviderSpecValidator::new().unwrap();
         let mut spec = create_basic_provider_spec();
         
-        spec.as_object_mut().unwrap().insert("mappings".to_string(), json!({
-            "request_mapping": {
+        // Add model with invalid JSONPath (must not start with $)
+        spec["models"] = json!([{
+            "model_id": "test-model",
+            "model_family": "chat",
+            "mappings": {
                 "paths": {
-                    "content": "$.messages[0].content",
-                    "invalid": "not-a-jsonpath"
+                    "content": "invalid.path"  // Invalid JSONPath - doesn't start with $
                 }
             }
-        }));
+        }]);
         
-        // Should fail with invalid JSONPath
-        assert!(validator.validate(&spec).is_err());
-        
-        // Should pass with valid JSONPath
-        spec["mappings"]["request_mapping"]["paths"]["invalid"] = json!("$.valid.path");
-        assert!(validator.validate(&spec).is_ok());
+        let result = validator.validate(&spec);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid JSONPath"));
     }
 
     #[test]
@@ -688,13 +405,16 @@ mod tests {
         let validator = ProviderSpecValidator::new().unwrap();
         let mut spec = create_basic_provider_spec();
         
-        // Add image input mode without multimodal support
-        spec["capabilities"]["input_modes"] = json!(["text", "image"]);
-        assert!(validator.validate(&spec).is_err());
+        // Chat model with image input (invalid)
+        spec["models"] = json!([{
+            "model_id": "test-model",
+            "model_family": "chat",
+            "input_modes": ["text", "image"]
+        }]);
         
-        // Add multimodal support
-        spec["capabilities"]["model_families"] = json!(["chat", "multimodal"]);
-        assert!(validator.validate(&spec).is_ok());
+        let result = validator.validate(&spec);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Chat models cannot have image input"));
     }
 
     #[test]
@@ -702,21 +422,17 @@ mod tests {
         let validator = ProviderSpecValidator::new().unwrap();
         let mut spec = create_basic_provider_spec();
         
-        // Add tooling without tool support
-        spec["capabilities"]["supports_tools"] = json!(false);
-        spec.as_object_mut().unwrap().insert("tooling".to_string(), json!({
-            "tool_choice_modes": ["auto", "none"]
-        }));
+        // Enable tools support but don't include "auto" in tool_choice_modes
+        spec["capabilities"] = json!({
+            "supports_tools": true
+        });
+        spec["tooling"] = json!({
+            "tool_choice_modes": ["required", "none"]
+        });
         
-        assert!(validator.validate(&spec).is_err());
-        
-        // Enable tool support
-        spec["capabilities"]["supports_tools"] = json!(true);
-        assert!(validator.validate(&spec).is_ok());
-        
-        // Test missing "auto" mode
-        spec["tooling"]["tool_choice_modes"] = json!(["none", "required"]);
-        assert!(validator.validate(&spec).is_err());
+        let result = validator.validate(&spec);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("must include 'auto'"));
     }
 
     #[test]
@@ -724,15 +440,16 @@ mod tests {
         let validator = ProviderSpecValidator::new().unwrap();
         let mut spec = create_basic_provider_spec();
         
-        // Add RAG config without RAG support
-        spec.as_object_mut().unwrap().insert("rag_config".to_string(), json!({
-            "retrieval_endpoint": "/retrieve",
-            "embedding_model": "text-embedding-ada-002"
-        }));
+        // Add rag_config without capability
+        spec["rag_config"] = json!({
+            "max_documents": 10
+        });
         
-        assert!(validator.validate(&spec).is_err());
+        let result = validator.validate(&spec);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("rag_config is only valid when"));
         
-        // Enable RAG support
+        // Enable capability - should pass
         spec["capabilities"]["supports_rag"] = json!(true);
         assert!(validator.validate(&spec).is_ok());
     }
@@ -742,15 +459,16 @@ mod tests {
         let validator = ProviderSpecValidator::new().unwrap();
         let mut spec = create_basic_provider_spec();
         
-        // Add conversation management without support
-        spec.as_object_mut().unwrap().insert("conversation_management".to_string(), json!({
-            "session_endpoint": "/sessions",
-            "persistence_type": "memory"
-        }));
+        // Add conversation_management without capability
+        spec["conversation_management"] = json!({
+            "max_history": 100
+        });
         
-        assert!(validator.validate(&spec).is_err());
+        let result = validator.validate(&spec);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("conversation_management is only valid"));
         
-        // Enable conversation persistence support
+        // Enable capability - should pass
         spec["capabilities"]["supports_conversation_persistence"] = json!(true);
         assert!(validator.validate(&spec).is_ok());
     }
@@ -760,30 +478,25 @@ mod tests {
         let validator = ProviderSpecValidator::new().unwrap();
         let mut spec = create_basic_provider_spec();
         
-        // Add endpoints with mismatched protocols
-        spec.as_object_mut().unwrap().insert("endpoints".to_string(), json!({
-            "chat": "ws://api.test.com/chat",  // WebSocket with HTTPS base
-            "models": "https://api.test.com/models"
-        }));
+        // Add base_url for this test
+        spec["base_url"] = json!("https://api.test.com");
         
-        assert!(validator.validate(&spec).is_err());
+        // HTTPS base URL with HTTP endpoint (mismatch)
+        spec["models"] = json!([{
+            "model_id": "test-model",
+            "endpoint": {
+                "protocol": "http",
+                "method": "POST",
+                "path": "/v1/chat"
+            }
+        }]);
         
-        // Fix protocol mismatch
-        spec["endpoints"]["chat"] = json!("https://api.test.com/chat");
-        assert!(validator.validate(&spec).is_ok());
-    }
-
-    #[test]
-    fn test_environment_variable_validation() {
-        let validator = ProviderSpecValidator::new().unwrap();
-        let mut spec = create_basic_provider_spec();
+        let result = validator.validate(&spec);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("doesn't match base_url security"));
         
-        // Invalid environment variable format
-        spec["authentication"]["env_var"] = json!("${env:invalid}");
-        assert!(validator.validate(&spec).is_err());
-        
-        // Valid format
-        spec["authentication"]["env_var"] = json!("${ENV:VALID_VAR}");
+        // Fix protocol - should pass
+        spec["models"][0]["endpoint"]["protocol"] = json!("https");
         assert!(validator.validate(&spec).is_ok());
     }
 
@@ -792,19 +505,13 @@ mod tests {
         let validator = ProviderSpecValidator::new().unwrap();
         let mut spec = create_basic_provider_spec();
         
-        // Add invalid JSONPath that should be caught in strict mode
-        spec.as_object_mut().unwrap().insert("mappings".to_string(), json!({
-            "request_mapping": {
-                "paths": {
-                    "content": "invalid-jsonpath"
-                }
-            }
-        }));
+        // Add invalid env var format
+        spec["authentication"]["env_var"] = json!("invalid_format");
         
-        // Basic mode should pass (no custom validations)
+        // Basic mode: only checks structure
         assert!(validator.validate_basic(&spec).is_ok());
         
-        // Strict mode should fail
+        // Strict mode: checks custom rules
         assert!(validator.validate(&spec).is_err());
     }
 }

@@ -32,4 +32,4 @@ pub use cache::{CacheEntry, SchemaCache};
 pub use error::{LoaderError, LoaderResult};
 pub use parser::{Format, SchemaParser};
 pub use resolver::{ReferenceResolver, ResolverContext};
-pub use schema_loader::SchemaLoader;
+pub use schema_loader::{SchemaLoader, LoaderConfig};

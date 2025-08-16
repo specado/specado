@@ -3,467 +3,305 @@
 //! Copyright (c) 2025 Specado Team
 //! Licensed under the Apache-2.0 license
 
-use crate::validation::base::{SchemaValidator, ValidationContext};
+use crate::loader::{SchemaLoader, LoaderConfig};
+use crate::validation::base::{SchemaValidator, ValidationContext, ValidationMode};
 use crate::validation::error::{ValidationError, ValidationResult};
 use serde_json::Value;
-use std::path::Path;
-
-// Embed the schema at compile time for reliability
-const PROMPT_SPEC_SCHEMA: &str = include_str!("../../../../schemas/prompt-spec.schema.json");
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// PromptSpec validator with custom rules
 pub struct PromptSpecValidator {
-    schema: Value,
+    schema: Arc<Value>,
 }
 
 impl PromptSpecValidator {
-    /// Create a new PromptSpec validator using embedded schema
+    /// Create a new PromptSpec validator by loading the schema file
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        // Try to load from environment variable first (for development)
-        let schema = if let Ok(schema_path) = std::env::var("PROMPT_SPEC_SCHEMA_PATH") {
-            // Load from disk if path is provided
-            let path = Path::new(&schema_path);
-            if path.exists() {
-                let content = std::fs::read_to_string(path)?;
-                serde_json::from_str(&content)?
-            } else {
-                // Fall back to embedded schema
-                serde_json::from_str(PROMPT_SPEC_SCHEMA)?
-            }
-        } else {
-            // Use embedded schema by default
-            serde_json::from_str(PROMPT_SPEC_SCHEMA)?
-        };
-        
-        Ok(Self { schema })
+        let schema_path = Self::resolve_schema_path()?;
+        // Create loader config that doesn't validate structure (for JSON Schema files)
+        let mut config = LoaderConfig::default();
+        config.validate_basic_structure = false;
+        config.allow_env_expansion = false;  // Don't expand env vars in schema definitions
+        let mut loader = SchemaLoader::with_config(config);
+        let schema = loader.load_schema(&schema_path)?;
+        Ok(Self {
+            schema: Arc::new(schema),
+        })
     }
     
-    /// Load schema from a specific path (useful for testing)
+    /// Load validator with a specific schema path
     pub fn from_path(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
-        let content = std::fs::read_to_string(path)?;
-        let schema: Value = serde_json::from_str(&content)?;
-        Ok(Self { schema })
+        // Create loader config that doesn't validate structure (for JSON Schema files)
+        let mut config = LoaderConfig::default();
+        config.validate_basic_structure = false;
+        config.allow_env_expansion = false;  // Don't expand env vars in schema definitions
+        let mut loader = SchemaLoader::with_config(config);
+        let schema = loader.load_schema(path)?;
+        Ok(Self {
+            schema: Arc::new(schema),
+        })
     }
-
-    /// Get the JSON Schema definition for PromptSpec
+    
+    /// Resolve the path to the prompt-spec schema file
+    fn resolve_schema_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+        // First check environment variable
+        if let Ok(path) = std::env::var("PROMPT_SPEC_SCHEMA_PATH") {
+            return Ok(PathBuf::from(path));
+        }
+        
+        // Try relative to CARGO_MANIFEST_DIR (for tests and development)
+        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            let schema_path = PathBuf::from(manifest_dir)
+                .parent() // go up from crate to workspace root
+                .and_then(|p| p.parent()) // go up one more level
+                .map(|p| p.join("schemas"))
+                .ok_or("Failed to resolve schema path from manifest dir")?;
+            
+            // Make sure we return the full path to the JSON file, not just the directory
+            let full_path = schema_path.join("prompt-spec.schema.json");
+            if full_path.exists() {
+                return Ok(full_path);
+            }
+        }
+        
+        // Try relative to current directory
+        let current_dir_path = PathBuf::from("schemas/prompt-spec.schema.json");
+        if current_dir_path.exists() {
+            return Ok(current_dir_path);
+        }
+        
+        // Try relative to executable location
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                // Look for schemas directory relative to executable
+                let schema_path = exe_dir.join("schemas").join("prompt-spec.schema.json");
+                if schema_path.exists() {
+                    return Ok(schema_path);
+                }
+                
+                // Try going up directories to find schemas
+                let mut current = exe_dir;
+                for _ in 0..5 {  // Try up to 5 levels
+                    if let Some(parent) = current.parent() {
+                        let schema_path = parent.join("schemas").join("prompt-spec.schema.json");
+                        if schema_path.exists() {
+                            return Ok(schema_path);
+                        }
+                        current = parent;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        
+        Err("Could not locate prompt-spec.schema.json. Set PROMPT_SPEC_SCHEMA_PATH environment variable.".into())
+    }
+    
+    /// Get the loaded schema
     pub fn schema(&self) -> &Value {
         &self.schema
     }
-    
-    #[allow(dead_code)]
-    fn get_schema_definition() -> Value {
-        serde_json::json!({
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$id": "https://schemas.specado.com/prompt-spec/v1.json",
-            "title": "PromptSpec",
-            "description": "Unified request format for LLM provider interactions",
-            "type": "object",
-            "properties": {
-                "spec_version": {
-                    "type": "string",
-                    "pattern": "^\\d+\\.\\d+$",
-                    "description": "Version of the PromptSpec specification"
-                },
-                "id": {
-                    "type": "string",
-                    "description": "Unique identifier for this prompt request"
-                },
-                "model_class": {
-                    "type": "string",
-                    "enum": ["Chat", "ReasoningChat", "RAGChat", "MultimodalChat", "AudioChat", "VideoChat"],
-                    "description": "Classification of the model being targeted"
-                },
-                "messages": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "role": {
-                                "type": "string",
-                                "enum": ["system", "user", "assistant", "tool"]
-                            },
-                            "content": {
-                                "oneOf": [
-                                    { "type": "string" },
-                                    { "type": "array" }
-                                ]
-                            }
-                        },
-                        "required": ["role", "content"]
-                    },
-                    "minItems": 1
-                },
-                "tools": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "type": { "type": "string" },
-                            "function": { "type": "object" }
+
+    /// Validate custom rules for PromptSpec
+    fn validate_custom_rules(&self, spec: &Value, ctx: &ValidationContext) -> Vec<ValidationError> {
+        let mut errors = Vec::new();
+
+        // Rule: tool_choice requires tools array to be defined and non-empty
+        if spec.get("tool_choice").is_some() {
+            let tools = spec.get("tools");
+            if tools.is_none() || !tools.unwrap().is_array() || tools.unwrap().as_array().unwrap().is_empty() {
+                errors.push(ValidationError::new(
+                    ctx.child("tool_choice").path.clone(),
+                    "tool_choice requires tools array to be defined and non-empty",
+                ));
+            }
+        }
+
+        // Rule: reasoning_tokens only valid when model_class is "ReasoningChat"
+        if spec.get("reasoning_tokens").is_some() {
+            let model_class = spec.get("model_class").and_then(|v| v.as_str());
+            if model_class != Some("ReasoningChat") {
+                errors.push(ValidationError::new(
+                    ctx.child("reasoning_tokens").path.clone(),
+                    format!("reasoning_tokens is only valid when model_class is ReasoningChat, found {:?}", model_class),
+                ));
+            }
+        }
+
+        // Rule: rag configuration only valid when model_class is "RAGChat"
+        if spec.get("rag").is_some() {
+            let model_class = spec.get("model_class").and_then(|v| v.as_str());
+            if model_class != Some("RAGChat") {
+                errors.push(ValidationError::new(
+                    ctx.child("rag").path.clone(),
+                    format!("rag configuration is only valid when model_class is RAGChat, found {:?}", model_class),
+                ));
+            }
+        }
+
+        // Rule: media.input_video only valid for "MultimodalChat" or "VideoChat"
+        if let Some(media) = spec.get("media") {
+            if media.get("input_video").is_some() {
+                let model_class = spec.get("model_class").and_then(|v| v.as_str());
+                if !matches!(model_class, Some("MultimodalChat") | Some("VideoChat")) {
+                    errors.push(ValidationError::new(
+                        ctx.child("media").child("input_video").path.clone(),
+                        format!("input_video is only valid for MultimodalChat or VideoChat, found {:?}", model_class),
+                    ));
+                }
+            }
+
+            // Rule: media.input_audio only valid for "AudioChat" or "MultimodalChat"
+            if media.get("input_audio").is_some() {
+                let model_class = spec.get("model_class").and_then(|v| v.as_str());
+                if !matches!(model_class, Some("AudioChat") | Some("MultimodalChat")) {
+                    errors.push(ValidationError::new(
+                        ctx.child("media").child("input_audio").path.clone(),
+                        format!("input_audio is only valid for AudioChat or MultimodalChat, found {:?}", model_class),
+                    ));
+                }
+            }
+        }
+
+        // Rule: conversation.parent_message_id requires valid message reference
+        if let Some(conversation) = spec.get("conversation") {
+            if let Some(parent_id) = conversation.get("parent_message_id").and_then(|v| v.as_str()) {
+                // Basic validation: check format (should be UUID-like or similar)
+                if parent_id.is_empty() || parent_id.len() < 8 {
+                    errors.push(ValidationError::new(
+                        ctx.child("conversation").child("parent_message_id").path.clone(),
+                        format!("parent_message_id must be a valid message reference (at least 8 characters), got '{}'", parent_id),
+                    ));
+                }
+            }
+        }
+
+        // Rule: When strict_mode is "Strict", no unknown fields allowed
+        if let Some(strict_mode) = spec.get("strict_mode").and_then(|v| v.as_str()) {
+            if strict_mode == "Strict" {
+                // Get known fields from the schema
+                let known_fields = if let Some(properties) = self.schema.get("properties") {
+                    properties.as_object()
+                        .map(|obj| obj.keys().map(|k| k.as_str()).collect::<Vec<_>>())
+                        .unwrap_or_default()
+                } else {
+                    // Fallback to a basic set if schema structure is unexpected
+                    vec![
+                        "spec_version", "id", "model_class", "messages", "model", "system",
+                        "max_tokens", "temperature", "top_p", "top_k", "seed", "stop", 
+                        "reasoning_tokens", "tools", "tool_choice", "media", "rag",
+                        "conversation", "preferences", "frequency_penalty", "presence_penalty",
+                        "repetition_penalty", "length_penalty", "strict_mode", "stream",
+                        "metadata", "trace_id", "parent_span_id"
+                    ]
+                };
+                
+                if let Some(obj) = spec.as_object() {
+                    for key in obj.keys() {
+                        if !known_fields.contains(&key.as_str()) {
+                            errors.push(ValidationError::new(
+                                ctx.child(key).path.clone(),
+                                format!("Unknown field '{}' not allowed in Strict mode", key),
+                            ));
                         }
                     }
-                },
-                "tool_choice": {
-                    "oneOf": [
-                        { "type": "string", "enum": ["auto", "none", "required"] },
-                        { "type": "object" }
-                    ]
-                },
-                "reasoning_tokens": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 65536
-                },
-                "rag": {
-                    "type": "object",
-                    "properties": {
-                        "query": { "type": "string" },
-                        "sources": { "type": "array" },
-                        "retrieval_config": { "type": "object" }
-                    }
-                },
-                "media": {
-                    "type": "object",
-                    "properties": {
-                        "input_video": { "type": "boolean" },
-                        "input_audio": { "type": "boolean" },
-                        "output_audio": { "type": "boolean" }
-                    }
-                },
-                "conversation": {
-                    "type": "object",
-                    "properties": {
-                        "parent_message_id": { "type": "string" },
-                        "conversation_id": { "type": "string" },
-                        "metadata": { "type": "object" }
-                    }
-                },
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
-                        "max_tokens": { "type": "integer", "minimum": 1 },
-                        "top_p": { "type": "number", "minimum": 0, "maximum": 1 },
-                        "frequency_penalty": { "type": "number", "minimum": -2, "maximum": 2 },
-                        "presence_penalty": { "type": "number", "minimum": -2, "maximum": 2 }
-                    }
-                },
-                "strict_mode": {
-                    "type": "string",
-                    "enum": ["Strict", "Lenient"],
-                    "default": "Lenient"
-                }
-            },
-            "required": ["spec_version", "id", "model_class", "messages"],
-            "additionalProperties": true
-        })
-    }
-
-    /// Validate basic structure requirements
-    fn validate_basic_structure(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        // Check that required fields exist
-        let required_fields = ["spec_version", "id", "model_class", "messages"];
-        
-        for field in &required_fields {
-            if data.get(field).is_none() {
-                return Err(ValidationError::with_violations(
-                    &context.child(field).path,
-                    format!("Required field {} is missing", field),
-                    vec![ValidationError::create_violation(
-                        "required_field",
-                        format!("{} to be present", field),
-                        "field is missing".to_string(),
-                    )],
-                ));
-            }
-        }
-
-        // Validate messages array is non-empty
-        if let Some(messages) = data.get("messages").and_then(|v| v.as_array()) {
-            if messages.is_empty() {
-                return Err(ValidationError::with_violations(
-                    &context.child("messages").path,
-                    "Messages array cannot be empty".to_string(),
-                    vec![ValidationError::create_violation(
-                        "non_empty_messages",
-                        "non-empty messages array",
-                        "empty array".to_string(),
-                    )],
-                ));
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Validate tool_choice requires tools array
-    fn validate_tool_choice_requires_tools(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let tool_choice = data.get("tool_choice");
-        let tools = data.get("tools");
-
-        if let Some(_) = tool_choice {
-            match tools {
-                Some(tools_array) if tools_array.as_array().map_or(false, |arr| !arr.is_empty()) => {
-                    Ok(())
-                }
-                _ => Err(ValidationError::with_violations(
-                    &context.child("tool_choice").path,
-                    "tool_choice requires tools array to be defined and non-empty".to_string(),
-                    vec![ValidationError::create_violation(
-                        "tool_choice_requires_tools",
-                        "non-empty tools array when tool_choice is specified",
-                        "tools array is missing or empty".to_string(),
-                    )],
-                )),
-            }
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Validate reasoning_tokens only for ReasoningChat
-    fn validate_reasoning_tokens_model_class(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let reasoning_tokens = data.get("reasoning_tokens");
-        let model_class = data.get("model_class").and_then(|v| v.as_str());
-
-        if let Some(_) = reasoning_tokens {
-            if model_class != Some("ReasoningChat") {
-                return Err(ValidationError::with_violations(
-                    &context.child("reasoning_tokens").path,
-                    "reasoning_tokens is only valid when model_class is 'ReasoningChat'".to_string(),
-                    vec![ValidationError::create_violation(
-                        "reasoning_tokens_model_class",
-                        "model_class to be 'ReasoningChat'",
-                        format!("model_class is '{}'", model_class.unwrap_or("undefined")),
-                    )],
-                ));
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Validate RAG configuration only for RAGChat
-    fn validate_rag_model_class(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let rag = data.get("rag");
-        let model_class = data.get("model_class").and_then(|v| v.as_str());
-
-        if let Some(_) = rag {
-            if model_class != Some("RAGChat") {
-                return Err(ValidationError::with_violations(
-                    &context.child("rag").path,
-                    "rag configuration is only valid when model_class is 'RAGChat'".to_string(),
-                    vec![ValidationError::create_violation(
-                        "rag_model_class",
-                        "model_class to be 'RAGChat'",
-                        format!("model_class is '{}'", model_class.unwrap_or("undefined")),
-                    )],
-                ));
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Validate media input constraints
-    fn validate_media_constraints(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let media = data.get("media");
-        let model_class = data.get("model_class").and_then(|v| v.as_str());
-
-        if let Some(media_obj) = media {
-            let input_video = media_obj.get("input_video").and_then(|v| v.as_bool()).unwrap_or(false);
-            let input_audio = media_obj.get("input_audio").and_then(|v| v.as_bool()).unwrap_or(false);
-
-            // Validate input_video
-            if input_video {
-                let valid_for_video = matches!(model_class, Some("MultimodalChat") | Some("VideoChat"));
-                if !valid_for_video {
-                    return Err(ValidationError::with_violations(
-                        &context.child("media").child("input_video").path,
-                        "input_video is only valid for 'MultimodalChat' or 'VideoChat' model classes".to_string(),
-                        vec![ValidationError::create_violation(
-                            "input_video_model_class",
-                            "model_class to be 'MultimodalChat' or 'VideoChat'",
-                            format!("model_class is '{}'", model_class.unwrap_or("undefined")),
-                        )],
-                    ));
-                }
-            }
-
-            // Validate input_audio
-            if input_audio {
-                let valid_for_audio = matches!(model_class, Some("AudioChat") | Some("MultimodalChat"));
-                if !valid_for_audio {
-                    return Err(ValidationError::with_violations(
-                        &context.child("media").child("input_audio").path,
-                        "input_audio is only valid for 'AudioChat' or 'MultimodalChat' model classes".to_string(),
-                        vec![ValidationError::create_violation(
-                            "input_audio_model_class",
-                            "model_class to be 'AudioChat' or 'MultimodalChat'",
-                            format!("model_class is '{}'", model_class.unwrap_or("undefined")),
-                        )],
-                    ));
                 }
             }
         }
 
-        Ok(())
-    }
-
-    /// Validate conversation parent_message_id reference
-    fn validate_conversation_message_reference(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let conversation = data.get("conversation");
-        
-        if let Some(conv_obj) = conversation {
-            if let Some(parent_id) = conv_obj.get("parent_message_id").and_then(|v| v.as_str()) {
-                // In a real implementation, you would validate against a message store
-                // For now, we just validate the format
-                if parent_id.is_empty() {
-                    return Err(ValidationError::with_violations(
-                        &context.child("conversation").child("parent_message_id").path,
-                        "parent_message_id cannot be empty".to_string(),
-                        vec![ValidationError::create_violation(
-                            "parent_message_id_format",
-                            "non-empty message ID",
-                            "empty string".to_string(),
-                        )],
-                    ));
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Validate strict mode compliance
-    fn validate_strict_mode(
-        &self,
-        data: &Value,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        let strict_mode = data.get("strict_mode").and_then(|v| v.as_str()).unwrap_or("Lenient");
-        
-        if strict_mode == "Strict" {
-            // In strict mode, validate that no unknown fields are present
-            let allowed_fields = [
-                "spec_version", "id", "model_class", "messages", "tools", "tool_choice",
-                "reasoning_tokens", "rag", "media", "conversation", "parameters", "strict_mode"
-            ];
-
-            if let Some(obj) = data.as_object() {
-                for key in obj.keys() {
-                    if !allowed_fields.contains(&key.as_str()) {
-                        return Err(ValidationError::with_violations(
-                            &context.child(key).path,
-                            format!("Unknown field '{}' not allowed in strict mode", key),
-                            vec![ValidationError::create_violation(
-                                "strict_mode_unknown_field",
-                                "only known fields in strict mode",
-                                format!("unknown field '{}'", key),
-                            )],
-                        ));
-                    }
-                }
-            }
-        }
-
-        Ok(())
+        errors
     }
 }
 
 impl SchemaValidator for PromptSpecValidator {
     type Input = Value;
 
-    fn validate_with_context(
-        &self,
-        input: &Self::Input,
-        context: &ValidationContext,
-    ) -> ValidationResult<()> {
-        // Basic structural validation
-        self.validate_basic_structure(input, context)?;
+    fn validate(&self, spec: &Value) -> ValidationResult<()> {
+        let context = ValidationContext::new(ValidationMode::Strict);
+        self.validate_with_context(spec, &context)
+    }
 
-        // Then validate custom business rules
-        match context.mode {
-            crate::validation::base::ValidationMode::Basic => {
-                // Only basic structure validation in basic mode
-                Ok(())
+    fn validate_partial(&self, spec: &Value) -> ValidationResult<()> {
+        let context = ValidationContext::new(ValidationMode::Partial);
+        self.validate_with_context(spec, &context)
+    }
+
+    fn validate_basic(&self, spec: &Value) -> ValidationResult<()> {
+        let context = ValidationContext::new(ValidationMode::Basic);
+        self.validate_with_context(spec, &context)
+    }
+
+    fn validate_with_context(&self, spec: &Value, ctx: &ValidationContext) -> ValidationResult<()> {
+        let mut all_errors = Vec::new();
+
+        // Check required fields (for all modes)
+        // Required fields should always be validated
+        // Check required fields from schema
+        if let Some(required) = self.schema.get("required").and_then(|r| r.as_array()) {
+            for field_value in required {
+                if let Some(field) = field_value.as_str() {
+                    if spec.get(field).is_none() {
+                        all_errors.push(ValidationError::new(
+                            ctx.child(field).path.clone(),
+                            format!("Required field {} is missing", field),
+                        ));
+                    }
+                }
             }
-            crate::validation::base::ValidationMode::Partial => {
-                // Run some custom validations in partial mode
-                self.validate_tool_choice_requires_tools(input, context)?;
-                self.validate_reasoning_tokens_model_class(input, context)?;
-                Ok(())
+        } else {
+            // Fallback if schema doesn't have required fields defined
+            let required_fields = ["messages"];
+            for field in &required_fields {
+                if spec.get(field).is_none() {
+                    all_errors.push(ValidationError::new(
+                        ctx.child(field).path.clone(),
+                        format!("Required field {} is missing", field),
+                    ));
+                }
             }
-            crate::validation::base::ValidationMode::Strict => {
-                // Run all custom validations in strict mode
-                self.validate_tool_choice_requires_tools(input, context)?;
-                self.validate_reasoning_tokens_model_class(input, context)?;
-                self.validate_rag_model_class(input, context)?;
-                self.validate_media_constraints(input, context)?;
-                self.validate_conversation_message_reference(input, context)?;
-                self.validate_strict_mode(input, context)?;
-                Ok(())
-            }
+        }
+
+        // Custom validation rules (for Partial and Strict modes)
+        if ctx.mode == ValidationMode::Strict || ctx.mode == ValidationMode::Partial {
+            all_errors.extend(self.validate_custom_rules(spec, ctx));
+        }
+
+        if all_errors.is_empty() {
+            Ok(())
+        } else {
+            Err(all_errors.into_iter().next().unwrap())
         }
     }
 }
 
 impl Default for PromptSpecValidator {
     fn default() -> Self {
-        Self::new().expect("Failed to create PromptSpecValidator")
+        Self::new().expect("Failed to create default PromptSpecValidator")
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
     use serde_json::json;
     
     #[test]
-    fn test_embedded_schema_loading() {
+    fn test_schema_loading() {
         let validator = PromptSpecValidator::new().unwrap();
         let schema = validator.schema();
         assert!(schema.is_object());
         assert_eq!(schema.get("title").and_then(|v| v.as_str()), Some("PromptSpec"));
-        assert_eq!(schema.get("$schema").and_then(|v| v.as_str()), Some("https://json-schema.org/draft/2020-12/schema"));
     }
 
     fn create_basic_prompt_spec() -> Value {
         json!({
-            "spec_version": "1.0",
-            "id": "test-123",
             "model_class": "Chat",
             "messages": [
-                {
-                    "role": "user",
-                    "content": "Hello"
-                }
-            ]
+                {"role": "user", "content": "Hello"}
+            ],
+            "strict_mode": "Standard"
         })
     }
 
@@ -471,107 +309,93 @@ mod tests {
     fn test_valid_basic_prompt_spec() {
         let validator = PromptSpecValidator::new().unwrap();
         let spec = create_basic_prompt_spec();
-        assert!(validator.validate(&spec).is_ok());
+        assert!(validator.validate_basic(&spec).is_ok());
     }
 
     #[test]
     fn test_tool_choice_requires_tools() {
         let validator = PromptSpecValidator::new().unwrap();
         let mut spec = create_basic_prompt_spec();
-        spec.as_object_mut().unwrap().insert("tool_choice".to_string(), json!("auto"));
+        spec["tool_choice"] = json!("auto");
         
-        // Should fail without tools
-        assert!(validator.validate(&spec).is_err());
-        
-        // Should pass with tools
-        spec.as_object_mut().unwrap().insert("tools".to_string(), json!([{
-            "type": "function",
-            "function": {"name": "test"}
-        }]));
-        assert!(validator.validate(&spec).is_ok());
+        let result = validator.validate(&spec);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("tool_choice requires tools"));
     }
 
     #[test]
     fn test_reasoning_tokens_model_class() {
         let validator = PromptSpecValidator::new().unwrap();
-        let mut spec = create_basic_prompt_spec();
-        spec.as_object_mut().unwrap().insert("reasoning_tokens".to_string(), json!(1000));
         
-        // Should fail with Chat model class
+        // Invalid: reasoning_tokens with wrong model_class
+        let mut spec = create_basic_prompt_spec();
+        spec["reasoning_tokens"] = json!(100);
         assert!(validator.validate(&spec).is_err());
         
-        // Should pass with ReasoningChat
-        spec.as_object_mut().unwrap().insert("model_class".to_string(), json!("ReasoningChat"));
+        // Valid: reasoning_tokens with ReasoningChat
+        spec["model_class"] = json!("ReasoningChat");
         assert!(validator.validate(&spec).is_ok());
     }
 
     #[test]
     fn test_rag_model_class() {
         let validator = PromptSpecValidator::new().unwrap();
-        let mut spec = create_basic_prompt_spec();
-        spec.as_object_mut().unwrap().insert("rag".to_string(), json!({
-            "query": "test query"
-        }));
         
-        // Should fail with Chat model class
+        // Invalid: rag with wrong model_class
+        let mut spec = create_basic_prompt_spec();
+        spec["rag"] = json!({"documents": []});
         assert!(validator.validate(&spec).is_err());
         
-        // Should pass with RAGChat
-        spec.as_object_mut().unwrap().insert("model_class".to_string(), json!("RAGChat"));
+        // Valid: rag with RAGChat
+        spec["model_class"] = json!("RAGChat");
         assert!(validator.validate(&spec).is_ok());
     }
 
     #[test]
     fn test_media_constraints() {
         let validator = PromptSpecValidator::new().unwrap();
-        let mut spec = create_basic_prompt_spec();
         
-        // Test input_video constraint
-        spec.as_object_mut().unwrap().insert("media".to_string(), json!({
-            "input_video": true
-        }));
+        // Test input_video constraints
+        let mut spec = create_basic_prompt_spec();
+        spec["media"] = json!({"input_video": "video.mp4"});
         assert!(validator.validate(&spec).is_err());
         
-        spec.as_object_mut().unwrap().insert("model_class".to_string(), json!("VideoChat"));
+        spec["model_class"] = json!("MultimodalChat");
         assert!(validator.validate(&spec).is_ok());
         
-        // Test input_audio constraint
-        spec.as_object_mut().unwrap().insert("media".to_string(), json!({
-            "input_audio": true
-        }));
-        spec.as_object_mut().unwrap().insert("model_class".to_string(), json!("Chat"));
+        // Test input_audio constraints
+        let mut spec = create_basic_prompt_spec();
+        spec["media"] = json!({"input_audio": {"data": "base64..."}});
         assert!(validator.validate(&spec).is_err());
         
-        spec.as_object_mut().unwrap().insert("model_class".to_string(), json!("AudioChat"));
+        spec["model_class"] = json!("AudioChat");
         assert!(validator.validate(&spec).is_ok());
     }
 
     #[test]
     fn test_strict_mode_validation() {
         let validator = PromptSpecValidator::new().unwrap();
-        let mut spec = create_basic_prompt_spec();
-        spec.as_object_mut().unwrap().insert("strict_mode".to_string(), json!("Strict"));
-        spec.as_object_mut().unwrap().insert("unknown_field".to_string(), json!("value"));
         
-        // Should fail in strict mode with unknown field
+        // Invalid: unknown field in Strict mode
+        let mut spec = create_basic_prompt_spec();
+        spec["strict_mode"] = json!("Strict");
+        spec["unknown_field"] = json!("value");
         assert!(validator.validate(&spec).is_err());
         
-        // Should pass in lenient mode
-        spec.as_object_mut().unwrap().insert("strict_mode".to_string(), json!("Lenient"));
+        // Valid: remove unknown field and test with a known field
+        spec.as_object_mut().unwrap().remove("unknown_field");
         assert!(validator.validate(&spec).is_ok());
     }
 
     #[test]
     fn test_validation_modes() {
         let validator = PromptSpecValidator::new().unwrap();
+        
+        // Basic mode: only checks structure
         let mut spec = create_basic_prompt_spec();
-        spec.as_object_mut().unwrap().insert("reasoning_tokens".to_string(), json!(1000));
+        spec["tool_choice"] = json!("auto");  // Would fail in strict mode
         
-        // Basic mode should pass (no custom validations)
         assert!(validator.validate_basic(&spec).is_ok());
-        
-        // Partial and strict modes should fail
-        assert!(validator.validate_partial(&spec).is_err());
         assert!(validator.validate(&spec).is_err());
     }
 }

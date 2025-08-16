@@ -191,37 +191,63 @@ impl ReferenceResolver {
         // Parse the reference
         let (file_path, json_pointer) = self.parse_reference(reference, context)?;
 
-        // Security check: ensure path is safe
-        if !context.is_safe_path(&file_path) {
-            return Err(LoaderError::path_traversal(
-                reference.to_string(),
-                context.base_dir.clone(),
-            ));
-        }
-
-        // Resolve to absolute path
-        let absolute_path = context.base_dir.join(&file_path);
-        let canonical_path = absolute_path
-            .canonicalize()
-            .map_err(|e| LoaderError::io_error(absolute_path.clone(), e))?;
-
-        // Check for circular references
-        context.push_path(canonical_path.clone())?;
-
-        // Load the referenced file (with caching)
-        let file_content = self.load_referenced_file(&canonical_path)?;
-
-        // Resolve references in the loaded content recursively
-        let resolved_content = self.resolve_refs(file_content, context)?;
-
-        // Pop from resolution stack
-        context.pop_path();
-
-        // Apply JSON pointer if specified
-        if json_pointer.is_empty() {
-            Ok(resolved_content)
+        // Check if this is a same-file reference (just a JSON pointer)
+        let is_same_file = reference.starts_with('#');
+        
+        if is_same_file {
+            // For same-file references, use the current file from the stack
+            if let Some(current_file) = context.resolution_stack.last() {
+                // Load the current file content
+                let file_content = self.load_referenced_file(current_file)?;
+                
+                // Apply the JSON pointer to get the referenced part
+                if json_pointer.is_empty() {
+                    Ok(file_content)
+                } else {
+                    self.apply_json_pointer(&file_content, &json_pointer, reference, current_file)
+                }
+            } else {
+                Err(LoaderError::reference_error(
+                    reference.to_string(),
+                    context.base_dir.clone(),
+                    "Cannot resolve same-file reference without current file context".to_string(),
+                ))
+            }
         } else {
-            self.apply_json_pointer(&resolved_content, &json_pointer, reference, &canonical_path)
+            // For external file references, proceed as before
+            
+            // Security check: ensure path is safe
+            if !context.is_safe_path(&file_path) {
+                return Err(LoaderError::path_traversal(
+                    reference.to_string(),
+                    context.base_dir.clone(),
+                ));
+            }
+
+            // Resolve to absolute path
+            let absolute_path = context.base_dir.join(&file_path);
+            let canonical_path = absolute_path
+                .canonicalize()
+                .map_err(|e| LoaderError::io_error(absolute_path.clone(), e))?;
+
+            // Check for circular references
+            context.push_path(canonical_path.clone())?;
+
+            // Load the referenced file (with caching)
+            let file_content = self.load_referenced_file(&canonical_path)?;
+
+            // Resolve references in the loaded content recursively
+            let resolved_content = self.resolve_refs(file_content, context)?;
+
+            // Pop from resolution stack
+            context.pop_path();
+
+            // Apply JSON pointer if specified
+            if json_pointer.is_empty() {
+                Ok(resolved_content)
+            } else {
+                self.apply_json_pointer(&resolved_content, &json_pointer, reference, &canonical_path)
+            }
         }
     }
 
@@ -232,10 +258,17 @@ impl ReferenceResolver {
             let pointer_part = &reference[hash_pos + 1..];
 
             let file_path = if file_part.is_empty() {
-                // Same-file reference
-                context.resolution_stack.last().cloned().unwrap_or_else(|| {
-                    context.base_dir.clone()
-                })
+                // Same-file reference - use the current file being processed
+                if let Some(current_file) = context.resolution_stack.last() {
+                    current_file.clone()
+                } else {
+                    // If no file in resolution stack, this is an error
+                    return Err(LoaderError::reference_error(
+                        reference.to_string(),
+                        context.base_dir.clone(),
+                        "Cannot resolve same-file reference without current file context".to_string(),
+                    ));
+                }
             } else {
                 PathBuf::from(file_part)
             };
