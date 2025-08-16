@@ -1,0 +1,529 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://specado.com/schemas/provider-spec.schema.json",
+    "title": "ProviderSpec",
+    "description": "Provider capability specification for LLM API translation",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["spec_version", "provider", "models"],
+    "properties": {
+      "spec_version": {
+        "description": "Specification version (semver)",
+        "type": "string",
+        "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      },
+      "provider": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "base_url", "headers"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "base_url": { "type": "string", "format": "uri" },
+          "headers": {
+            "type": "object",
+            "description": "Static headers; values may include ${ENV:VAR} placeholders.",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      },
+  
+      "models": {
+        "type": "array",
+        "minItems": 1,
+        "items": { "$ref": "#/$defs/Model" }
+      }
+    },
+  
+    "$defs": {
+      "Model": {
+        "description": "Model specification within a provider",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "family", "endpoints", "input_modes", "tooling", "json_output", "parameters", "constraints", "mappings", "response_normalization"],
+        "properties": {
+          "id": { 
+            "description": "Model identifier",
+            "type": "string", 
+            "minLength": 1 
+          },
+          "aliases": { 
+            "description": "Alternative names/aliases for the model",
+            "type": "array", 
+            "items": { "type": "string" }
+          },
+          "family": { 
+            "description": "Model family (e.g., gpt-4, claude-3)",
+            "type": "string", 
+            "minLength": 1 
+          },
+  
+          "endpoints": {
+            "description": "API endpoints for this model",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["chat_completion", "streaming_chat_completion"],
+            "properties": {
+              "chat_completion": { "$ref": "#/$defs/EndpointConfig" },
+              "streaming_chat_completion": { "$ref": "#/$defs/EndpointConfig" }
+            }
+          },
+  
+          "input_modes": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["messages", "single_text", "images"],
+            "properties": {
+              "messages": { "type": "boolean" },
+              "single_text": { "type": "boolean" },
+              "images": { "type": "boolean" }
+            }
+          },
+  
+          "tooling": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["tools_supported", "parallel_tool_calls_default", "can_disable_parallel_tool_calls"],
+            "properties": {
+              "tools_supported": { "type": "boolean" },
+              "parallel_tool_calls_default": { "type": "boolean" },
+              "can_disable_parallel_tool_calls": { "type": "boolean" },
+              "disable_switch": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "value"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "value": {}
+                }
+              }
+            }
+          },
+  
+          "json_output": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["native_param", "strategy"],
+            "properties": {
+              "native_param": { "type": "boolean" },
+              "strategy": { "type": "string", "enum": ["json_schema", "prompt_only"] },
+              "notes": { "type": "string" }
+            }
+          },
+  
+          "parameters": {
+            "description": "Parameter mappings and constraints (provider-specific)",
+            "type": "object",
+            "additionalProperties": true
+          },
+  
+          "constraints": {
+            "description": "Provider-specific constraints and limits",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["system_prompt_location", "forbid_unknown_top_level_fields", "mutually_exclusive", "resolution_preferences", "limits"],
+            "properties": {
+              "system_prompt_location": { 
+                "description": "Where system prompts are placed",
+                "type": "string", 
+                "enum": ["top_level", "message_role"] 
+              },
+              "forbid_unknown_top_level_fields": { 
+                "description": "Whether unknown fields cause errors",
+                "type": "boolean" 
+              },
+              "mutually_exclusive": {
+                "description": "Fields that cannot be used together",
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "items": { "type": "string" }
+                }
+              },
+              "resolution_preferences": {
+                "description": "Conflict resolution order",
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "limits": {
+                "description": "Size limits for various fields",
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["max_tool_schema_bytes", "max_system_prompt_bytes"],
+                "properties": {
+                  "max_tool_schema_bytes": { "type": "integer", "minimum": 0 },
+                  "max_system_prompt_bytes": { "type": "integer", "minimum": 0 }
+                }
+              }
+            }
+          },
+
+          "mappings": {
+            "description": "Field mappings from uniform to provider format",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["paths", "flags"],
+            "properties": {
+              "paths": {
+                "description": "JSONPath mappings for fields",
+                "type": "object",
+                "additionalProperties": { "type": "string" }
+              },
+              "flags": {
+                "description": "Feature flags and their mappings",
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          },
+
+          "response_normalization": {
+            "description": "Rules for normalizing provider responses",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sync", "stream"],
+            "properties": {
+              "sync": {
+                "description": "Synchronous response normalization",
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["content_path", "finish_reason_path", "finish_reason_map"],
+                "properties": {
+                  "content_path": { 
+                    "description": "JSONPath to response content",
+                    "type": "string" 
+                  },
+                  "finish_reason_path": { 
+                    "description": "JSONPath to finish reason",
+                    "type": "string" 
+                  },
+                  "finish_reason_map": {
+                    "description": "Map provider finish reasons to uniform ones",
+                    "type": "object",
+                    "additionalProperties": { "type": "string" }
+                  }
+                }
+              },
+              "stream": {
+                "description": "Stream response normalization",
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["protocol", "event_selector"],
+                "properties": {
+                  "protocol": { 
+                    "description": "Streaming protocol",
+                    "type": "string",
+                    "enum": ["sse", "websocket", "http2"]
+                  },
+                  "event_selector": {
+                    "description": "Event routing rules",
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type_path", "routes"],
+                    "properties": {
+                      "type_path": { 
+                        "description": "JSONPath to event type",
+                        "type": "string" 
+                      },
+                      "routes": {
+                        "description": "Event routing configuration",
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["when", "emit"],
+                          "properties": {
+                            "when": { "type": "string" },
+                            "emit": { "type": "string" },
+                            "text_path": { "type": "string" },
+                            "name_path": { "type": "string" },
+                            "args_path": { "type": "string" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+  
+      "EndpointConfig": {
+        "description": "API endpoint configuration",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["method", "path", "protocol"],
+        "properties": {
+          "method": { 
+            "description": "HTTP method",
+            "type": "string", 
+            "enum": ["POST", "GET", "PUT", "PATCH", "DELETE"] 
+          },
+          "path": { 
+            "description": "URL path",
+            "type": "string", 
+            "pattern": "^/.*" 
+          },
+          "protocol": {
+            "description": "Communication protocol",
+            "type": "string",
+            "enum": ["http", "https", "ws", "wss"]
+          },
+          "query": {
+            "description": "Query parameters",
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "headers": {
+            "description": "Additional headers for this endpoint",
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    },
+  
+    "examples": [
+      {
+        "spec_version": "1.0.0",
+        "provider": {
+          "name": "openai",
+          "base_url": "https://api.openai.com",
+          "headers": { 
+            "Authorization": "Bearer ${ENV:OPENAI_API_KEY}",
+            "Content-Type": "application/json"
+          }
+        },
+        "models": [
+          {
+            "id": "gpt-4-turbo",
+            "aliases": ["gpt-4-turbo-preview"],
+            "family": "gpt-4",
+            "endpoints": {
+              "chat_completion": { 
+                "method": "POST", 
+                "path": "/v1/chat/completions",
+                "protocol": "https"
+              },
+              "streaming_chat_completion": { 
+                "method": "POST", 
+                "path": "/v1/chat/completions",
+                "protocol": "https",
+                "query": { "stream": "true" }
+              }
+            },
+            "input_modes": { 
+              "messages": true, 
+              "single_text": false, 
+              "images": true 
+            },
+            "tooling": {
+              "tools_supported": true,
+              "parallel_tool_calls_default": true,
+              "can_disable_parallel_tool_calls": true,
+              "disable_switch": { 
+                "path": "parallel_tool_calls", 
+                "value": false 
+              }
+            },
+            "json_output": { 
+              "native_param": true, 
+              "strategy": "json_schema"
+            },
+            "parameters": {
+              "temperature": {
+                "path": "temperature",
+                "range": { "min": 0.0, "max": 2.0 }
+              },
+              "top_p": {
+                "path": "top_p",
+                "range": { "min": 0.0, "max": 1.0 }
+              },
+              "max_tokens": {
+                "path": "max_tokens"
+              },
+              "response_format": {
+                "path": "response_format"
+              }
+            },
+            "constraints": {
+              "system_prompt_location": "message_role",
+              "forbid_unknown_top_level_fields": false,
+              "mutually_exclusive": [],
+              "resolution_preferences": ["temperature", "top_p"],
+              "limits": {
+                "max_tool_schema_bytes": 100000,
+                "max_system_prompt_bytes": 50000
+              }
+            },
+            "mappings": {
+              "paths": {
+                "model_class": "model",
+                "messages": "messages",
+                "tools": "tools",
+                "tool_choice": "tool_choice",
+                "sampling.temperature": "temperature",
+                "sampling.top_p": "top_p",
+                "limits.max_output_tokens": "max_tokens"
+              },
+              "flags": {}
+            },
+            "response_normalization": {
+              "sync": {
+                "content_path": "choices[0].message.content",
+                "finish_reason_path": "choices[0].finish_reason",
+                "finish_reason_map": {
+                  "stop": "stop",
+                  "length": "length",
+                  "tool_calls": "tool_call",
+                  "content_filter": "other"
+                }
+              },
+              "stream": {
+                "protocol": "sse",
+                "event_selector": {
+                  "type_path": "object",
+                  "routes": [
+                    {
+                      "when": "chat.completion.chunk",
+                      "emit": "delta",
+                      "text_path": "choices[0].delta.content"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+  
+      {
+        "spec_version": "1.0.0",
+        "provider": {
+          "name": "anthropic",
+          "base_url": "https://api.anthropic.com",
+          "headers": {
+            "x-api-key": "${ENV:ANTHROPIC_API_KEY}",
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json"
+          }
+        },
+        "models": [
+          {
+            "id": "claude-3-opus-20240229",
+            "aliases": ["claude-3-opus"],
+            "family": "claude-3",
+            "endpoints": {
+              "chat_completion": { 
+                "method": "POST", 
+                "path": "/v1/messages",
+                "protocol": "https"
+              },
+              "streaming_chat_completion": { 
+                "method": "POST", 
+                "path": "/v1/messages",
+                "protocol": "https",
+                "headers": { "X-Stream": "true" }
+              }
+            },
+            "input_modes": { 
+              "messages": true, 
+              "single_text": false, 
+              "images": true 
+            },
+            "tooling": {
+              "tools_supported": true,
+              "parallel_tool_calls_default": true,
+              "can_disable_parallel_tool_calls": true,
+              "disable_switch": { 
+                "path": "tool_choice.disable_parallel_tool_use", 
+                "value": true 
+              }
+            },
+            "json_output": {
+              "native_param": false,
+              "strategy": "prompt_only",
+              "notes": "Use tools for structured output"
+            },
+            "parameters": {
+              "temperature": {
+                "path": "temperature",
+                "range": { "min": 0.0, "max": 1.0 }
+              },
+              "top_p": {
+                "path": "top_p",
+                "range": { "min": 0.0, "max": 1.0 }
+              },
+              "top_k": {
+                "path": "top_k",
+                "range": { "min": 1, "max": 100 }
+              },
+              "max_tokens": {
+                "path": "max_tokens"
+              },
+              "system": {
+                "path": "system"
+              }
+            },
+            "constraints": {
+              "system_prompt_location": "top_level",
+              "forbid_unknown_top_level_fields": true,
+              "mutually_exclusive": [["temperature", "top_p"]],
+              "resolution_preferences": ["temperature", "top_k", "top_p"],
+              "limits": {
+                "max_tool_schema_bytes": 50000,
+                "max_system_prompt_bytes": 100000
+              }
+            },
+            "mappings": {
+              "paths": {
+                "model_class": "model",
+                "messages": "messages",
+                "tools": "tools",
+                "tool_choice": "tool_choice",
+                "sampling.temperature": "temperature",
+                "sampling.top_p": "top_p",
+                "sampling.top_k": "top_k",
+                "limits.max_output_tokens": "max_tokens"
+              },
+              "flags": {
+                "system_in_messages": false
+              }
+            },
+            "response_normalization": {
+              "sync": {
+                "content_path": "content[0].text",
+                "finish_reason_path": "stop_reason",
+                "finish_reason_map": {
+                  "end_turn": "stop",
+                  "max_tokens": "length",
+                  "tool_use": "tool_call",
+                  "stop_sequence": "stop"
+                }
+              },
+              "stream": {
+                "protocol": "sse",
+                "event_selector": {
+                  "type_path": "type",
+                  "routes": [
+                    {
+                      "when": "content_block_delta",
+                      "emit": "delta",
+                      "text_path": "delta.text"
+                    },
+                    {
+                      "when": "message_stop",
+                      "emit": "stop"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+  
