@@ -8,15 +8,17 @@ mod cli;
 mod config;
 mod error;
 mod handlers;
+mod logging;
 mod output;
 
 use cli::{Cli, Commands};
 use colored::control;
 use config::Config;
 use error::{Error, Result};
+use logging::{LoggingConfig, timing::Timer};
 use output::OutputWriter;
 use std::process;
-use tracing_subscriber::EnvFilter;
+use tracing::instrument;
 
 #[tokio::main]
 async fn main() {
@@ -27,7 +29,7 @@ async fn main() {
     control::set_override(cli.use_color());
     
     // Initialize logging
-    if let Err(e) = init_logging(cli.verbosity_level()) {
+    if let Err(e) = init_logging(&cli) {
         eprintln!("Failed to initialize logging: {}", e);
     }
     
@@ -52,12 +54,25 @@ async fn main() {
 }
 
 /// Main application logic
+#[instrument(skip(cli), fields(command = ?cli.command))]
 async fn run(cli: Cli) -> Result<()> {
+    let _timer = Timer::new("cli_execution");
+    
     // Load configuration
-    let config = Config::load_with_file(cli.config.as_deref())?;
+    let config = {
+        let _config_timer = Timer::new("config_loading");
+        tracing::info!("Loading configuration");
+        Config::load_with_file(cli.config.as_deref())?
+    };
     
     // Create output writer
-    let mut output = OutputWriter::new(cli.output, cli.use_color(), cli.quiet);
+    let mut output = OutputWriter::new(cli.output, cli.use_color(), cli.quiet, cli.verbosity_level());
+    
+    tracing::info!(
+        command = ?cli.command,
+        verbosity = cli.verbosity_level(),
+        "Executing command"
+    );
     
     // Handle the subcommand
     match cli.command {
@@ -70,6 +85,9 @@ async fn run(cli: Cli) -> Result<()> {
         Commands::Translate(args) => {
             handlers::handle_translate(args, &config, &mut output).await
         }
+        Commands::Config(args) => {
+            handlers::handle_config(args, &config, &mut output).await
+        }
         Commands::Completions(args) => {
             handlers::handle_completions(args)
         }
@@ -77,27 +95,21 @@ async fn run(cli: Cli) -> Result<()> {
 }
 
 /// Initialize the logging system
-fn init_logging(verbosity: u8) -> Result<()> {
-    let level = match verbosity {
-        0 => "warn",
-        1 => "info",
-        2 => "debug",
-        _ => "trace",
-    };
+fn init_logging(cli: &Cli) -> Result<()> {
+    // Create logging configuration from CLI args and environment
+    let mut logging_config = LoggingConfig::from_verbosity(cli.verbosity_level());
     
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(level));
+    // Apply environment overrides
+    logging_config.merge_with_env();
     
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_target(verbosity >= 2)
-        .with_thread_ids(verbosity >= 3)
-        .with_line_number(verbosity >= 3)
-        .with_file(verbosity >= 3)
-        .compact()
-        .init();
+    // If quiet mode, only log errors
+    if cli.quiet {
+        logging_config.level = "error".to_string();
+        logging_config.console = false;
+    }
     
-    Ok(())
+    // Initialize the logging system
+    logging::init_logging(logging_config)
 }
 
 #[cfg(test)]

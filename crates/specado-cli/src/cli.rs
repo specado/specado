@@ -58,6 +58,9 @@ pub enum Commands {
     /// Translate and execute a prompt against a provider (L2 feature)
     Translate(TranslateArgs),
     
+    /// Manage configuration files and settings
+    Config(ConfigArgs),
+    
     /// Generate shell completions for the specified shell
     Completions(CompletionsArgs),
 }
@@ -160,6 +163,124 @@ pub struct TranslateArgs {
     /// Save raw response to file
     #[arg(long)]
     pub save_raw: Option<PathBuf>,
+}
+
+/// Arguments for the config command
+#[derive(Parser, Debug)]
+pub struct ConfigArgs {
+    #[command(subcommand)]
+    pub action: ConfigAction,
+}
+
+/// Configuration management actions
+#[derive(Subcommand, Debug)]
+pub enum ConfigAction {
+    /// Initialize default configuration files
+    Init(ConfigInitArgs),
+    
+    /// Show current configuration values
+    Show(ConfigShowArgs),
+    
+    /// Set a configuration value
+    Set(ConfigSetArgs),
+    
+    /// Get a configuration value
+    Get(ConfigGetArgs),
+    
+    /// List available profiles
+    Profiles,
+    
+    /// Validate current configuration
+    Validate,
+}
+
+/// Arguments for config init
+#[derive(Parser, Debug)]
+pub struct ConfigInitArgs {
+    /// Initialize user config (~/.specado/config.toml)
+    #[arg(long)]
+    pub user: bool,
+    
+    /// Initialize project config (.specado.toml)
+    #[arg(long)]
+    pub project: bool,
+    
+    /// Force overwrite existing config files
+    #[arg(long)]
+    pub force: bool,
+}
+
+/// Arguments for config show
+#[derive(Parser, Debug)]
+pub struct ConfigShowArgs {
+    /// Show configuration in specified format
+    #[arg(short, long, value_enum, default_value = "toml")]
+    pub format: ConfigFormat,
+    
+    /// Show only user configuration
+    #[arg(long)]
+    pub user_only: bool,
+    
+    /// Show only project configuration
+    #[arg(long)]
+    pub project_only: bool,
+    
+    /// Show merged configuration (default)
+    #[arg(long)]
+    pub merged: bool,
+}
+
+/// Arguments for config set
+#[derive(Parser, Debug)]
+pub struct ConfigSetArgs {
+    /// Configuration key (e.g., default_provider, output.format)
+    pub key: String,
+    
+    /// Configuration value
+    pub value: String,
+    
+    /// Set in user config (~/.specado/config.toml)
+    #[arg(long)]
+    pub user: bool,
+    
+    /// Set in project config (.specado.toml)
+    #[arg(long)]
+    pub project: bool,
+    
+    /// Profile to modify (if not specified, modifies global config)
+    #[arg(long)]
+    pub profile: Option<String>,
+}
+
+/// Arguments for config get
+#[derive(Parser, Debug)]
+pub struct ConfigGetArgs {
+    /// Configuration key (e.g., default_provider, output.format)
+    pub key: String,
+    
+    /// Output format
+    #[arg(short, long, value_enum, default_value = "value")]
+    pub format: ConfigGetFormat,
+}
+
+/// Configuration file formats
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+pub enum ConfigFormat {
+    /// TOML format
+    Toml,
+    /// JSON format
+    Json,
+    /// YAML format
+    Yaml,
+}
+
+/// Configuration get output formats
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+pub enum ConfigGetFormat {
+    /// Just the value
+    Value,
+    /// JSON formatted
+    Json,
 }
 
 /// Arguments for generating shell completions

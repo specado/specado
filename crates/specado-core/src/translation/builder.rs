@@ -673,10 +673,7 @@ impl TranslationResult {
         TranslationResultBuilder::new()
     }
 
-    /// Check if the translation has any lossiness
-    pub fn has_lossiness(&self) -> bool {
-        self.lossiness.items.len() > 0
-    }
+    // Note: has_lossiness method moved to impl block in types.rs
 
     /// Check if the translation has critical issues
     pub fn has_critical_issues(&self) -> bool {

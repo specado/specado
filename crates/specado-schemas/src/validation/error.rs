@@ -3,11 +3,12 @@
 //! Copyright (c) 2025 Specado Team
 //! Licensed under the Apache-2.0 license
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
 
 /// A validation violation with detailed context
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Violation {
     /// The validation rule that was violated
     pub rule: String,
@@ -28,7 +29,7 @@ impl fmt::Display for Violation {
 }
 
 /// Schema validation error with path context and detailed violations
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Serialize, Deserialize)]
 pub struct ValidationError {
     /// JSON path where the error occurred
     pub path: String,
@@ -104,7 +105,7 @@ impl ValidationError {
 pub type ValidationResult<T> = Result<T, ValidationError>;
 
 /// Multiple validation errors that can occur during batch validation
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Serialize, Deserialize)]
 pub struct ValidationErrors {
     /// List of validation errors
     pub errors: Vec<ValidationError>,

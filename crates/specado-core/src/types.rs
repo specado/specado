@@ -355,6 +355,13 @@ pub struct TranslationResult {
     pub metadata: Option<TranslationMetadata>,
 }
 
+impl TranslationResult {
+    /// Check if the translation has any lossiness
+    pub fn has_lossiness(&self) -> bool {
+        !self.lossiness.items.is_empty()
+    }
+}
+
 /// Lossiness report containing all deviations
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LossinessReport {
