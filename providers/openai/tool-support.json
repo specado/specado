@@ -1,0 +1,632 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenAI Tool Support Specification",
+  "description": "Comprehensive tool/function calling support specification for OpenAI API",
+  "type": "object",
+  "properties": {
+    "tooling": {
+      "type": "object",
+      "description": "Tool support configuration for OpenAI models",
+      "properties": {
+        "tools_supported": {
+          "type": "boolean",
+          "const": true,
+          "description": "OpenAI supports function calling"
+        },
+        "parallel_tool_calls_default": {
+          "type": "boolean",
+          "const": true,
+          "description": "Parallel tool calls are enabled by default"
+        },
+        "can_disable_parallel_tool_calls": {
+          "type": "boolean",
+          "const": true,
+          "description": "Parallel tool calls can be disabled via parameter"
+        },
+        "disable_switch": {
+          "type": "object",
+          "properties": {
+            "parameter_name": {
+              "type": "string",
+              "const": "parallel_tool_calls"
+            },
+            "disable_value": {
+              "type": "boolean",
+              "const": false
+            }
+          }
+        },
+        "max_parallel_calls": {
+          "type": "integer",
+          "description": "Maximum number of parallel tool calls per response",
+          "default": 10
+        },
+        "supported_tool_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["function", "code_interpreter", "retrieval", "file_search"]
+          },
+          "description": "Supported tool types in OpenAI API"
+        }
+      },
+      "required": ["tools_supported", "parallel_tool_calls_default", "can_disable_parallel_tool_calls"]
+    },
+    "tool_schemas": {
+      "type": "object",
+      "description": "JSON Schema definitions for tool calling",
+      "properties": {
+        "function_tool": {
+          "type": "object",
+          "description": "Schema for function tool definition",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "function"
+            },
+            "function": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+                  "description": "Function name (1-64 chars, alphanumeric, underscores, hyphens)"
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 1024,
+                  "description": "Function description (max 1024 chars)"
+                },
+                "parameters": {
+                  "type": "object",
+                  "description": "JSON Schema for function parameters",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "object"
+                    },
+                    "properties": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "$ref": "#/$defs/json_schema_property"
+                      }
+                    },
+                    "required": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["type"]
+                },
+                "strict": {
+                  "type": "boolean",
+                  "description": "Enable strict schema validation (Structured Outputs)",
+                  "default": false
+                }
+              },
+              "required": ["name"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["type", "function"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "tool_choice_modes": {
+      "type": "object",
+      "description": "Tool choice configuration options",
+      "properties": {
+        "auto": {
+          "type": "object",
+          "description": "Automatic tool selection mode",
+          "properties": {
+            "value": {
+              "type": "string",
+              "const": "auto"
+            },
+            "description": {
+              "type": "string",
+              "const": "Model decides whether to call tools"
+            }
+          }
+        },
+        "none": {
+          "type": "object",
+          "description": "No tool calls mode",
+          "properties": {
+            "value": {
+              "type": "string",
+              "const": "none"
+            },
+            "description": {
+              "type": "string",
+              "const": "Model will not call any tools"
+            }
+          }
+        },
+        "required": {
+          "type": "object",
+          "description": "Required tool use mode",
+          "properties": {
+            "value": {
+              "type": "string",
+              "const": "required"
+            },
+            "description": {
+              "type": "string",
+              "const": "Model must call at least one tool"
+            }
+          }
+        },
+        "function_specific": {
+          "type": "object",
+          "description": "Specific function selection",
+          "properties": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "function"
+                },
+                "function": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Name of the specific function to call"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["type", "function"],
+              "additionalProperties": false
+            },
+            "description": {
+              "type": "string",
+              "const": "Model must call the specified function"
+            }
+          }
+        }
+      }
+    },
+    "response_format": {
+      "type": "object",
+      "description": "Tool call response format specification",
+      "properties": {
+        "tool_calls": {
+          "type": "object",
+          "description": "Schema for tool calls in response",
+          "properties": {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique identifier for the tool call"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["function"],
+                    "description": "Type of tool call"
+                  },
+                  "function": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Name of the function called"
+                      },
+                      "arguments": {
+                        "type": "string",
+                        "description": "JSON string of function arguments"
+                      }
+                    },
+                    "required": ["name", "arguments"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["id", "type", "function"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "tool_call_results": {
+          "type": "object",
+          "description": "Schema for tool call results in messages",
+          "properties": {
+            "message_schema": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "const": "tool"
+                },
+                "content": {
+                  "type": "string",
+                  "description": "Result of the tool call"
+                },
+                "tool_call_id": {
+                  "type": "string",
+                  "description": "ID of the tool call this is responding to"
+                }
+              },
+              "required": ["role", "content", "tool_call_id"],
+              "additionalProperties": false
+            }
+          }
+        }
+      }
+    },
+    "parameter_mappings": {
+      "type": "object",
+      "description": "Parameter mappings for tool-related fields",
+      "properties": {
+        "tools": {
+          "type": "object",
+          "properties": {
+            "source_path": {
+              "type": "string",
+              "const": "tools"
+            },
+            "target_path": {
+              "type": "string",
+              "const": "tools"
+            },
+            "validation": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "validate_function_names",
+                  "validate_schema_size",
+                  "validate_parameter_schema",
+                  "check_strict_mode_compatibility"
+                ]
+              }
+            }
+          }
+        },
+        "tool_choice": {
+          "type": "object",
+          "properties": {
+            "source_path": {
+              "type": "string",
+              "const": "tool_choice"
+            },
+            "target_path": {
+              "type": "string",
+              "const": "tool_choice"
+            },
+            "transformation": {
+              "type": "string",
+              "const": "normalize_tool_choice"
+            }
+          }
+        },
+        "parallel_tool_calls": {
+          "type": "object",
+          "properties": {
+            "source_path": {
+              "type": "string",
+              "const": "tooling.parallel_calls_enabled"
+            },
+            "target_path": {
+              "type": "string",
+              "const": "parallel_tool_calls"
+            },
+            "default_value": {
+              "type": "boolean",
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "description": "Tool-related constraints and limitations",
+      "properties": {
+        "max_tools_per_request": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128,
+          "default": 128,
+          "description": "Maximum number of tools per request"
+        },
+        "max_function_name_length": {
+          "type": "integer",
+          "const": 64,
+          "description": "Maximum length for function names"
+        },
+        "max_function_description_length": {
+          "type": "integer",
+          "const": 1024,
+          "description": "Maximum length for function descriptions"
+        },
+        "max_tool_schema_size_bytes": {
+          "type": "integer",
+          "const": 100000,
+          "description": "Maximum size for tool schema in bytes"
+        },
+        "function_name_pattern": {
+          "type": "string",
+          "const": "^[a-zA-Z0-9_-]{1,64}$",
+          "description": "Regex pattern for valid function names"
+        },
+        "strict_mode_requirements": {
+          "type": "object",
+          "description": "Requirements when strict mode is enabled",
+          "properties": {
+            "required_properties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Properties that must be present for strict mode"
+            },
+            "forbidden_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["additionalProperties", "patternProperties", "unevaluatedProperties"]
+              },
+              "description": "JSON Schema keywords not allowed in strict mode"
+            },
+            "supported_types": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["object", "array", "string", "number", "integer", "boolean", "null"]
+              },
+              "description": "JSON Schema types supported in strict mode"
+            }
+          }
+        }
+      }
+    },
+    "error_handling": {
+      "type": "object",
+      "description": "Error handling for tool-related operations",
+      "properties": {
+        "invalid_tool_call": {
+          "type": "object",
+          "properties": {
+            "error_code": {
+              "type": "string",
+              "const": "invalid_tool_call"
+            },
+            "recovery_strategy": {
+              "type": "string",
+              "enum": ["retry_without_tools", "regenerate", "abort"]
+            }
+          }
+        },
+        "tool_execution_error": {
+          "type": "object",
+          "properties": {
+            "error_code": {
+              "type": "string",
+              "const": "tool_execution_error"
+            },
+            "recovery_strategy": {
+              "type": "string",
+              "enum": ["continue_conversation", "retry_call", "abort"]
+            }
+          }
+        },
+        "schema_validation_error": {
+          "type": "object",
+          "properties": {
+            "error_code": {
+              "type": "string",
+              "const": "schema_validation_error"
+            },
+            "recovery_strategy": {
+              "type": "string",
+              "enum": ["disable_strict_mode", "fix_schema", "abort"]
+            }
+          }
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "description": "Model compatibility for tool features",
+      "properties": {
+        "models_with_tool_support": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Models that support function calling",
+          "examples": [
+            "gpt-4",
+            "gpt-4-turbo",
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-3.5-turbo"
+          ]
+        },
+        "models_with_parallel_calls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Models that support parallel tool calls",
+          "examples": [
+            "gpt-4",
+            "gpt-4-turbo",
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-3.5-turbo"
+          ]
+        },
+        "models_with_strict_mode": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Models that support Structured Outputs (strict mode)",
+          "examples": [
+            "gpt-4o-2024-08-06",
+            "gpt-4o-mini-2024-07-18"
+          ]
+        },
+        "deprecated_features": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "feature": {
+                "type": "string"
+              },
+              "deprecated_since": {
+                "type": "string"
+              },
+              "replacement": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "streaming_support": {
+      "type": "object",
+      "description": "Tool calling support in streaming mode",
+      "properties": {
+        "supports_streaming_tool_calls": {
+          "type": "boolean",
+          "const": true,
+          "description": "OpenAI supports tool calls in streaming mode"
+        },
+        "tool_call_delta_format": {
+          "type": "object",
+          "description": "Format for incremental tool call updates in streams",
+          "properties": {
+            "delta_schema": {
+              "type": "object",
+              "properties": {
+                "tool_calls": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "index": {
+                        "type": "integer",
+                        "description": "Index of the tool call being updated"
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Tool call ID (present in first delta)"
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "function"
+                      },
+                      "function": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Function name (present in first delta)"
+                          },
+                          "arguments": {
+                            "type": "string",
+                            "description": "Incremental arguments string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "json_schema_property": {
+      "type": "object",
+      "description": "JSON Schema property definition",
+      "properties": {
+        "type": {
+          "type": ["string", "array"],
+          "description": "JSON Schema type"
+        },
+        "description": {
+          "type": "string",
+          "description": "Property description"
+        },
+        "enum": {
+          "type": "array",
+          "description": "Allowed values"
+        },
+        "items": {
+          "$ref": "#/$defs/json_schema_property",
+          "description": "Array item schema"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/json_schema_property"
+          },
+          "description": "Object property schemas"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required properties"
+        },
+        "additionalProperties": {
+          "type": "boolean",
+          "description": "Allow additional properties"
+        },
+        "minimum": {
+          "type": "number",
+          "description": "Minimum numeric value"
+        },
+        "maximum": {
+          "type": "number",
+          "description": "Maximum numeric value"
+        },
+        "minLength": {
+          "type": "integer",
+          "description": "Minimum string length"
+        },
+        "maxLength": {
+          "type": "integer",
+          "description": "Maximum string length"
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Regex pattern for strings"
+        }
+      }
+    }
+  },
+  "required": [
+    "tooling",
+    "tool_schemas",
+    "tool_choice_modes",
+    "response_format",
+    "parameter_mappings",
+    "constraints"
+  ]
+}

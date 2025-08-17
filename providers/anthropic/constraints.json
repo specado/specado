@@ -1,0 +1,712 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Anthropic API Constraints Specification",
+  "description": "Comprehensive constraints and validation rules for Anthropic API compliance",
+  "type": "object",
+  "properties": {
+    "message_constraints": {
+      "type": "object",
+      "description": "Message role ordering and structure constraints",
+      "properties": {
+        "role_ordering": {
+          "type": "object",
+          "description": "Rules for message role ordering",
+          "properties": {
+            "first_message_role": {
+              "type": "string",
+              "const": "user",
+              "description": "First message must be from user role"
+            },
+            "alternating_required": {
+              "type": "boolean",
+              "const": true,
+              "description": "Messages must alternate between user and assistant"
+            },
+            "allowed_roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["user", "assistant"]
+              },
+              "description": "Only user and assistant roles allowed in messages array"
+            },
+            "system_role_forbidden": {
+              "type": "boolean",
+              "const": true,
+              "description": "System role not allowed in messages array"
+            }
+          },
+          "required": ["first_message_role", "alternating_required", "allowed_roles", "system_role_forbidden"]
+        },
+        "validation_rules": {
+          "type": "object",
+          "description": "Message validation rules",
+          "properties": {
+            "min_messages": {
+              "type": "integer",
+              "const": 1,
+              "description": "At least one message required"
+            },
+            "max_messages": {
+              "type": "integer",
+              "const": 1000,
+              "description": "Maximum number of messages per request"
+            },
+            "empty_content_forbidden": {
+              "type": "boolean",
+              "const": true,
+              "description": "Message content cannot be empty"
+            },
+            "role_sequence_patterns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "pattern": {
+                    "type": "string"
+                  },
+                  "valid": {
+                    "type": "boolean"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              },
+              "default": [
+                {
+                  "pattern": "user,assistant,user,assistant",
+                  "valid": true,
+                  "description": "Valid alternating pattern"
+                },
+                {
+                  "pattern": "user,user,assistant",
+                  "valid": false,
+                  "description": "Consecutive user messages not allowed"
+                },
+                {
+                  "pattern": "assistant,user",
+                  "valid": false,
+                  "description": "Cannot start with assistant message"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "required": ["role_ordering", "validation_rules"]
+    },
+    "system_prompt_constraints": {
+      "type": "object",
+      "description": "System prompt placement and size constraints",
+      "properties": {
+        "placement": {
+          "type": "object",
+          "description": "System prompt placement rules",
+          "properties": {
+            "location": {
+              "type": "string",
+              "const": "top_level",
+              "description": "System prompt must be at top-level, not in messages"
+            },
+            "parameter_name": {
+              "type": "string",
+              "const": "system",
+              "description": "System prompt parameter name"
+            },
+            "forbidden_in_messages": {
+              "type": "boolean",
+              "const": true,
+              "description": "System messages forbidden in messages array"
+            },
+            "extraction_required": {
+              "type": "boolean",
+              "const": true,
+              "description": "System messages must be extracted from messages to top-level"
+            }
+          },
+          "required": ["location", "parameter_name", "forbidden_in_messages", "extraction_required"]
+        },
+        "size_limits": {
+          "type": "object",
+          "description": "System prompt size constraints",
+          "properties": {
+            "max_bytes": {
+              "type": "integer",
+              "const": 100000,
+              "description": "Maximum system prompt size in bytes"
+            },
+            "max_characters": {
+              "type": "integer",
+              "const": 50000,
+              "description": "Maximum system prompt size in characters"
+            },
+            "encoding": {
+              "type": "string",
+              "const": "utf-8",
+              "description": "Required character encoding"
+            },
+            "validation_method": {
+              "type": "string",
+              "enum": ["byte_count", "character_count", "token_estimate"],
+              "default": "byte_count",
+              "description": "Method for validating size limits"
+            }
+          },
+          "required": ["max_bytes", "max_characters", "encoding"]
+        }
+      },
+      "required": ["placement", "size_limits"]
+    },
+    "token_limit_constraints": {
+      "type": "object",
+      "description": "Token limit validations and requirements",
+      "properties": {
+        "context_limits": {
+          "type": "object",
+          "description": "Context window limits by model family",
+          "properties": {
+            "claude_opus": {
+              "type": "integer",
+              "const": 200000,
+              "description": "Claude Opus context window"
+            },
+            "claude_sonnet": {
+              "type": "integer",
+              "const": 200000,
+              "description": "Claude Sonnet context window"
+            },
+            "claude_haiku": {
+              "type": "integer",
+              "const": 200000,
+              "description": "Claude Haiku context window"
+            }
+          }
+        },
+        "max_tokens_parameter": {
+          "type": "object",
+          "description": "max_tokens parameter requirements",
+          "properties": {
+            "required": {
+              "type": "boolean",
+              "const": true,
+              "description": "max_tokens parameter is required by Anthropic API"
+            },
+            "minimum_value": {
+              "type": "integer",
+              "const": 1,
+              "description": "Minimum allowed value for max_tokens"
+            },
+            "maximum_value": {
+              "type": "integer",
+              "const": 4096,
+              "description": "Maximum allowed value for max_tokens"
+            },
+            "default_value": {
+              "type": "integer",
+              "const": 1024,
+              "description": "Default value when not specified"
+            },
+            "validation_rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "rule": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              },
+              "default": [
+                {
+                  "rule": "must_be_positive_integer",
+                  "description": "max_tokens must be a positive integer"
+                },
+                {
+                  "rule": "cannot_exceed_context_remaining",
+                  "description": "max_tokens cannot exceed remaining context after input"
+                },
+                {
+                  "rule": "required_for_all_requests",
+                  "description": "max_tokens required for all completion requests"
+                }
+              ]
+            }
+          },
+          "required": ["required", "minimum_value", "maximum_value"]
+        },
+        "input_output_restrictions": {
+          "type": "object",
+          "description": "Input vs output token restrictions",
+          "properties": {
+            "max_input_tokens": {
+              "type": "integer",
+              "description": "Maximum input tokens (context - max_tokens)"
+            },
+            "input_calculation": {
+              "type": "string",
+              "const": "context_window - max_tokens",
+              "description": "Formula for calculating maximum input tokens"
+            },
+            "buffer_tokens": {
+              "type": "integer",
+              "const": 100,
+              "description": "Safety buffer for token counting accuracy"
+            },
+            "validation_strategy": {
+              "type": "string",
+              "enum": ["strict", "conservative", "optimistic"],
+              "default": "conservative",
+              "description": "Strategy for token limit validation"
+            }
+          }
+        }
+      },
+      "required": ["context_limits", "max_tokens_parameter", "input_output_restrictions"]
+    },
+    "anthropic_specific_constraints": {
+      "type": "object",
+      "description": "Additional Anthropic-specific constraints",
+      "properties": {
+        "stop_sequences": {
+          "type": "object",
+          "description": "Stop sequence limitations",
+          "properties": {
+            "max_sequences": {
+              "type": "integer",
+              "const": 4,
+              "description": "Maximum number of stop sequences"
+            },
+            "max_length_per_sequence": {
+              "type": "integer",
+              "const": 64,
+              "description": "Maximum length per stop sequence"
+            },
+            "encoding_restrictions": {
+              "type": "object",
+              "properties": {
+                "allowed_characters": {
+                  "type": "string",
+                  "const": "utf-8",
+                  "description": "Stop sequences must be valid UTF-8"
+                },
+                "special_character_handling": {
+                  "type": "boolean",
+                  "const": true,
+                  "description": "Special characters properly escaped"
+                }
+              }
+            },
+            "validation_rules": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "no_empty_sequences",
+                "no_duplicate_sequences",
+                "valid_utf8_encoding",
+                "max_length_check"
+              ]
+            }
+          },
+          "required": ["max_sequences", "max_length_per_sequence"]
+        },
+        "sampling_constraints": {
+          "type": "object",
+          "description": "Temperature and sampling parameter constraints",
+          "properties": {
+            "temperature": {
+              "type": "object",
+              "properties": {
+                "minimum": {
+                  "type": "number",
+                  "const": 0.0
+                },
+                "maximum": {
+                  "type": "number",
+                  "const": 1.0
+                },
+                "default": {
+                  "type": "number",
+                  "const": 1.0
+                },
+                "precision": {
+                  "type": "integer",
+                  "const": 2,
+                  "description": "Decimal precision for temperature values"
+                }
+              }
+            },
+            "top_p": {
+              "type": "object",
+              "properties": {
+                "minimum": {
+                  "type": "number",
+                  "const": 0.0
+                },
+                "maximum": {
+                  "type": "number",
+                  "const": 1.0
+                },
+                "default": {
+                  "type": "number",
+                  "const": 1.0
+                }
+              }
+            },
+            "top_k": {
+              "type": "object",
+              "properties": {
+                "minimum": {
+                  "type": "integer",
+                  "const": 1
+                },
+                "maximum": {
+                  "type": "integer",
+                  "const": 100000
+                },
+                "description": {
+                  "type": "string",
+                  "const": "Limits sampling to top K most likely tokens"
+                }
+              }
+            },
+            "mutual_exclusivity": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "parameters": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  },
+                  "rule": {
+                    "type": "string"
+                  }
+                }
+              },
+              "default": [
+                {
+                  "parameters": ["temperature", "top_p"],
+                  "rule": "avoid_using_both_simultaneously"
+                }
+              ]
+            }
+          }
+        },
+        "metadata_constraints": {
+          "type": "object",
+          "description": "Metadata field restrictions",
+          "properties": {
+            "allowed_fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": ["user_id"]
+            },
+            "field_constraints": {
+              "type": "object",
+              "properties": {
+                "user_id": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "string"
+                    },
+                    "max_length": {
+                      "type": "integer",
+                      "const": 256
+                    },
+                    "required": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "description": {
+                      "type": "string",
+                      "const": "Opaque user identifier for tracking"
+                    }
+                  }
+                }
+              }
+            },
+            "total_metadata_size_limit": {
+              "type": "integer",
+              "const": 1024,
+              "description": "Maximum total metadata size in bytes"
+            }
+          }
+        },
+        "tool_usage_constraints": {
+          "type": "object",
+          "description": "Tool usage constraints vs streaming",
+          "properties": {
+            "streaming_compatibility": {
+              "type": "object",
+              "properties": {
+                "tools_with_streaming": {
+                  "type": "boolean",
+                  "const": true,
+                  "description": "Tools can be used with streaming"
+                },
+                "thinking_with_streaming": {
+                  "type": "boolean",
+                  "const": false,
+                  "description": "Thinking mode incompatible with streaming"
+                },
+                "parallel_tools_default": {
+                  "type": "boolean",
+                  "const": true,
+                  "description": "Parallel tool calls enabled by default"
+                },
+                "can_disable_parallel": {
+                  "type": "boolean",
+                  "const": false,
+                  "description": "Cannot disable parallel tool calls"
+                }
+              }
+            },
+            "tool_schema_limits": {
+              "type": "object",
+              "properties": {
+                "max_schema_bytes": {
+                  "type": "integer",
+                  "const": 500000,
+                  "description": "Maximum tool schema size in bytes"
+                },
+                "max_tools_per_request": {
+                  "type": "integer",
+                  "const": 100,
+                  "description": "Maximum number of tools per request"
+                },
+                "schema_validation": {
+                  "type": "string",
+                  "const": "json_schema_draft_7",
+                  "description": "Tool schemas must be valid JSON Schema Draft 7"
+                }
+              }
+            },
+            "tool_choice_constraints": {
+              "type": "object",
+              "properties": {
+                "allowed_types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": ["auto", "none", "required", "any"]
+                },
+                "specific_tool_selection": {
+                  "type": "object",
+                  "properties": {
+                    "format": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "tool"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Must match an available tool name"
+                        }
+                      }
+                    },
+                    "validation": {
+                      "type": "string",
+                      "const": "tool_name_must_exist_in_tools_array"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": ["streaming_compatibility", "tool_schema_limits", "tool_choice_constraints"]
+        },
+        "thinking_mode_constraints": {
+          "type": "object",
+          "description": "Thinking mode specific constraints",
+          "properties": {
+            "budget_constraints": {
+              "type": "object",
+              "properties": {
+                "minimum_tokens": {
+                  "type": "integer",
+                  "const": 1024
+                },
+                "maximum_tokens": {
+                  "type": "integer",
+                  "const": 8192
+                },
+                "default_tokens": {
+                  "type": "integer",
+                  "const": 4096
+                }
+              }
+            },
+            "streaming_incompatibility": {
+              "type": "object",
+              "properties": {
+                "mutually_exclusive": {
+                  "type": "boolean",
+                  "const": true,
+                  "description": "Thinking mode and streaming cannot be used together"
+                },
+                "error_message": {
+                  "type": "string",
+                  "const": "Thinking mode is not compatible with streaming responses"
+                }
+              }
+            },
+            "supported_types": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": ["enabled", "disabled"]
+            }
+          }
+        }
+      },
+      "required": [
+        "stop_sequences", 
+        "sampling_constraints", 
+        "metadata_constraints", 
+        "tool_usage_constraints",
+        "thinking_mode_constraints"
+      ]
+    },
+    "validation_engine_integration": {
+      "type": "object",
+      "description": "Integration points for the translation engine validation",
+      "properties": {
+        "pre_request_validations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "validation_name": {
+                "type": "string"
+              },
+              "validation_function": {
+                "type": "string"
+              },
+              "error_message_template": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["error", "warning", "info"]
+              }
+            }
+          },
+          "default": [
+            {
+              "validation_name": "message_role_ordering",
+              "validation_function": "validate_message_role_sequence",
+              "error_message_template": "Invalid message role sequence: {details}",
+              "severity": "error"
+            },
+            {
+              "validation_name": "system_prompt_location",
+              "validation_function": "validate_system_prompt_placement",
+              "error_message_template": "System prompt must be at top-level, not in messages",
+              "severity": "error"
+            },
+            {
+              "validation_name": "max_tokens_required",
+              "validation_function": "validate_max_tokens_presence",
+              "error_message_template": "max_tokens parameter is required for Anthropic API",
+              "severity": "error"
+            },
+            {
+              "validation_name": "token_limits",
+              "validation_function": "validate_token_limits",
+              "error_message_template": "Token limits exceeded: {details}",
+              "severity": "error"
+            },
+            {
+              "validation_name": "stop_sequences_limit",
+              "validation_function": "validate_stop_sequences",
+              "error_message_template": "Stop sequences validation failed: {details}",
+              "severity": "error"
+            },
+            {
+              "validation_name": "streaming_thinking_conflict",
+              "validation_function": "validate_streaming_thinking_exclusivity",
+              "error_message_template": "Thinking mode cannot be used with streaming",
+              "severity": "error"
+            }
+          ]
+        },
+        "transformation_validations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "transformation_name": {
+                "type": "string"
+              },
+              "validation_function": {
+                "type": "string"
+              },
+              "rollback_strategy": {
+                "type": "string"
+              }
+            }
+          },
+          "default": [
+            {
+              "transformation_name": "system_message_extraction",
+              "validation_function": "validate_system_extraction_success",
+              "rollback_strategy": "preserve_original_messages"
+            },
+            {
+              "transformation_name": "tool_format_conversion",
+              "validation_function": "validate_tool_schema_conversion",
+              "rollback_strategy": "use_original_tool_format"
+            }
+          ]
+        },
+        "runtime_constraints": {
+          "type": "object",
+          "properties": {
+            "enable_strict_validation": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable strict constraint validation"
+            },
+            "fail_on_constraint_violation": {
+              "type": "boolean",
+              "default": true,
+              "description": "Fail request on constraint violations"
+            },
+            "log_constraint_warnings": {
+              "type": "boolean",
+              "default": true,
+              "description": "Log constraint warnings for debugging"
+            },
+            "constraint_error_format": {
+              "type": "string",
+              "default": "anthropic_constraint_error",
+              "description": "Error format for constraint violations"
+            }
+          }
+        }
+      },
+      "required": ["pre_request_validations", "transformation_validations", "runtime_constraints"]
+    }
+  },
+  "required": [
+    "message_constraints",
+    "system_prompt_constraints", 
+    "token_limit_constraints",
+    "anthropic_specific_constraints",
+    "validation_engine_integration"
+  ]
+}
