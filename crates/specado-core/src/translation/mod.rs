@@ -7,6 +7,7 @@
 //! Licensed under the Apache-2.0 license
 
 pub mod builder;
+pub mod conflict;
 pub mod context;
 pub mod jsonpath;
 pub mod lossiness;
@@ -23,6 +24,7 @@ use std::time::Instant;
 use std::sync::{Arc, Mutex};
 
 pub use builder::{TranslationResultBuilder, BuilderState, BuilderError, ProviderRequestBuilder};
+pub use conflict::{ConflictResolver, FieldConflict, ResolutionStrategy, ConflictResolutionConfig};
 pub use context::TranslationContext;
 pub use lossiness::LossinessTracker;
 pub use mapper::JSONPathMapper;
@@ -269,7 +271,15 @@ pub fn translate(
         if let Some(top_p) = sampling.top_p {
             provider_request["top_p"] = serde_json::json!(top_p);
         }
-        // Add other sampling parameters as needed
+        if let Some(top_k) = sampling.top_k {
+            provider_request["top_k"] = serde_json::json!(top_k);
+        }
+        if let Some(freq_penalty) = sampling.frequency_penalty {
+            provider_request["frequency_penalty"] = serde_json::json!(freq_penalty);
+        }
+        if let Some(pres_penalty) = sampling.presence_penalty {
+            provider_request["presence_penalty"] = serde_json::json!(pres_penalty);
+        }
     }
 
     // Step 11: Apply limits
@@ -345,8 +355,19 @@ pub fn translate(
         strictness_policy.evaluate_proceeding(&tracker)?;
     }
 
-    // Step 14: Resolve conflicts (placeholder for issue #20)
-    // Future: Apply conflict resolution logic
+    // Step 14: Resolve conflicts using the conflict resolution system (issue #20)
+    let conflict_resolver = ConflictResolver::new(context.clone());
+    let conflicts = conflict_resolver.resolve_conflicts(&mut provider_request, Some(&lossiness_tracker))?;
+    
+    // Log resolved conflicts if any
+    if !conflicts.is_empty() {
+        eprintln!("Resolved {} field conflicts during translation", conflicts.len());
+        for conflict in &conflicts {
+            if let Some(winner) = &conflict.winner {
+                eprintln!("  - Kept '{}', dropped {:?}", winner, conflict.losers);
+            }
+        }
+    }
 
     // Step 15: Build final result
     let duration_ms = start_time.elapsed().as_millis() as u64;
@@ -586,5 +607,50 @@ mod tests {
         // Check that metadata includes timing
         assert!(result.metadata.is_some());
         assert!(result.duration_ms().is_some());
+    }
+
+    #[test]
+    fn test_translate_with_conflict_resolution() {
+        let mut prompt = create_test_prompt();
+        let mut provider = create_test_provider();
+        
+        // Add mutually exclusive fields to the provider constraints
+        provider.models[0].constraints.mutually_exclusive = vec![
+            vec!["temperature".to_string(), "top_k".to_string()],
+        ];
+        provider.models[0].constraints.resolution_preferences = vec![
+            "temperature".to_string(),
+        ];
+        
+        // Add sampling parameters that conflict
+        use crate::SamplingParams;
+        prompt.sampling = Some(SamplingParams {
+            temperature: Some(0.7),
+            top_p: Some(0.9),
+            top_k: Some(40),  // This conflicts with temperature
+            frequency_penalty: None,
+            presence_penalty: None,
+        });
+        
+        let result = translate(&prompt, &provider, "test-model", StrictMode::Warn).unwrap();
+        
+        // Check that the request was built successfully
+        assert!(result.provider_request_json.is_object());
+        
+        // Temperature should be present (winner based on resolution_preferences)
+        assert!(result.provider_request_json["temperature"].is_number());
+        
+        // top_k should NOT be present (loser in the conflict)
+        assert!(result.provider_request_json.get("top_k").is_none());
+        
+        // top_p should still be present (not in conflict)
+        assert!(result.provider_request_json["top_p"].is_number());
+        
+        // Should have lossiness due to the dropped field
+        assert!(result.has_lossiness());
+        let lossiness_items: Vec<_> = result.lossiness.items.iter()
+            .filter(|item| item.path.contains("top_k"))
+            .collect();
+        assert!(!lossiness_items.is_empty(), "Should have lossiness for dropped top_k field");
     }
 }
