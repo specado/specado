@@ -95,6 +95,10 @@
         "additionalProperties": false,
         "required": ["id", "family", "endpoints", "input_modes", "tooling", "json_output", "parameters", "constraints", "mappings", "response_normalization"],
         "properties": {
+          "description": {
+            "description": "Model description and use cases",
+            "type": "string"
+          },
           "id": { 
             "description": "Model identifier",
             "type": "string", 
@@ -109,6 +113,37 @@
             "description": "Model family (e.g., gpt-4, claude-3)",
             "type": "string", 
             "minLength": 1 
+          },
+          "reasoning": {
+            "description": "Reasoning capabilities (for models that support chain-of-thought)",
+            "type": "object",
+            "properties": {
+              "supported": { "type": "boolean" },
+              "effort_levels": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "default_effort": { "type": "string" },
+              "internal_chain_of_thought": { "type": "boolean" },
+              "optimized_for": { "type": "string" },
+              "summary_modes": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "default_summary": { "type": "string" }
+            }
+          },
+          "verbosity": {
+            "description": "Verbosity control capabilities",
+            "type": "object",
+            "properties": {
+              "supported": { "type": "boolean" },
+              "levels": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "default_level": { "type": "string" }
+            }
           },
   
           "endpoints": {
@@ -156,6 +191,13 @@
               "tools_supported": { "type": "boolean" },
               "parallel_tool_calls_default": { "type": "boolean" },
               "can_disable_parallel_tool_calls": { "type": "boolean" },
+              "custom_tools": { "type": "boolean" },
+              "preambles_supported": { "type": "boolean" },
+              "tool_types": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "context_free_grammars": { "type": "boolean" },
               "tool_choice_modes": {
                 "description": "Supported tool choice modes",
                 "type": "array",
@@ -193,9 +235,25 @@
           },
   
           "parameters": {
-            "description": "Parameter mappings and constraints (provider-specific)",
+            "description": "Parameter definitions for the model API",
             "type": "object",
-            "additionalProperties": true
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "required": { "type": "boolean" },
+                "description": { "type": "string" },
+                "enum": {
+                  "type": "array",
+                  "items": {}
+                },
+                "default": {},
+                "minimum": { "type": "number" },
+                "maximum": { "type": "number" },
+                "properties": { "type": "object" },
+                "items": { "type": "object" }
+              }
+            }
           },
   
           "constraints": {
@@ -275,6 +333,18 @@
                 "description": "Feature flags and their mappings",
                 "type": "object",
                 "additionalProperties": true
+              },
+              "transformations": {
+                "description": "Data transformation rules",
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "description": { "type": "string" },
+                    "type": { "type": "string" },
+                    "separator": { "type": "string" }
+                  }
+                }
               }
             }
           },
@@ -350,6 +420,26 @@
                     "description": "Map provider finish reasons to uniform ones",
                     "type": "object",
                     "additionalProperties": { "type": "string" }
+                  },
+                  "reasoning_path": { 
+                    "description": "JSONPath to reasoning content",
+                    "type": "string"
+                  },
+                  "tool_calls_path": { 
+                    "description": "JSONPath to tool calls",
+                    "type": "string"
+                  },
+                  "response_id_path": { 
+                    "description": "JSONPath to response ID",
+                    "type": "string"
+                  },
+                  "incomplete_details_path": { 
+                    "description": "JSONPath to incomplete details",
+                    "type": "string"
+                  },
+                  "output_array_path": { 
+                    "description": "JSONPath to output array",
+                    "type": "string"
                   }
                 }
               },

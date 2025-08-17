@@ -12,18 +12,18 @@
       "value_template": "Bearer ${ENV:OPENAI_API_KEY}"
     }
   },
-  "model": {
+  "models": [{
     "id": "gpt-5",
     "aliases": ["gpt-5-thinking"],
     "family": "gpt-5",
     "description": "Complex reasoning, broad world knowledge, and code-heavy or multi-step agentic tasks",
     "endpoints": {
-      "response": {
+      "chat_completion": {
         "method": "POST",
         "path": "/v1/responses",
         "protocol": "https"
       },
-      "streaming_response": {
+      "streaming_chat_completion": {
         "method": "POST",
         "path": "/v1/responses",
         "protocol": "https",
@@ -33,17 +33,17 @@
       }
     },
     "input_modes": {
-      "text": true,
-      "messages": false,
+      "messages": true,
+      "single_text": true,
       "images": true,
       "audio": false,
       "video": false
     },
     "reasoning": {
       "supported": true,
-      "effort_levels": ["minimal", "low", "medium", "high"],
+      "effort_levels": ["low", "medium", "high"],
       "default_effort": "medium",
-      "passes_chain_of_thought": true,
+      "internal_chain_of_thought": true,
       "summary_modes": ["auto", "none"],
       "default_summary": "none"
     },
@@ -54,11 +54,18 @@
     },
     "tooling": {
       "tools_supported": true,
+      "parallel_tool_calls_default": true,
+      "can_disable_parallel_tool_calls": true,
       "custom_tools": true,
-      "allowed_tools": true,
       "preambles_supported": true,
-      "tool_types": ["function", "custom", "mcp", "image_generation"],
-      "context_free_grammars": true
+      "tool_types": ["function", "custom"],
+      "context_free_grammars": true,
+      "tool_choice_modes": ["auto", "none", "required", "specific"]
+    },
+    "json_output": {
+      "native_param": true,
+      "strategy": "json_schema",
+      "notes": "Supports structured outputs via response_format parameter"
     },
     "parameters": {
       "input": {
@@ -71,7 +78,7 @@
         "properties": {
           "effort": {
             "type": "string",
-            "enum": ["minimal", "low", "medium", "high"],
+            "enum": ["low", "medium", "high"],
             "default": "medium"
           },
           "summary": {
@@ -103,7 +110,7 @@
           "properties": {
             "type": {
               "type": "string",
-              "enum": ["function", "custom", "mcp", "image_generation"]
+              "enum": ["function", "custom"]
             },
             "name": {
               "type": "string"
@@ -123,7 +130,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["auto", "none", "required", "allowed_tools"]
+            "enum": ["auto", "none", "required", "specific"]
           },
           "mode": {
             "type": "string",
@@ -180,6 +187,21 @@
         "description": "Maximum tokens to generate in output"
       }
     },
+    "constraints": {
+      "system_prompt_location": "message_role",
+      "forbid_unknown_top_level_fields": true,
+      "mutually_exclusive": [
+        ["stream", "background"]
+      ],
+      "resolution_preferences": [
+        "max_output_tokens",
+        "max_tokens"
+      ],
+      "limits": {
+        "max_tool_schema_bytes": 1000000,
+        "max_system_prompt_bytes": 200000
+      }
+    },
     "mappings": {
       "paths": {
         "$.prompt_spec.messages[0].content": "$.input",
@@ -195,6 +217,10 @@
           "type": "join",
           "separator": "\n"
         }
+      },
+      "flags": {
+        "supports_reasoning": true,
+        "supports_response_api": true
       }
     },
     "response_normalization": {
@@ -203,6 +229,12 @@
         "reasoning_path": "reasoning_text",
         "tool_calls_path": "tool_calls",
         "finish_reason_path": "status",
+      "finish_reason_map": {
+        "completed": "stop",
+        "max_tokens": "length",
+        "tool_calls": "tool_calls",
+        "error": "error"
+      },
         "response_id_path": "id",
         "incomplete_details_path": "incomplete_details",
         "output_array_path": "output"
@@ -213,23 +245,34 @@
           "type_path": "object",
           "routes": [
             {
-              "when": "reasoning.delta",
-              "emit": "reasoning",
+              "when": "response.output_text.delta",
+              "emit": "delta",
               "text_path": "content"
             },
             {
-              "when": "output.delta",
-              "emit": "output",
+              "when": "response.reasoning_text.delta",
+              "emit": "delta",
               "text_path": "content"
             },
             {
-              "when": "done",
+              "when": "response.tool_calls.delta",
+              "emit": "tool",
+              "text_path": "arguments",
+              "name_path": "name"
+            },
+            {
+              "when": "response.completed",
               "emit": "stop",
               "text_path": "output_text"
+            },
+            {
+              "when": "response.error",
+              "emit": "error",
+              "text_path": "message"
             }
           ]
         }
       }
     }
-  }
+  }]
 }

@@ -14,9 +14,12 @@ def validate_provider_spec(spec_file: Path, schema_file: Path) -> bool:
     with open(schema_file, 'r') as f:
         schema = json.load(f)
     
-    # Load the specification (YAML)
+    # Load the specification (YAML or JSON)
     with open(spec_file, 'r') as f:
-        spec = yaml.safe_load(f)
+        if spec_file.suffix == '.json':
+            spec = json.load(f)
+        else:
+            spec = yaml.safe_load(f)
     
     try:
         # Validate against schema
@@ -33,10 +36,17 @@ def validate_provider_spec(spec_file: Path, schema_file: Path) -> bool:
         return False
 
 if __name__ == "__main__":
-    spec_file = Path("providers/openai/gpt-5.yaml")
+    # Validate all GPT-5 model specs
+    spec_files = [
+        Path("providers/openai/gpt-5.json"),
+        Path("providers/openai/gpt-5-mini.json"),
+        Path("providers/openai/gpt-5-nano.json")
+    ]
     schema_file = Path("schemas/provider-spec.schema.json")
     
-    if validate_provider_spec(spec_file, schema_file):
-        sys.exit(0)
-    else:
-        sys.exit(1)
+    all_valid = True
+    for spec_file in spec_files:
+        if not validate_provider_spec(spec_file, schema_file):
+            all_valid = False
+    
+    sys.exit(0 if all_valid else 1)
