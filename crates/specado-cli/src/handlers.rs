@@ -2,7 +2,7 @@
 //!
 //! This module contains the implementation logic for each CLI subcommand.
 
-use crate::cli::{CompletionsArgs, PreviewArgs, TranslateArgs, ValidateArgs};
+use crate::cli::{CompletionsArgs, PreviewArgs, StrictMode, TranslateArgs, ValidateArgs};
 use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::output::{OutputFormatter, OutputWriter};
@@ -10,6 +10,10 @@ use clap::CommandFactory;
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use specado_core::{PromptSpec, ProviderSpec};
+use specado_schemas::validation::{
+    create_prompt_spec_validator, create_provider_spec_validator,
+    SchemaValidator, ValidationError, ValidationMode,
+};
 use std::fs;
 use std::path::Path;
 
@@ -19,7 +23,7 @@ pub async fn handle_validate(
     config: &Config,
     output: &mut OutputWriter,
 ) -> Result<()> {
-    output.info(&format!("Validating prompt spec: {}", args.prompt_spec.display()))?;
+    output.info(&format!("Validating specification: {}", args.prompt_spec.display()))?;
     
     // Check if file exists
     if !args.prompt_spec.exists() {
@@ -28,16 +32,17 @@ pub async fn handle_validate(
         });
     }
     
-    // Read the prompt spec file
+    // Read the spec file
     let content = fs::read_to_string(&args.prompt_spec)?;
     
-    // Determine file format and parse
-    let prompt_spec: PromptSpec = if args.prompt_spec
+    // Determine file format and parse to JSON value for validation
+    let is_yaml = args.prompt_spec
         .extension()
         .and_then(|s| s.to_str())
         .map(|s| s == "yaml" || s == "yml")
-        .unwrap_or(false)
-    {
+        .unwrap_or(false);
+    
+    let spec_value: serde_json::Value = if is_yaml {
         serde_yaml::from_str(&content).map_err(|e| Error::InvalidFormat {
             path: args.prompt_spec.clone(),
             expected: "YAML".to_string(),
@@ -49,14 +54,140 @@ pub async fn handle_validate(
         })?
     };
     
-    // TODO: Implement actual schema validation (Issue #11)
-    // For now, just check that we can parse the file
+    // Determine spec type and validate
+    let spec_type = detect_spec_type(&spec_value);
     
-    output.success("✓ Prompt specification is valid")?;
+    // Convert strict mode to validation mode
+    let validation_mode = match args.strict {
+        StrictMode::Strict => ValidationMode::Strict,
+        StrictMode::Warn => ValidationMode::Partial,
+        StrictMode::Coerce => ValidationMode::Basic,
+    };
     
-    if args.detailed {
-        output.info("Prompt specification details:")?;
-        output.data(&prompt_spec)?;
+    // Run validation based on spec type
+    let validation_result = match spec_type {
+        SpecType::PromptSpec => {
+            output.info("Detected PromptSpec format")?;
+            validate_prompt_spec(&spec_value, validation_mode)
+        }
+        SpecType::ProviderSpec => {
+            output.info("Detected ProviderSpec format")?;
+            validate_provider_spec(&spec_value, validation_mode)
+        }
+        SpecType::Unknown => {
+            return Err(Error::InvalidFormat {
+                path: args.prompt_spec.clone(),
+                expected: "PromptSpec or ProviderSpec".to_string(),
+            });
+        }
+    };
+    
+    // Handle validation results
+    match validation_result {
+        Ok(()) => {
+            output.success("✓ Specification is valid")?;
+            
+            if args.detailed {
+                output.section("Specification Details")?;
+                output.data(&spec_value)?;
+            }
+        }
+        Err(validation_error) => {
+            output.error("✗ Specification validation failed")?;
+            
+            // Format and display validation errors
+            format_validation_errors(output, &validation_error)?;
+            
+            if args.detailed {
+                output.section("Failed Specification")?;
+                output.data(&spec_value)?;
+            }
+            
+            return Err(Error::other(format!(
+                "Validation failed with {} violation(s)",
+                validation_error.schema_violations.len()
+            )));
+        }
+    }
+    
+    Ok(())
+}
+
+/// Spec type detection
+#[derive(Debug, PartialEq)]
+enum SpecType {
+    PromptSpec,
+    ProviderSpec,
+    Unknown,
+}
+
+/// Detect whether a JSON value is a PromptSpec or ProviderSpec
+fn detect_spec_type(value: &serde_json::Value) -> SpecType {
+    if let Some(obj) = value.as_object() {
+        // PromptSpec has 'model_class' and 'messages' (or 'prompt')
+        if obj.contains_key("model_class") || 
+           obj.contains_key("messages") || 
+           obj.contains_key("prompt") {
+            return SpecType::PromptSpec;
+        }
+        
+        // ProviderSpec has 'provider' and 'models'
+        if obj.contains_key("provider") || obj.contains_key("models") {
+            return SpecType::ProviderSpec;
+        }
+    }
+    
+    SpecType::Unknown
+}
+
+/// Validate a PromptSpec
+fn validate_prompt_spec(
+    spec: &serde_json::Value,
+    mode: ValidationMode,
+) -> std::result::Result<(), ValidationError> {
+    let validator = create_prompt_spec_validator()
+        .map_err(|e| ValidationError::new(
+            "$",
+            format!("Failed to create PromptSpec validator: {}", e)
+        ))?;
+    
+    let context = specado_schemas::validation::ValidationContext::new(mode);
+    validator.validate_with_context(spec, &context)
+}
+
+/// Validate a ProviderSpec
+fn validate_provider_spec(
+    spec: &serde_json::Value,
+    mode: ValidationMode,
+) -> std::result::Result<(), ValidationError> {
+    let validator = create_provider_spec_validator()
+        .map_err(|e| ValidationError::new(
+            "$",
+            format!("Failed to create ProviderSpec validator: {}", e)
+        ))?;
+    
+    let context = specado_schemas::validation::ValidationContext::new(mode);
+    validator.validate_with_context(spec, &context)
+}
+
+/// Format validation errors for display
+fn format_validation_errors(
+    output: &mut OutputWriter,
+    error: &ValidationError,
+) -> Result<()> {
+    output.error(&format!("Validation error at '{}':", error.path))?;
+    output.error(&format!("  {}", error.message))?;
+    
+    if !error.schema_violations.is_empty() {
+        output.error("")?;
+        output.error("Schema violations:")?;
+        
+        for violation in &error.schema_violations {
+            output.error(&format!("  • Rule: {}", violation.rule))?;
+            output.error(&format!("    Expected: {}", violation.expected))?;
+            output.error(&format!("    Actual: {}", violation.actual))?;
+            output.error("")?;
+        }
     }
     
     Ok(())
