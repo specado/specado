@@ -2,7 +2,7 @@
 
 use crate::{
     corpus::{CorpusManager, TestCase},
-    diff::DiffEngine,
+    diff::{DiffEngine, DiffOptions},
     snapshot::SnapshotManager,
     GoldenConfig, GoldenError, Result,
 };

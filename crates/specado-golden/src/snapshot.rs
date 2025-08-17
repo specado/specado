@@ -302,7 +302,7 @@ mod tests {
         let manager = SnapshotManager::new(temp_dir.path());
         
         let content = json!({
-            "model": "gpt-4",
+            "model": "gpt-5",
             "messages": [{"role": "user", "content": "Hello"}]
         });
         
@@ -351,7 +351,7 @@ mod tests {
     #[test]
     fn test_apply_ignores() {
         let mut value = json!({
-            "model": "gpt-4",
+            "model": "gpt-5",
             "timestamp": "2025-01-01T00:00:00Z",
             "nested": {
                 "keep": "this",

@@ -26,6 +26,9 @@ pub mod provider_discovery;
 pub mod translation;
 pub mod types;
 
+#[cfg(test)]
+pub mod proptest_strategies;
+
 // Re-export main types for convenience
 pub use error::{Error, Result, Severity, StrictMode};
 pub use types::{
