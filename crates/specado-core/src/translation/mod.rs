@@ -17,6 +17,9 @@ pub mod strictness;
 pub mod transformer;
 pub mod validator;
 
+#[cfg(test)]
+pub mod provider_spec_tests;
+
 use crate::{
     Error, PromptSpec, ProviderSpec, Result, StrictMode, TranslationMetadata,
     TranslationResult,
