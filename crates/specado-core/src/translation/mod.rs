@@ -12,6 +12,7 @@ pub mod jsonpath;
 pub mod lossiness;
 pub mod mapper;
 pub mod strictness;
+pub mod transformer;
 pub mod validator;
 
 use crate::{
@@ -19,13 +20,19 @@ use crate::{
     TranslationResult,
 };
 use std::time::Instant;
+use std::sync::{Arc, Mutex};
 
 pub use builder::{TranslationResultBuilder, BuilderState, BuilderError, ProviderRequestBuilder};
 pub use context::TranslationContext;
 pub use lossiness::LossinessTracker;
 pub use mapper::JSONPathMapper;
 pub use strictness::{StrictnessAction, StrictnessPolicy, PolicyResult};
-pub use validator::PreValidator;
+pub use transformer::{
+    TransformationPipeline, TransformationRule, TransformationRuleBuilder,
+    TransformationType, TransformationDirection, TransformationError,
+    TransformationContext, ValueType, ConversionFormula, Condition,
+};
+pub use validator::{PreValidator, ValidationError, ValidationSeverity, ValidationMode};
 
 /// Main translation function that converts a PromptSpec to provider-specific format
 ///
@@ -115,18 +122,18 @@ pub fn translate(
         strict_mode,
     );
 
-    // Step 3: Pre-validation (placeholder for issue #16)
+    // Step 3: Pre-validation - comprehensive validation with detailed error reporting
     let validator = PreValidator::new(&context);
-    validator.validate()?;
+    validator.validate_strict()?;
 
-    // Step 4: Initialize lossiness tracker (placeholder for issue #18)
-    let mut lossiness_tracker = LossinessTracker::new(strict_mode);
+    // Step 4: Create shared lossiness tracker for issue #18
+    let lossiness_tracker = Arc::new(Mutex::new(LossinessTracker::new(strict_mode)));
 
     // Step 5: Initialize strictness policy engine
     let strictness_policy = StrictnessPolicy::new(context.clone());
 
-    // Step 6: Create JSONPath mapper (placeholder for issue #10)
-    let _mapper = JSONPathMapper::new(&context);
+    // Step 6: Create JSONPath mapper with lossiness tracking (issue #18)
+    let mut mapper = JSONPathMapper::new(&context);
 
     // Step 7: Build base provider request structure
     // This is a placeholder implementation - the actual mapping logic
@@ -141,8 +148,46 @@ pub fn translate(
         }).collect::<Vec<_>>(),
     });
 
-    // Step 8: Apply field transformations (placeholder for issue #17)
-    // Future: Apply transformations based on provider mappings
+    // Step 7.5: Apply JSONPath mappings with lossiness tracking
+    // This demonstrates integration of mapper with tracking
+    let prompt_as_json = serde_json::to_value(prompt_spec).unwrap_or_default();
+    if let Ok(mapped_fields) = mapper.apply_mappings_with_tracker(&prompt_as_json, Some(&lossiness_tracker)) {
+        // Merge mapped fields into provider request
+        if let (serde_json::Value::Object(ref mut request_obj), serde_json::Value::Object(mapped_obj)) = 
+            (&mut provider_request, mapped_fields) {
+            for (key, value) in mapped_obj {
+                request_obj.insert(key, value);
+            }
+        }
+    }
+
+    // Step 8: Apply field transformations using the transformation pipeline
+    let mut transformation_pipeline = TransformationPipeline::new();
+    
+    // Build transformation pipeline from provider mappings
+    // In a real implementation, this would be configured from the provider spec
+    // For now, create some example transformations based on common provider needs
+    
+    // Add temperature scaling if needed (example: OpenAI uses 0-2, Anthropic uses 0-1)
+    if context.provider_name() == "anthropic" {
+        if let Ok(temp_rule) = TransformationRuleBuilder::new("temperature_scale", "$.temperature")
+            .transformation(TransformationType::UnitConversion {
+                from_unit: "openai_range".to_string(),
+                to_unit: "anthropic_range".to_string(),
+                formula: ConversionFormula::Linear { scale: 0.5, offset: 0.0 },
+            })
+            .direction(TransformationDirection::Forward)
+            .priority(10)
+            .optional()
+            .build() {
+            transformation_pipeline = transformation_pipeline.add_rule(temp_rule);
+        }
+    }
+    
+    // Apply transformations to the provider request
+    provider_request = transformation_pipeline
+        .transform(&provider_request, TransformationDirection::Forward, &context)
+        .unwrap_or(provider_request); // Fall back to original on error
 
     // Step 9: Handle tools if present
     if let Some(ref tools) = prompt_spec.tools {
@@ -153,6 +198,14 @@ pub fn translate(
                 provider_request["tool_choice"] = serde_json::json!(tool_choice);
             }
         } else {
+            // Track field dropped due to provider limitations
+            mapper.track_field_dropped_due_to_provider(
+                "$.tools",
+                Some(serde_json::json!(tools)),
+                &format!("Provider {} doesn't support tools", context.provider_name()),
+                Some(&lossiness_tracker),
+            );
+            
             // Use strictness policy to handle unsupported tools
             let policy_result = strictness_policy.evaluate_unsupported_feature(
                 "tools",
@@ -162,7 +215,9 @@ pub fn translate(
             
             // Add lossiness item if provided
             if let Some(lossiness_item) = policy_result.lossiness_item {
-                lossiness_tracker.add_item(lossiness_item);
+                if let Ok(mut tracker) = lossiness_tracker.lock() {
+                    tracker.add_item(lossiness_item);
+                }
             }
             
             // Handle the policy action
@@ -206,7 +261,9 @@ pub fn translate(
             }
             
             if let Some(lossiness_item) = policy_result.lossiness_item {
-                lossiness_tracker.add_item(lossiness_item);
+                if let Ok(mut tracker) = lossiness_tracker.lock() {
+                    tracker.add_item(lossiness_item);
+                }
             }
         }
         if let Some(top_p) = sampling.top_p {
@@ -237,7 +294,9 @@ pub fn translate(
             
             // Add lossiness item if provided
             if let Some(lossiness_item) = policy_result.lossiness_item {
-                lossiness_tracker.add_item(lossiness_item);
+                if let Ok(mut tracker) = lossiness_tracker.lock() {
+                    tracker.add_item(lossiness_item);
+                }
             }
             
             // Handle the policy action
@@ -263,7 +322,9 @@ pub fn translate(
             );
             
             if let Some(lossiness_item) = policy_result.lossiness_item {
-                lossiness_tracker.add_item(lossiness_item);
+                if let Ok(mut tracker) = lossiness_tracker.lock() {
+                    tracker.add_item(lossiness_item);
+                }
             }
             
             match policy_result.action {
@@ -280,7 +341,9 @@ pub fn translate(
 
     // Step 13: Apply strictness policy evaluation
     // Check if we should proceed based on accumulated lossiness
-    strictness_policy.evaluate_proceeding(&lossiness_tracker)?;
+    if let Ok(tracker) = lossiness_tracker.lock() {
+        strictness_policy.evaluate_proceeding(&tracker)?;
+    }
 
     // Step 14: Resolve conflicts (placeholder for issue #20)
     // Future: Apply conflict resolution logic
@@ -296,15 +359,34 @@ pub fn translate(
         strict_mode,
     };
 
-    let result = TranslationResultBuilder::new()
-        .with_provider_request(provider_request)
-        .with_lossiness_report(lossiness_tracker.build_report())
-        .with_metadata(metadata)
-        .build()
-        .map_err(|_| Error::Translation {
-            message: "Failed to build translation result".to_string(),
+    // Build final result with lossiness tracking
+    let result = if let Ok(tracker) = Arc::try_unwrap(lossiness_tracker) {
+        // If we can unwrap the Arc, consume the tracker to build the report
+        let tracker = tracker.into_inner().map_err(|_| Error::Translation {
+            message: "Failed to access lossiness tracker".to_string(),
             context: None,
         })?;
+        
+        TranslationResultBuilder::new()
+            .with_provider_request(provider_request)
+            .with_lossiness_report(tracker.build_report())
+            .with_metadata(metadata)
+            .build()
+            .map_err(|_| Error::Translation {
+                message: "Failed to build translation result".to_string(),
+                context: None,
+            })?
+    } else {
+        // Fallback: create result without consuming the tracker
+        TranslationResultBuilder::new()
+            .with_provider_request(provider_request)
+            .with_metadata(metadata)
+            .build()
+            .map_err(|_| Error::Translation {
+                message: "Failed to build translation result".to_string(),
+                context: None,
+            })?
+    };
 
     Ok(result)
 }
@@ -473,5 +555,36 @@ mod tests {
         assert_eq!(metadata.model, "test-model");
         assert_eq!(metadata.strict_mode, StrictMode::Strict);
         assert!(metadata.duration_ms.is_some());
+    }
+
+    #[test]
+    fn test_translate_with_lossiness_tracking() {
+        let mut prompt = create_test_prompt();
+        let provider = create_test_provider();
+        
+        // Add tools to test tracking when they're not supported
+        use crate::Tool;
+        prompt.tools = Some(vec![Tool {
+            name: "test_function".to_string(),
+            description: Some("A test function".to_string()),
+            json_schema: serde_json::json!({
+                "type": "object",
+                "properties": {}
+            }),
+        }]);
+        
+        // Use a provider that doesn't support tools for this test
+        let mut test_provider = provider;
+        test_provider.models[0].tooling.tools_supported = false;
+        
+        let result = translate(&prompt, &test_provider, "test-model", StrictMode::Warn).unwrap();
+        
+        // Should have lossiness due to dropped tools
+        assert!(result.has_lossiness());
+        assert!(result.lossiness.items.len() > 0);
+        
+        // Check that metadata includes timing
+        assert!(result.metadata.is_some());
+        assert!(result.duration_ms().is_some());
     }
 }

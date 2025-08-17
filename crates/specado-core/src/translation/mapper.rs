@@ -9,8 +9,11 @@
 use crate::Result;
 use super::TranslationContext;
 use super::jsonpath::JSONPath;
+use super::transformer::{TransformationPipeline, TransformationDirection};
+use super::lossiness::LossinessTracker;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 /// JSONPath mapper for translating fields between uniform and provider formats
 ///
@@ -43,16 +46,58 @@ impl<'a> JSONPathMapper<'a> {
         source_data: &Value,
         target_data: &mut Value,
     ) -> Result<()> {
+        self.map_field_with_tracker(source_path, target_path, source_data, target_data, None)
+    }
+
+    /// Map a value from a source path to a target path with lossiness tracking
+    ///
+    /// This version includes comprehensive lossiness tracking for field mappings.
+    pub fn map_field_with_tracker(
+        &mut self,
+        source_path: &str,
+        target_path: &str,
+        source_data: &Value,
+        target_data: &mut Value,
+        lossiness_tracker: Option<&Arc<Mutex<LossinessTracker>>>,
+    ) -> Result<()> {
         // Extract value from source using JSONPath
         let extracted_values = self.extract_values(source_path, source_data)?;
         
         if extracted_values.is_empty() {
+            // Track missing field if we have a tracker
+            if let Some(tracker) = lossiness_tracker {
+                if let Ok(mut tracker) = tracker.lock() {
+                    tracker.track_dropped_field(
+                        source_path,
+                        None,
+                        "Source field not found during mapping",
+                        Some(self.context.provider_name().to_string()),
+                    );
+                }
+            }
             // No values found - this might be acceptable depending on strictness
             return Ok(());
         }
         
         // For now, take the first value if multiple are found
         let value_to_set = extracted_values[0].clone();
+        
+        // Track field mapping if paths are different
+        if source_path != target_path {
+            if let Some(tracker) = lossiness_tracker {
+                if let Ok(mut tracker) = tracker.lock() {
+                    tracker.track_transformation(
+                        source_path,
+                        super::lossiness::OperationType::FieldMove,
+                        Some(value_to_set.clone()),
+                        Some(value_to_set.clone()),
+                        &format!("Field moved from '{}' to '{}'", source_path, target_path),
+                        Some(self.context.provider_name().to_string()),
+                        HashMap::new(),
+                    );
+                }
+            }
+        }
         
         // Set the value at the target path
         self.set_value_at_path(target_path, value_to_set, target_data)
@@ -64,11 +109,22 @@ impl<'a> JSONPathMapper<'a> {
     /// provider specification and applies them to transform the uniform
     /// format to the provider-specific format.
     pub fn apply_mappings(&mut self, input: &Value) -> Result<Value> {
+        self.apply_mappings_with_tracker(input, None)
+    }
+
+    /// Apply all mappings from the provider spec with lossiness tracking
+    ///
+    /// This version includes comprehensive tracking of field mappings and drops.
+    pub fn apply_mappings_with_tracker(
+        &mut self,
+        input: &Value,
+        lossiness_tracker: Option<&Arc<Mutex<LossinessTracker>>>,
+    ) -> Result<Value> {
         let mut output = Value::Object(serde_json::Map::new());
         
         // Apply path mappings from the provider spec
         for (source_path, target_path) in &self.context.model_spec.mappings.paths {
-            self.map_field(source_path, target_path, input, &mut output)?;
+            self.map_field_with_tracker(source_path, target_path, input, &mut output, lossiness_tracker)?;
         }
         
         // If no mappings are defined, perform a basic structure copy
@@ -77,7 +133,7 @@ impl<'a> JSONPathMapper<'a> {
         }
         
         // Apply flag mappings
-        self.apply_flags(&mut output)?;
+        self.apply_flags_with_tracker(&mut output, lossiness_tracker)?;
         
         Ok(output)
     }
@@ -121,13 +177,87 @@ impl<'a> JSONPathMapper<'a> {
         (self.compiled_paths.len(), self.compiled_paths.capacity())
     }
 
+    /// Apply mappings with transformations
+    ///
+    /// This method combines JSONPath mapping with field transformations,
+    /// providing a comprehensive translation from uniform to provider format.
+    pub fn apply_mappings_with_transformations(
+        &mut self,
+        input: &Value,
+        transformation_pipeline: &mut TransformationPipeline,
+        direction: TransformationDirection,
+    ) -> Result<Value> {
+        self.apply_mappings_with_transformations_and_tracker(input, transformation_pipeline, direction, None)
+    }
+
+    /// Apply mappings with transformations and lossiness tracking
+    ///
+    /// This version includes comprehensive tracking throughout the transformation pipeline.
+    pub fn apply_mappings_with_transformations_and_tracker(
+        &mut self,
+        input: &Value,
+        transformation_pipeline: &mut TransformationPipeline,
+        direction: TransformationDirection,
+        lossiness_tracker: Option<&Arc<Mutex<LossinessTracker>>>,
+    ) -> Result<Value> {
+        // First apply JSONPath mappings
+        let mut mapped_output = self.apply_mappings_with_tracker(input, lossiness_tracker)?;
+        
+        // Then apply transformations (transformer module should handle its own lossiness tracking)
+        mapped_output = transformation_pipeline.transform(
+            &mapped_output,
+            direction,
+            self.context,
+        )?;
+        
+        Ok(mapped_output)
+    }
+
+    /// Create a basic transformation pipeline from provider mappings
+    ///
+    /// This creates transformation rules based on the provider spec's mapping configuration.
+    /// In the future, this could be extended to read transformation configs from the spec.
+    pub fn create_transformation_pipeline(&self) -> TransformationPipeline {
+        let pipeline = TransformationPipeline::new();
+        
+        // Add transformation rules based on provider mappings
+        // This is a placeholder - in practice, transformation rules would be
+        // defined in the provider specification
+        
+        pipeline
+    }
+
     /// Apply flag mappings (boolean transformations)
     pub fn apply_flags(&self, output: &mut Value) -> Result<()> {
+        self.apply_flags_with_tracker(output, None)
+    }
+
+    /// Apply flag mappings with lossiness tracking
+    pub fn apply_flags_with_tracker(
+        &self,
+        output: &mut Value,
+        lossiness_tracker: Option<&Arc<Mutex<LossinessTracker>>>,
+    ) -> Result<()> {
         // Apply flag mappings from the provider spec
         for (flag_name, flag_value) in &self.context.model_spec.mappings.flags {
             // Flags are simple key-value pairs that get set directly
             if let Some(obj) = output.as_object_mut() {
                 obj.insert(flag_name.clone(), flag_value.clone());
+                
+                // Track flag application
+                if let Some(tracker) = lossiness_tracker {
+                    if let Ok(mut tracker) = tracker.lock() {
+                        tracker.track_transformation(
+                            &format!("$.{}", flag_name),
+                            super::lossiness::OperationType::DefaultApplied,
+                            None,
+                            Some(flag_value.clone()),
+                            &format!("Applied provider flag: {}", flag_name),
+                            Some(self.context.provider_name().to_string()),
+                            HashMap::new(),
+                        );
+                    }
+                }
             }
         }
         
@@ -200,6 +330,112 @@ impl<'a> JSONPathMapper<'a> {
         }
         
         Ok(())
+    }
+
+    /// Check if a provider supports a specific feature
+    pub fn provider_supports_feature(&self, feature: &str) -> bool {
+        match feature {
+            "tools" => self.context.model_spec.tooling.tools_supported,
+            "json_output" => self.context.model_spec.json_output.native_param,
+            "streaming" => true, // Most providers support streaming
+            _ => false,
+        }
+    }
+
+    /// Track when a field is dropped due to provider limitations
+    pub fn track_field_dropped_due_to_provider(
+        &self,
+        field_path: &str,
+        original_value: Option<Value>,
+        reason: &str,
+        lossiness_tracker: Option<&Arc<Mutex<LossinessTracker>>>,
+    ) {
+        if let Some(tracker) = lossiness_tracker {
+            if let Ok(mut tracker) = tracker.lock() {
+                tracker.track_dropped_field(
+                    field_path,
+                    original_value,
+                    reason,
+                    Some(self.context.provider_name().to_string()),
+                );
+            }
+        }
+    }
+
+    /// Track when a field is mapped to a different location
+    pub fn track_field_mapping(
+        &self,
+        from_path: &str,
+        to_path: &str,
+        value: Option<Value>,
+        reason: &str,
+        lossiness_tracker: Option<&Arc<Mutex<LossinessTracker>>>,
+    ) {
+        if let Some(tracker) = lossiness_tracker {
+            if let Ok(mut tracker) = tracker.lock() {
+                let mut metadata = HashMap::new();
+                metadata.insert("target_path".to_string(), to_path.to_string());
+                
+                tracker.track_transformation(
+                    from_path,
+                    super::lossiness::OperationType::FieldMove,
+                    value.clone(),
+                    value,
+                    reason,
+                    Some(self.context.provider_name().to_string()),
+                    metadata,
+                );
+            }
+        }
+    }
+
+    /// Handle array manipulations with tracking
+    pub fn handle_array_manipulation(
+        &mut self,
+        source_path: &str,
+        target_path: &str,
+        source_data: &Value,
+        manipulation_type: &str,
+        lossiness_tracker: Option<&Arc<Mutex<LossinessTracker>>>,
+    ) -> Result<Value> {
+        let extracted_values = self.extract_values(source_path, source_data)?;
+        
+        if extracted_values.is_empty() {
+            if let Some(tracker) = lossiness_tracker {
+                if let Ok(mut tracker) = tracker.lock() {
+                    tracker.track_dropped_field(
+                        source_path,
+                        None,
+                        &format!("Array not found for manipulation: {}", manipulation_type),
+                        Some(self.context.provider_name().to_string()),
+                    );
+                }
+            }
+            return Ok(Value::Array(vec![]));
+        }
+        
+        let array_value = &extracted_values[0];
+        
+        // Track the array manipulation
+        if let Some(tracker) = lossiness_tracker {
+            if let Ok(mut tracker) = tracker.lock() {
+                let mut metadata = HashMap::new();
+                metadata.insert("manipulation_type".to_string(), manipulation_type.to_string());
+                metadata.insert("target_path".to_string(), target_path.to_string());
+                
+                tracker.track_transformation(
+                    source_path,
+                    super::lossiness::OperationType::FieldMove,
+                    Some(array_value.clone()),
+                    Some(array_value.clone()),
+                    &format!("Array manipulation: {} from {} to {}", manipulation_type, source_path, target_path),
+                    Some(self.context.provider_name().to_string()),
+                    metadata,
+                );
+            }
+        }
+        
+        Ok(array_value.clone())
     }
 }
 

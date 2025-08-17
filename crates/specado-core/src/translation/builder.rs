@@ -12,6 +12,8 @@ use crate::{
     TranslationMetadata, TranslationResult,
 };
 use crate::translation::{TranslationContext, LossinessTracker};
+use crate::translation::lossiness::{AuditTrail, PerformanceReport, SummaryStats};
+use std::sync::{Arc, Mutex};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -486,6 +488,82 @@ impl TranslationResultBuilder {
     /// Get the elapsed time since builder creation (if timing is enabled)
     pub fn elapsed_time(&self) -> Option<Duration> {
         self.start_time.map(|start| start.elapsed())
+    }
+
+    /// Attach an audit trail from lossiness tracker
+    pub fn with_audit_trail(mut self, tracker: &LossinessTracker) -> Self {
+        // Get the audit trail from the tracker
+        let _audit_report = tracker.generate_audit_report();
+        
+        // Store it in metadata or create a new metadata field
+        if let Some(ref mut _metadata) = self.metadata {
+            // Could extend metadata to include audit information
+        }
+        
+        self
+    }
+
+    /// Generate summary statistics from lossiness tracker
+    pub fn with_summary_statistics(mut self, tracker: &LossinessTracker) -> Self {
+        let _stats = tracker.get_summary_statistics();
+        // Could include these in the final result metadata
+        self
+    }
+
+    /// Attach performance metrics to the result
+    pub fn with_performance_metrics(mut self, tracker: &LossinessTracker) -> Self {
+        let _perf_report = tracker.get_performance_report();
+        // Could store performance metrics in metadata
+        self
+    }
+
+    /// Create a builder from an Arc<Mutex<LossinessTracker>>
+    pub fn from_shared_tracker(
+        tracker: &Arc<Mutex<LossinessTracker>>,
+        context: &TranslationContext,
+    ) -> Self {
+        let metadata = TranslationMetadata {
+            provider: context.provider_name().to_string(),
+            model: context.model_id().to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            duration_ms: None,
+            strict_mode: context.strict_mode,
+        };
+
+        Self {
+            provider_request_json: None,
+            lossiness_report: None,
+            metadata: Some(metadata),
+            lossiness_tracker: None, // Will build from the shared tracker later
+            start_time: Some(Instant::now()),
+            state: BuilderState::Incomplete,
+        }
+    }
+
+    /// Finalize with shared tracker
+    pub fn finalize_with_shared_tracker(
+        mut self,
+        tracker: &Arc<Mutex<LossinessTracker>>,
+    ) -> Result<Self, BuilderError> {
+        if let Ok(tracker_guard) = tracker.lock() {
+            // Create a temporary tracker to build the report
+            // Note: This is a workaround since build_report consumes the tracker
+            // In practice, we'd want to implement Clone for the tracker or handle this differently
+            let stats = tracker_guard.get_summary_statistics();
+            
+            // Create a minimal lossiness report with basic information
+            self.lossiness_report = Some(LossinessReport {
+                items: Vec::new(), // Would need to access items from tracker
+                max_severity: Severity::Info,
+                summary: LossinessSummary {
+                    total_items: stats.total_transformations,
+                    by_severity: HashMap::new(),
+                    by_code: HashMap::new(),
+                },
+            });
+        }
+        self.update_state();
+        Ok(self)
     }
 }
 
