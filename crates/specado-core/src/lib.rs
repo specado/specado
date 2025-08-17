@@ -22,6 +22,7 @@
 //! ```
 
 pub mod error;
+pub mod translation;
 pub mod types;
 
 // Re-export main types for convenience
@@ -63,18 +64,14 @@ pub use error::LossinessCode;
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Placeholder translate function (to be implemented in issue #9)
-pub fn translate(
-    _prompt_spec: &PromptSpec,
-    _provider_spec: &ProviderSpec,
-    _model_id: &str,
-    _mode: StrictMode,
-) -> Result<TranslationResult> {
-    Err(Error::Unsupported {
-        message: "Translation not yet implemented (see issue #9)".to_string(),
-        feature: Some("translate".to_string()),
-    })
-}
+/// Main translation function that converts a PromptSpec to provider-specific format
+///
+/// This function is the primary public API for the translation engine. It takes
+/// a validated `PromptSpec` and converts it to a provider-specific JSON format
+/// based on the `ProviderSpec` configuration.
+///
+/// See `translation::translate` for full documentation.
+pub use translation::translate;
 
 /// Placeholder run function (to be implemented in L2)
 pub async fn run(_provider_request_json: &serde_json::Value) -> Result<UniformResponse> {

@@ -120,6 +120,10 @@ pub struct Message {
     /// Content of the message
     pub content: String,
     
+    /// Optional name for the message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    
     /// Optional metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Value>,
@@ -352,7 +356,7 @@ pub struct TranslationResult {
 }
 
 /// Lossiness report containing all deviations
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LossinessReport {
     /// List of lossiness items
     pub items: Vec<LossinessItem>,
@@ -365,7 +369,7 @@ pub struct LossinessReport {
 }
 
 /// Individual lossiness item
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LossinessItem {
     pub code: LossinessCode,
     pub path: String,
@@ -380,7 +384,7 @@ pub struct LossinessItem {
 }
 
 /// Summary of lossiness statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LossinessSummary {
     pub total_items: usize,
     pub by_severity: HashMap<String, usize>,
@@ -388,7 +392,7 @@ pub struct LossinessSummary {
 }
 
 /// Metadata about a translation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TranslationMetadata {
     pub provider: String,
     pub model: String,
@@ -459,6 +463,7 @@ mod tests {
                 Message {
                     role: MessageRole::User,
                     content: "Hello".to_string(),
+                    name: None,
                     metadata: None,
                 }
             ],
