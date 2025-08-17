@@ -12,6 +12,7 @@ pub mod context;
 pub mod jsonpath;
 pub mod lossiness;
 pub mod mapper;
+pub mod provider_loader;
 pub mod strictness;
 pub mod transformer;
 pub mod validator;

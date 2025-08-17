@@ -22,6 +22,7 @@
 //! ```
 
 pub mod error;
+pub mod provider_discovery;
 pub mod translation;
 pub mod types;
 
