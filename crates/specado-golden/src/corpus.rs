@@ -1,6 +1,6 @@
 //! Test corpus management for golden tests
 
-use crate::{GoldenError, Result};
+use crate::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;

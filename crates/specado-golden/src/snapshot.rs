@@ -109,7 +109,7 @@ impl SnapshotManager {
         
         // Update content and metadata
         snapshot.content = new_content;
-        snapshot.metadata.updated_at = chrono::Utc::now().to_rfc3339();
+        snapshot.metadata.updated_at = Utc::now().to_rfc3339();
         
         self.save(&snapshot)
     }
@@ -121,7 +121,7 @@ impl SnapshotManager {
         content: Value,
         description: Option<String>,
     ) -> Result<Snapshot> {
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = Utc::now().to_rfc3339();
         
         let snapshot = Snapshot {
             name: name.to_string(),
@@ -199,7 +199,7 @@ impl SnapshotManager {
             return Ok(());
         }
         
-        let backup_name = format!("{}.backup.{}", name, chrono::Utc::now().timestamp());
+        let backup_name = format!("{}.backup.{}", name, Utc::now().timestamp());
         let backup_path = self.snapshot_path(&backup_name);
         
         fs::copy(source, backup_path)?;
@@ -288,31 +288,7 @@ fn remove_field_recursive(value: &mut Value, path_parts: &[&str]) {
     }
 }
 
-// Add chrono dependency for timestamps
-use once_cell::sync::Lazy;
-
-// Mock chrono for now - in real implementation would use chrono crate
-mod chrono {
-    pub struct Utc;
-    
-    impl Utc {
-        pub fn now() -> DateTime {
-            DateTime
-        }
-    }
-    
-    pub struct DateTime;
-    
-    impl DateTime {
-        pub fn to_rfc3339(&self) -> String {
-            "2025-01-01T00:00:00Z".to_string()
-        }
-        
-        pub fn timestamp(&self) -> i64 {
-            1704067200
-        }
-    }
-}
+use chrono::Utc;
 
 #[cfg(test)]
 mod tests {

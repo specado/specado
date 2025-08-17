@@ -2,14 +2,13 @@
 
 use crate::{
     corpus::{CorpusManager, TestCase},
-    diff::{DiffEngine, DiffOptions, DiffResult},
-    snapshot::{Snapshot, SnapshotManager},
+    diff::DiffEngine,
+    snapshot::SnapshotManager,
     GoldenConfig, GoldenError, Result,
 };
 use colored::*;
 use serde_json::Value;
-use specado_core::{translate, types::TranslationResult};
-use std::path::Path;
+use specado_core::translate;
 use std::time::Instant;
 
 /// Result of running a golden test
@@ -66,7 +65,6 @@ pub struct GoldenTestRunner {
     config: GoldenConfig,
     corpus_manager: CorpusManager,
     snapshot_manager: SnapshotManager,
-    diff_engine: DiffEngine,
 }
 
 impl GoldenTestRunner {
@@ -74,13 +72,11 @@ impl GoldenTestRunner {
     pub fn new(config: GoldenConfig) -> Self {
         let corpus_manager = CorpusManager::new(&config.corpus_dir);
         let snapshot_manager = SnapshotManager::new(&config.snapshot_dir);
-        let diff_engine = DiffEngine::new(config.diff_options.clone());
         
         Self {
             config,
             corpus_manager,
             snapshot_manager,
-            diff_engine,
         }
     }
     

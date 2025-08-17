@@ -8,7 +8,7 @@ pub mod diff;
 pub mod runner;
 pub mod snapshot;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use thiserror::Error;
 
 pub use corpus::CorpusManager;
