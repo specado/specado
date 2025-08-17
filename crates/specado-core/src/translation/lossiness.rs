@@ -168,12 +168,16 @@ impl LossinessTracker {
         });
     }
 
+    /// Add a custom lossiness item
+    pub fn add_item(&mut self, item: LossinessItem) {
+        self.items.push(item);
+    }
+
     /// Determine severity based on lossiness code and strict mode
     fn determine_severity(&self, code: LossinessCode) -> Severity {
         match (code, self.strict_mode) {
-            // Unsupported features are critical in strict mode
-            (LossinessCode::Unsupported, StrictMode::Strict) => Severity::Critical,
-            (LossinessCode::Unsupported, _) => Severity::Error,
+            // Unsupported features are always critical since they cannot be emulated or coerced
+            (LossinessCode::Unsupported, _) => Severity::Critical,
             
             // Drops are errors in strict mode
             (LossinessCode::Drop, StrictMode::Strict) => Severity::Error,
@@ -354,7 +358,7 @@ mod tests {
         tracker.add_clamped("f4", "msg", None, None);
         
         let report = tracker.build_report();
-        assert_eq!(report.items[0].severity, Severity::Error);   // Unsupported
+        assert_eq!(report.items[0].severity, Severity::Critical); // Unsupported
         assert_eq!(report.items[1].severity, Severity::Warning); // Drop
         assert_eq!(report.items[2].severity, Severity::Warning); // Conflict
         assert_eq!(report.items[3].severity, Severity::Info);    // Clamp

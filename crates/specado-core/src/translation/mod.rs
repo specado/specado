@@ -10,6 +10,7 @@ pub mod builder;
 pub mod context;
 pub mod lossiness;
 pub mod mapper;
+pub mod strictness;
 pub mod validator;
 
 use crate::{
@@ -18,10 +19,11 @@ use crate::{
 };
 use std::time::Instant;
 
-pub use builder::TranslationResultBuilder;
+pub use builder::{TranslationResultBuilder, BuilderState, BuilderError, ProviderRequestBuilder};
 pub use context::TranslationContext;
 pub use lossiness::LossinessTracker;
 pub use mapper::JSONPathMapper;
+pub use strictness::{StrictnessAction, StrictnessPolicy, PolicyResult};
 pub use validator::PreValidator;
 
 /// Main translation function that converts a PromptSpec to provider-specific format
@@ -119,10 +121,13 @@ pub fn translate(
     // Step 4: Initialize lossiness tracker (placeholder for issue #18)
     let mut lossiness_tracker = LossinessTracker::new(strict_mode);
 
-    // Step 5: Create JSONPath mapper (placeholder for issue #10)
+    // Step 5: Initialize strictness policy engine
+    let strictness_policy = StrictnessPolicy::new(context.clone());
+
+    // Step 6: Create JSONPath mapper (placeholder for issue #10)
     let _mapper = JSONPathMapper::new(&context);
 
-    // Step 6: Build base provider request structure
+    // Step 7: Build base provider request structure
     // This is a placeholder implementation - the actual mapping logic
     // will be implemented in subsequent issues
     let mut provider_request = serde_json::json!({
@@ -135,10 +140,10 @@ pub fn translate(
         }).collect::<Vec<_>>(),
     });
 
-    // Step 7: Apply field transformations (placeholder for issue #17)
+    // Step 8: Apply field transformations (placeholder for issue #17)
     // Future: Apply transformations based on provider mappings
 
-    // Step 8: Handle tools if present
+    // Step 9: Handle tools if present
     if let Some(ref tools) = prompt_spec.tools {
         if model_spec.tooling.tools_supported {
             provider_request["tools"] = serde_json::json!(tools);
@@ -147,19 +152,61 @@ pub fn translate(
                 provider_request["tool_choice"] = serde_json::json!(tool_choice);
             }
         } else {
-            // Track lossiness for unsupported tools
-            lossiness_tracker.add_unsupported(
+            // Use strictness policy to handle unsupported tools
+            let policy_result = strictness_policy.evaluate_unsupported_feature(
                 "tools",
-                "Provider does not support tools",
+                "function_calling",
                 Some(serde_json::json!(tools)),
             );
+            
+            // Add lossiness item if provided
+            if let Some(lossiness_item) = policy_result.lossiness_item {
+                lossiness_tracker.add_item(lossiness_item);
+            }
+            
+            // Handle the policy action
+            match policy_result.action {
+                StrictnessAction::Fail { error } => return Err(error),
+                StrictnessAction::Warn { message } => {
+                    // In a real implementation, this would log the warning
+                    eprintln!("Warning: {}", message);
+                }
+                StrictnessAction::Proceed | StrictnessAction::Coerce { .. } => {
+                    // Continue processing - tools will be dropped
+                }
+            }
         }
     }
 
-    // Step 9: Apply sampling parameters
+    // Step 10: Apply sampling parameters
     if let Some(ref sampling) = prompt_spec.sampling {
         if let Some(temp) = sampling.temperature {
-            provider_request["temperature"] = serde_json::json!(temp);
+            // Use strictness policy to validate temperature range
+            let policy_result = strictness_policy.evaluate_value_clamping(
+                "temperature",
+                serde_json::json!(temp),
+                0.0,
+                2.0,
+                &context.provider_name(),
+            );
+            
+            match policy_result.action {
+                StrictnessAction::Coerce { adjusted_value, .. } => {
+                    provider_request["temperature"] = adjusted_value;
+                }
+                StrictnessAction::Proceed => {
+                    provider_request["temperature"] = serde_json::json!(temp);
+                }
+                StrictnessAction::Warn { message } => {
+                    eprintln!("Warning: {}", message);
+                    provider_request["temperature"] = serde_json::json!(temp);
+                }
+                StrictnessAction::Fail { error } => return Err(error),
+            }
+            
+            if let Some(lossiness_item) = policy_result.lossiness_item {
+                lossiness_tracker.add_item(lossiness_item);
+            }
         }
         if let Some(top_p) = sampling.top_p {
             provider_request["top_p"] = serde_json::json!(top_p);
@@ -167,34 +214,77 @@ pub fn translate(
         // Add other sampling parameters as needed
     }
 
-    // Step 10: Apply limits
+    // Step 11: Apply limits
     if let Some(ref limits) = prompt_spec.limits {
         if let Some(max_tokens) = limits.max_output_tokens {
             provider_request["max_tokens"] = serde_json::json!(max_tokens);
         }
     }
 
-    // Step 11: Handle response format
+    // Step 12: Handle response format
     if let Some(ref format) = prompt_spec.response_format {
         if model_spec.json_output.native_param {
             provider_request["response_format"] = serde_json::json!(format);
         } else if model_spec.json_output.strategy == "system_prompt" {
-            // Emulate via system prompt modification
-            lossiness_tracker.add_emulated(
+            // Use strictness policy for feature emulation
+            let policy_result = strictness_policy.evaluate_feature_emulation(
                 "response_format",
-                "JSON mode emulated via system prompt",
+                "JSON mode",
+                "system prompt modification",
                 Some(serde_json::json!(format)),
             );
+            
+            // Add lossiness item if provided
+            if let Some(lossiness_item) = policy_result.lossiness_item {
+                lossiness_tracker.add_item(lossiness_item);
+            }
+            
+            // Handle the policy action
+            match policy_result.action {
+                StrictnessAction::Proceed => {
+                    // Emulate via system prompt - actual implementation would modify system prompt
+                }
+                StrictnessAction::Warn { message } => {
+                    eprintln!("Warning: {}", message);
+                    // Still proceed with emulation
+                }
+                StrictnessAction::Fail { error } => return Err(error),
+                StrictnessAction::Coerce { .. } => {
+                    // Proceed with emulation
+                }
+            }
+        } else {
+            // Response format not supported at all
+            let policy_result = strictness_policy.evaluate_unsupported_feature(
+                "response_format",
+                "structured_output",
+                Some(serde_json::json!(format)),
+            );
+            
+            if let Some(lossiness_item) = policy_result.lossiness_item {
+                lossiness_tracker.add_item(lossiness_item);
+            }
+            
+            match policy_result.action {
+                StrictnessAction::Fail { error } => return Err(error),
+                StrictnessAction::Warn { message } => {
+                    eprintln!("Warning: {}", message);
+                }
+                StrictnessAction::Proceed | StrictnessAction::Coerce { .. } => {
+                    // Continue processing - response format will be dropped
+                }
+            }
         }
     }
 
-    // Step 12: Apply strictness policy (placeholder for issue #19)
-    // Future: Apply strictness policy engine rules
+    // Step 13: Apply strictness policy evaluation
+    // Check if we should proceed based on accumulated lossiness
+    strictness_policy.evaluate_proceeding(&lossiness_tracker)?;
 
-    // Step 13: Resolve conflicts (placeholder for issue #20)
+    // Step 14: Resolve conflicts (placeholder for issue #20)
     // Future: Apply conflict resolution logic
 
-    // Step 14: Build final result (placeholder for issue #21)
+    // Step 15: Build final result
     let duration_ms = start_time.elapsed().as_millis() as u64;
     
     let metadata = TranslationMetadata {
@@ -209,7 +299,11 @@ pub fn translate(
         .with_provider_request(provider_request)
         .with_lossiness_report(lossiness_tracker.build_report())
         .with_metadata(metadata)
-        .build();
+        .build()
+        .map_err(|_| Error::Translation {
+            message: "Failed to build translation result".to_string(),
+            context: None,
+        })?;
 
     Ok(result)
 }

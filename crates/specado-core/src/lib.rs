@@ -71,7 +71,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// based on the `ProviderSpec` configuration.
 ///
 /// See `translation::translate` for full documentation.
-pub use translation::translate;
+pub use translation::{translate, StrictnessAction, StrictnessPolicy, PolicyResult};
 
 /// Placeholder run function (to be implemented in L2)
 pub async fn run(_provider_request_json: &serde_json::Value) -> Result<UniformResponse> {
