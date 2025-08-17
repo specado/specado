@@ -1,0 +1,206 @@
+{
+  "spec_version": "1.1.0",
+  "provider": {
+    "name": "openai",
+    "base_url": "https://api.openai.com",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "auth": {
+      "type": "bearer",
+      "header_name": "Authorization",
+      "value_template": "Bearer ${ENV:OPENAI_API_KEY}"
+    }
+  },
+  "model": {
+    "id": "gpt-5-nano",
+    "aliases": ["gpt-5-thinking-nano"],
+    "family": "gpt-5",
+    "description": "High-throughput tasks, especially simple instruction-following or classification",
+    "endpoints": {
+      "response": {
+        "method": "POST",
+        "path": "/v1/responses",
+        "protocol": "https"
+      },
+      "streaming_response": {
+        "method": "POST",
+        "path": "/v1/responses",
+        "protocol": "https",
+        "headers": {
+          "Accept": "text/event-stream"
+        }
+      }
+    },
+    "input_modes": {
+      "text": true,
+      "messages": false,
+      "images": false,
+      "audio": false,
+      "video": false
+    },
+    "reasoning": {
+      "supported": true,
+      "effort_levels": ["minimal", "low", "medium"],
+      "default_effort": "minimal",
+      "passes_chain_of_thought": true,
+      "optimized_for": "throughput"
+    },
+    "verbosity": {
+      "supported": true,
+      "levels": ["low", "medium", "high"],
+      "default_level": "low"
+    },
+    "tooling": {
+      "tools_supported": true,
+      "custom_tools": true,
+      "allowed_tools": true,
+      "preambles_supported": true,
+      "tool_types": ["function", "custom"],
+      "context_free_grammars": false
+    },
+    "parameters": {
+      "input": {
+        "type": "string",
+        "required": true,
+        "description": "The input prompt or conversation"
+      },
+      "reasoning": {
+        "type": "object",
+        "properties": {
+          "effort": {
+            "type": "string",
+            "enum": ["minimal", "low", "medium"],
+            "default": "minimal"
+          }
+        }
+      },
+      "text": {
+        "type": "object",
+        "properties": {
+          "verbosity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "default": "low"
+          }
+        }
+      },
+      "previous_response_id": {
+        "type": "string",
+        "description": "ID of previous response for chain-of-thought continuity"
+      },
+      "tools": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["function", "custom"]
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "tool_choice": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["auto", "none", "required", "allowed_tools"]
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["auto", "required"]
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "temperature": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 2,
+        "default": 1
+      },
+      "top_p": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "default": 1
+      },
+      "max_tokens": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 32000
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2147483647
+      },
+      "stream": {
+        "type": "boolean",
+        "default": false
+      }
+    },
+    "mappings": {
+      "paths": {
+        "$.prompt_spec.messages[0].content": "$.input",
+        "$.prompt_spec.sampling.temperature": "$.temperature",
+        "$.prompt_spec.sampling.top_p": "$.top_p",
+        "$.prompt_spec.limits.max_output_tokens": "$.max_tokens",
+        "$.prompt_spec.tools": "$.tools",
+        "$.prompt_spec.tool_choice": "$.tool_choice"
+      },
+      "transformations": {
+        "messages_to_input": {
+          "description": "Convert messages array to single input string",
+          "type": "join",
+          "separator": "\n"
+        }
+      }
+    },
+    "response_normalization": {
+      "sync": {
+        "content_path": "output_text",
+        "reasoning_path": "reasoning_text",
+        "tool_calls_path": "tool_calls",
+        "finish_reason_path": "finish_reason",
+        "response_id_path": "id"
+      },
+      "stream": {
+        "protocol": "sse",
+        "event_selector": {
+          "type_path": "object",
+          "routes": [
+            {
+              "when": "reasoning.delta",
+              "emit": "reasoning",
+              "text_path": "content"
+            },
+            {
+              "when": "output.delta",
+              "emit": "output",
+              "text_path": "content"
+            },
+            {
+              "when": "done",
+              "emit": "stop",
+              "text_path": "output_text"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
