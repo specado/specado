@@ -1,0 +1,28 @@
+[package]
+name = "specado-golden"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Golden test infrastructure for Specado translation engine"
+
+[dependencies]
+specado-core = { path = "../specado-core" }
+specado-schemas = { path = "../specado-schemas" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+walkdir = "2.4"
+similar = "2.3"
+colored = "2.0"
+tempfile = "3.8"
+regex = "1.10"
+once_cell = "1.19"
+
+[dev-dependencies]
+pretty_assertions = "1.4"

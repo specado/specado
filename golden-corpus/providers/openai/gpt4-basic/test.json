@@ -1,0 +1,48 @@
+{
+  "name": "gpt4-basic",
+  "category": "providers/openai",
+  "input": {
+    "prompt_spec": {
+      "model_class": "Chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a coding assistant."
+        },
+        {
+          "role": "user",
+          "content": "Write a Python hello world function."
+        }
+      ],
+      "response_format": "JsonObject",
+      "sampling": {
+        "temperature": 0.0
+      },
+      "strict_mode": "Strict"
+    },
+    "provider_spec": "openai-provider.json"
+  },
+  "provider": "openai",
+  "expectations": {
+    "should_succeed": true,
+    "error_pattern": null,
+    "ignore_fields": [
+      "metadata.timestamp",
+      "metadata.duration_ms",
+      "provider_request_json.created"
+    ],
+    "volatile_fields": [
+      {
+        "path": "provider_request_json.id",
+        "pattern": "^chatcmpl-.*"
+      }
+    ],
+    "expected_lossiness": []
+  },
+  "metadata": {
+    "description": "OpenAI GPT-4 specific test with JSON response format",
+    "tags": ["provider", "openai", "gpt-4", "json"],
+    "enabled": true,
+    "priority": 30
+  }
+}

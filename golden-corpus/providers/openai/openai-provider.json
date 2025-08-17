@@ -1,0 +1,118 @@
+{
+  "spec_version": "1.0.0",
+  "provider": {
+    "name": "openai",
+    "base_url": "https://api.openai.com/v1",
+    "headers": {
+      "Authorization": "Bearer ${OPENAI_API_KEY}"
+    }
+  },
+  "models": [
+    {
+      "id": "gpt-4",
+      "aliases": ["gpt-4-0613"],
+      "family": "gpt",
+      "endpoints": {
+        "chat_completion": {
+          "method": "POST",
+          "path": "/chat/completions",
+          "protocol": "http"
+        },
+        "streaming_chat_completion": {
+          "method": "POST",
+          "path": "/chat/completions",
+          "protocol": "sse"
+        }
+      },
+      "input_modes": {
+        "messages": true,
+        "single_text": false,
+        "images": false
+      },
+      "tooling": {
+        "tools_supported": true,
+        "parallel_tool_calls_default": true,
+        "can_disable_parallel_tool_calls": true,
+        "disable_switch": {
+          "parallel_tool_calls": false
+        }
+      },
+      "json_output": {
+        "native_param": true,
+        "strategy": "response_format"
+      },
+      "parameters": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "default": 1.0
+        },
+        "top_p": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 1.0
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128000
+        }
+      },
+      "constraints": {
+        "system_prompt_location": "first_message",
+        "forbid_unknown_top_level_fields": true,
+        "mutually_exclusive": [
+          ["temperature", "top_p"]
+        ],
+        "resolution_preferences": ["temperature"],
+        "limits": {
+          "max_tool_schema_bytes": 16384,
+          "max_system_prompt_bytes": 32768
+        }
+      },
+      "mappings": {
+        "paths": {
+          "$.limits.max_output_tokens": "$.max_tokens",
+          "$.sampling.temperature": "$.temperature",
+          "$.sampling.top_p": "$.top_p",
+          "$.sampling.frequency_penalty": "$.frequency_penalty",
+          "$.sampling.presence_penalty": "$.presence_penalty"
+        },
+        "flags": {}
+      },
+      "response_normalization": {
+        "sync": {
+          "content_path": "$.choices[0].message.content",
+          "finish_reason_path": "$.choices[0].finish_reason",
+          "finish_reason_map": {
+            "stop": "stop",
+            "length": "length",
+            "function_call": "tool_call",
+            "tool_calls": "tool_call"
+          }
+        },
+        "stream": {
+          "protocol": "sse",
+          "event_selector": {
+            "type_path": "$.choices[0].delta",
+            "routes": [
+              {
+                "when": "content",
+                "emit": "text",
+                "text_path": "$.choices[0].delta.content"
+              },
+              {
+                "when": "tool_calls",
+                "emit": "tool_call",
+                "name_path": "$.choices[0].delta.tool_calls[0].function.name",
+                "args_path": "$.choices[0].delta.tool_calls[0].function.arguments"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

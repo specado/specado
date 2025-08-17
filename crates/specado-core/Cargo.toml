@@ -19,6 +19,7 @@ regex = "1.10"
 
 [dev-dependencies]
 criterion = "0.5"
+specado-golden = { path = "../specado-golden" }
 
 [[bench]]
 name = "jsonpath_benchmarks"

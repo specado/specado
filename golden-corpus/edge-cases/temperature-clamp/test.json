@@ -1,0 +1,38 @@
+{
+  "name": "temperature-clamp",
+  "category": "edge-cases",
+  "input": {
+    "prompt_spec": {
+      "model_class": "Chat",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello"
+        }
+      ],
+      "sampling": {
+        "temperature": 2.5,
+        "top_p": 1.5
+      },
+      "strict_mode": "Warn"
+    },
+    "provider_spec": null
+  },
+  "provider": "openai",
+  "expectations": {
+    "should_succeed": true,
+    "error_pattern": null,
+    "ignore_fields": [
+      "metadata.timestamp",
+      "metadata.duration_ms"
+    ],
+    "volatile_fields": [],
+    "expected_lossiness": ["Clamp"]
+  },
+  "metadata": {
+    "description": "Test temperature and top_p clamping to valid ranges",
+    "tags": ["edge-cases", "lossiness", "clamp"],
+    "enabled": true,
+    "priority": 20
+  }
+}

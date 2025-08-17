@@ -1,0 +1,38 @@
+{
+  "name": "simple-chat",
+  "category": "basic",
+  "input": {
+    "prompt_spec": {
+      "model_class": "Chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "What is 2+2?"
+        }
+      ],
+      "strict_mode": "Warn"
+    },
+    "provider_spec": null
+  },
+  "provider": "openai",
+  "expectations": {
+    "should_succeed": true,
+    "error_pattern": null,
+    "ignore_fields": [
+      "metadata.timestamp",
+      "metadata.duration_ms"
+    ],
+    "volatile_fields": [],
+    "expected_lossiness": []
+  },
+  "metadata": {
+    "description": "Simple chat completion test with system and user messages",
+    "tags": ["basic", "chat", "smoke"],
+    "enabled": true,
+    "priority": 1
+  }
+}

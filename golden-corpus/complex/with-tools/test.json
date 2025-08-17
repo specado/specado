@@ -1,0 +1,55 @@
+{
+  "name": "with-tools",
+  "category": "complex",
+  "input": {
+    "prompt_spec": {
+      "model_class": "Chat",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What's the weather in San Francisco?"
+        }
+      ],
+      "tools": [
+        {
+          "name": "get_weather",
+          "description": "Get the current weather for a location",
+          "json_schema": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "type": "string",
+                "description": "City name"
+              },
+              "unit": {
+                "type": "string",
+                "enum": ["celsius", "fahrenheit"]
+              }
+            },
+            "required": ["location"]
+          }
+        }
+      ],
+      "tool_choice": "Auto",
+      "strict_mode": "Warn"
+    },
+    "provider_spec": null
+  },
+  "provider": "openai",
+  "expectations": {
+    "should_succeed": true,
+    "error_pattern": null,
+    "ignore_fields": [
+      "metadata.timestamp",
+      "metadata.duration_ms"
+    ],
+    "volatile_fields": [],
+    "expected_lossiness": []
+  },
+  "metadata": {
+    "description": "Test with function calling/tools",
+    "tags": ["complex", "tools", "function-calling"],
+    "enabled": true,
+    "priority": 10
+  }
+}

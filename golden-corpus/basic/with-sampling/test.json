@@ -1,0 +1,42 @@
+{
+  "name": "with-sampling",
+  "category": "basic",
+  "input": {
+    "prompt_spec": {
+      "model_class": "Chat",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Write a creative story about a robot."
+        }
+      ],
+      "sampling": {
+        "temperature": 0.8,
+        "top_p": 0.95,
+        "frequency_penalty": 0.5
+      },
+      "limits": {
+        "max_output_tokens": 100
+      },
+      "strict_mode": "Warn"
+    },
+    "provider_spec": null
+  },
+  "provider": "openai",
+  "expectations": {
+    "should_succeed": true,
+    "error_pattern": null,
+    "ignore_fields": [
+      "metadata.timestamp",
+      "metadata.duration_ms"
+    ],
+    "volatile_fields": [],
+    "expected_lossiness": []
+  },
+  "metadata": {
+    "description": "Test with sampling parameters and token limits",
+    "tags": ["basic", "sampling", "limits"],
+    "enabled": true,
+    "priority": 2
+  }
+}
