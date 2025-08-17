@@ -233,7 +233,7 @@ impl ConflictResolver {
             StrictnessAction::Fail { error } => return Err(error),
             StrictnessAction::Warn { message } => {
                 if self.config.warn_on_resolution {
-                    eprintln!("Warning: {}", message);
+                    log::warn!("{}", message);
                 }
             }
             StrictnessAction::Proceed | StrictnessAction::Coerce { .. } => {
@@ -396,7 +396,7 @@ impl ConflictResolver {
     fn resolve_by_custom_logic(&self, conflict: &FieldConflict, logic: &str) -> Result<String> {
         // This could be extended to support custom resolution patterns
         // For now, just return the first field with a note
-        eprintln!("Custom resolution logic '{}' not implemented, using first field", logic);
+        log::warn!("Custom resolution logic '{}' not implemented, using first field", logic);
         conflict.present_fields.first()
             .cloned()
             .ok_or_else(|| Error::Translation {

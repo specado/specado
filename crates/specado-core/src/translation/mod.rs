@@ -226,8 +226,7 @@ pub fn translate(
             match policy_result.action {
                 StrictnessAction::Fail { error } => return Err(error),
                 StrictnessAction::Warn { message } => {
-                    // In a real implementation, this would log the warning
-                    eprintln!("Warning: {}", message);
+                    log::warn!("{}", message);
                 }
                 StrictnessAction::Proceed | StrictnessAction::Coerce { .. } => {
                     // Continue processing - tools will be dropped
@@ -256,7 +255,7 @@ pub fn translate(
                     provider_request["temperature"] = serde_json::json!(temp);
                 }
                 StrictnessAction::Warn { message } => {
-                    eprintln!("Warning: {}", message);
+                    log::warn!("{}", message);
                     provider_request["temperature"] = serde_json::json!(temp);
                 }
                 StrictnessAction::Fail { error } => return Err(error),
@@ -315,7 +314,7 @@ pub fn translate(
                     // Emulate via system prompt - actual implementation would modify system prompt
                 }
                 StrictnessAction::Warn { message } => {
-                    eprintln!("Warning: {}", message);
+                    log::warn!("{}", message);
                     // Still proceed with emulation
                 }
                 StrictnessAction::Fail { error } => return Err(error),
@@ -340,7 +339,7 @@ pub fn translate(
             match policy_result.action {
                 StrictnessAction::Fail { error } => return Err(error),
                 StrictnessAction::Warn { message } => {
-                    eprintln!("Warning: {}", message);
+                    log::warn!("{}", message);
                 }
                 StrictnessAction::Proceed | StrictnessAction::Coerce { .. } => {
                     // Continue processing - response format will be dropped
@@ -361,10 +360,10 @@ pub fn translate(
     
     // Log resolved conflicts if any
     if !conflicts.is_empty() {
-        eprintln!("Resolved {} field conflicts during translation", conflicts.len());
+        log::info!("Resolved {} field conflicts during translation", conflicts.len());
         for conflict in &conflicts {
             if let Some(winner) = &conflict.winner {
-                eprintln!("  - Kept '{}', dropped {:?}", winner, conflict.losers);
+                log::debug!("  - Kept '{}', dropped {:?}", winner, conflict.losers);
             }
         }
     }

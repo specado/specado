@@ -361,7 +361,7 @@ impl TransformationPipeline {
                     
                     if rule.optional {
                         // Log warning and continue with optional rules
-                        eprintln!("Warning: Optional transformation rule '{}' failed: {}", rule.id, e);
+                        log::warn!("Optional transformation rule '{}' failed: {}", rule.id, e);
                     } else {
                         return Err(e);
                     }
