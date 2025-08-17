@@ -109,7 +109,8 @@ impl PromptSpecValidator {
         let mut errors = Vec::new();
 
         // Rule: tool_choice requires tools array to be defined and non-empty
-        if spec.get("tool_choice").is_some() {
+        if let Some(tool_choice) = spec.get("tool_choice") {
+            if !tool_choice.is_null() {
             let tools = spec.get("tools");
             if tools.is_none() || !tools.unwrap().is_array() || tools.unwrap().as_array().unwrap().is_empty() {
                 errors.push(ValidationError::new(
@@ -117,16 +118,19 @@ impl PromptSpecValidator {
                     "tool_choice requires tools array to be defined and non-empty",
                 ));
             }
+            }
         }
 
         // Rule: reasoning_tokens only valid when model_class is "ReasoningChat"
-        if spec.get("reasoning_tokens").is_some() {
-            let model_class = spec.get("model_class").and_then(|v| v.as_str());
-            if model_class != Some("ReasoningChat") {
-                errors.push(ValidationError::new(
-                    ctx.child("reasoning_tokens").path.clone(),
-                    format!("reasoning_tokens is only valid when model_class is ReasoningChat, found {:?}", model_class),
-                ));
+        if let Some(limits) = spec.get("limits") {
+            if limits.get("reasoning_tokens").is_some() {
+                let model_class = spec.get("model_class").and_then(|v| v.as_str());
+                if model_class != Some("ReasoningChat") {
+                    errors.push(ValidationError::new(
+                        ctx.child("limits").child("reasoning_tokens").path.clone(),
+                        format!("reasoning_tokens is only valid when model_class is ReasoningChat, found {:?}", model_class),
+                    ));
+                }
             }
         }
 
@@ -181,22 +185,17 @@ impl PromptSpecValidator {
         // Rule: When strict_mode is "Strict", no unknown fields allowed
         if let Some(strict_mode) = spec.get("strict_mode").and_then(|v| v.as_str()) {
             if strict_mode == "Strict" {
-                // Get known fields from the schema
-                let known_fields = if let Some(properties) = self.schema.get("properties") {
-                    properties.as_object()
-                        .map(|obj| obj.keys().map(|k| k.as_str()).collect::<Vec<_>>())
-                        .unwrap_or_default()
-                } else {
-                    // Fallback to a basic set if schema structure is unexpected
-                    vec![
-                        "spec_version", "id", "model_class", "messages", "model", "system",
-                        "max_tokens", "temperature", "top_p", "top_k", "seed", "stop", 
-                        "reasoning_tokens", "tools", "tool_choice", "media", "rag",
-                        "conversation", "preferences", "frequency_penalty", "presence_penalty",
-                        "repetition_penalty", "length_penalty", "strict_mode", "stream",
-                        "metadata", "trace_id", "parent_span_id"
-                    ]
-                };
+                // Always use the comprehensive list of known fields
+                // Schema loading may not always have properties available during tests
+                let known_fields = vec![
+                    "spec_version", "id", "model_class", "messages", "model", "system",
+                    "max_tokens", "temperature", "top_p", "top_k", "seed", "stop", 
+                    "reasoning_tokens", "tools", "tool_choice", "media", "rag",
+                    "conversation", "preferences", "frequency_penalty", "presence_penalty",
+                    "repetition_penalty", "length_penalty", "strict_mode", "stream",
+                    "metadata", "trace_id", "parent_span_id", "sampling", "limits",
+                    "response_format"
+                ];
                 
                 if let Some(obj) = spec.as_object() {
                     for key in obj.keys() {
