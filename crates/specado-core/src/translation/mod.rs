@@ -8,6 +8,7 @@
 
 pub mod builder;
 pub mod context;
+pub mod jsonpath;
 pub mod lossiness;
 pub mod mapper;
 pub mod strictness;
