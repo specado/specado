@@ -1,0 +1,51 @@
+{
+  "name": "claude-opus-basic",
+  "category": "providers/anthropic",
+  "input": {
+    "prompt_spec": {
+      "model_class": "Chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful AI assistant focused on clear explanations."
+        },
+        {
+          "role": "user",
+          "content": "Explain recursion in simple terms."
+        }
+      ],
+      "sampling": {
+        "temperature": 0.7,
+        "top_p": 0.9
+      },
+      "limits": {
+        "max_output_tokens": 150
+      },
+      "strict_mode": "Warn"
+    },
+    "provider_spec": "anthropic-provider.json"
+  },
+  "provider": "anthropic",
+  "expectations": {
+    "should_succeed": true,
+    "error_pattern": null,
+    "ignore_fields": [
+      "metadata.timestamp",
+      "metadata.duration_ms",
+      "provider_request_json.id"
+    ],
+    "volatile_fields": [
+      {
+        "path": "provider_request_json.id",
+        "pattern": "^msg_.*"
+      }
+    ],
+    "expected_lossiness": []
+  },
+  "metadata": {
+    "description": "Anthropic Claude Opus 4.1 basic test",
+    "tags": ["provider", "anthropic", "claude-opus-4.1"],
+    "enabled": true,
+    "priority": 31
+  }
+}

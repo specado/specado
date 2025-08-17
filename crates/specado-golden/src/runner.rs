@@ -284,7 +284,7 @@ impl GoldenTestRunner {
         // Get model ID - use first model from provider or default
         let model_id = provider_spec.models.first()
             .map(|m| m.id.as_str())
-            .unwrap_or("gpt-4");
+            .unwrap_or("gpt-5");
         
         // Perform translation
         let result = translate(&prompt_spec, &provider_spec, model_id, prompt_spec.strict_mode)

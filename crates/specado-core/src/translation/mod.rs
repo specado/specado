@@ -97,7 +97,7 @@ pub use validator::{PreValidator, ValidationError, ValidationSeverity, Validatio
 /// #   models: vec![],
 /// };
 ///
-/// let result = translate(&prompt, &provider, "gpt-4", StrictMode::Warn)?;
+/// let result = translate(&prompt, &provider, "gpt-5", StrictMode::Warn)?;
 /// # Ok(())
 /// # }
 /// ```

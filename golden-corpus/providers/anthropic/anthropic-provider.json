@@ -1,0 +1,114 @@
+{
+  "spec_version": "1.0.0",
+  "provider": {
+    "name": "anthropic",
+    "base_url": "https://api.anthropic.com",
+    "headers": {
+      "x-api-key": "${ANTHROPIC_API_KEY}",
+      "anthropic-version": "2023-06-01"
+    }
+  },
+  "models": [
+    {
+      "id": "claude-opus-4-1-20250805",
+      "aliases": ["claude-opus-4.1", "claude-4-opus"],
+      "family": "claude-opus",
+      "endpoints": {
+        "chat_completion": {
+          "method": "POST",
+          "path": "/v1/messages",
+          "protocol": "https"
+        },
+        "streaming_chat_completion": {
+          "method": "POST",
+          "path": "/v1/messages",
+          "protocol": "https"
+        }
+      },
+      "input_modes": {
+        "messages": true,
+        "single_text": false,
+        "images": true
+      },
+      "tooling": {
+        "tools_supported": true,
+        "parallel_tool_calls_default": false,
+        "can_disable_parallel_tool_calls": false,
+        "disable_switch": null
+      },
+      "json_output": {
+        "native_param": false,
+        "strategy": "system_prompt"
+      },
+      "parameters": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 1.0
+        },
+        "top_p": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 1.0
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200000,
+          "required": true
+        }
+      },
+      "constraints": {
+        "system_prompt_location": "first_message",
+        "forbid_unknown_top_level_fields": true,
+        "mutually_exclusive": [],
+        "resolution_preferences": [],
+        "limits": {
+          "max_tool_schema_bytes": 65536,
+          "max_system_prompt_bytes": 100000
+        }
+      },
+      "mappings": {
+        "paths": {
+          "$.limits.max_output_tokens": "$.max_tokens",
+          "$.sampling.temperature": "$.temperature",
+          "$.sampling.top_p": "$.top_p"
+        },
+        "flags": {}
+      },
+      "response_normalization": {
+        "sync": {
+          "content_path": "$.content[0].text",
+          "finish_reason_path": "$.stop_reason",
+          "finish_reason_map": {
+            "end_turn": "stop",
+            "max_tokens": "length",
+            "stop_sequence": "stop",
+            "tool_use": "tool_call"
+          }
+        },
+        "stream": {
+          "protocol": "sse",
+          "event_selector": {
+            "type_path": "$.type",
+            "routes": [
+              {
+                "when": "content_block_delta",
+                "emit": "text",
+                "text_path": "$.delta.text"
+              },
+              {
+                "when": "tool_use",
+                "emit": "tool_call",
+                "name_path": "$.name",
+                "args_path": "$.input"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1091,8 +1091,8 @@ pub mod built_in {
     /// Create an OpenAI to Anthropic model mapping
     pub fn openai_to_anthropic_models() -> TransformationType {
         let mut mappings = HashMap::new();
-        mappings.insert("gpt-4".to_string(), "claude-3-opus-20240229".to_string());
-        mappings.insert("gpt-4-turbo".to_string(), "claude-3-sonnet-20240229".to_string());
+        mappings.insert("gpt-5".to_string(), "claude-opus-4-1-20250805".to_string());
+        mappings.insert("gpt-5-mini".to_string(), "claude-3-sonnet-20240229".to_string());
         mappings.insert("gpt-3.5-turbo".to_string(), "claude-3-haiku-20240307".to_string());
 
         TransformationType::EnumMapping {

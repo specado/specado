@@ -204,7 +204,7 @@ mod tests {
         assert_eq!(provider.name, "anthropic");
         
         // Test pattern matching
-        let provider = registry.discover_provider("gpt-4-turbo")
+        let provider = registry.discover_provider("gpt-5-mini")
             .expect("Should discover GPT-4 provider through pattern");
         assert_eq!(provider.name, "openai");
         

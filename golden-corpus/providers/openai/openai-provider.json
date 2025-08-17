@@ -9,8 +9,8 @@
   },
   "models": [
     {
-      "id": "gpt-4",
-      "aliases": ["gpt-4-0613"],
+      "id": "gpt-5",
+      "aliases": ["gpt-5-thinking"],
       "family": "gpt",
       "endpoints": {
         "chat_completion": {

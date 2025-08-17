@@ -433,7 +433,7 @@ mod tests {
     fn test_json_redaction() {
         let mut value = serde_json::json!({
             "api_key": "sk-1234567890abcdef",
-            "model": "gpt-4",
+            "model": "gpt-5",
             "headers": {
                 "authorization": "Bearer token123"
             }
@@ -442,7 +442,7 @@ mod tests {
         redaction::redact_json_value(&mut value);
         
         assert_eq!(value["api_key"], "***");
-        assert_eq!(value["model"], "gpt-4");
+        assert_eq!(value["model"], "gpt-5");
         assert_eq!(value["headers"]["authorization"], "***");
     }
     

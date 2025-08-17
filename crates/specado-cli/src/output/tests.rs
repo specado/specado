@@ -48,7 +48,7 @@ fn test_translation_result_formatting_human() {
 
     let metadata = TranslationMetadata {
         provider: "openai".to_string(),
-        model: "gpt-4".to_string(),
+        model: "gpt-5".to_string(),
         timestamp: "2025-01-17T10:30:00Z".to_string(),
         duration_ms: Some(150),
         strict_mode: StrictMode::Warn,
@@ -56,7 +56,7 @@ fn test_translation_result_formatting_human() {
 
     let translation_result = TranslationResult {
         provider_request_json: serde_json::json!({
-            "model": "gpt-4",
+            "model": "gpt-5",
             "messages": [{"role": "user", "content": "Hello"}]
         }),
         lossiness: lossiness_report,
@@ -70,7 +70,7 @@ fn test_translation_result_formatting_human() {
     assert!(formatted.contains("═══ Translation Result ═══"));
     assert!(formatted.contains("🔧 Translation Details:"));
     assert!(formatted.contains("Provider: openai"));
-    assert!(formatted.contains("Model: gpt-4"));
+    assert!(formatted.contains("Model: gpt-5"));
     assert!(formatted.contains("Duration: 150ms"));
     assert!(formatted.contains("🔍 Lossiness Summary:"));
     assert!(formatted.contains("Total Issues: 3"));
@@ -83,7 +83,7 @@ fn test_translation_result_formatting_human() {
 fn test_translation_result_formatting_perfect() {
     let translation_result = TranslationResult {
         provider_request_json: serde_json::json!({
-            "model": "gpt-4",
+            "model": "gpt-5",
             "messages": [{"role": "user", "content": "Hello"}]
         }),
         lossiness: LossinessReport {
