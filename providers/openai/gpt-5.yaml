@@ -30,11 +30,11 @@ models:
     endpoints:
       chat_completion:
         method: POST
-        path: "/v1/responses"
+        path: "/v1/chat/completions"
         protocol: https
       streaming_chat_completion:
         method: POST
-        path: "/v1/responses"
+        path: "/v1/chat/completions"
         protocol: https
         headers:
           Accept: "text/event-stream"
@@ -315,11 +315,11 @@ models:
     endpoints:
       chat_completion:
         method: POST
-        path: "/v1/responses"
+        path: "/v1/chat/completions"
         protocol: https
       streaming_chat_completion:
         method: POST
-        path: "/v1/responses"
+        path: "/v1/chat/completions"
         protocol: https
         headers:
           Accept: "text/event-stream"
@@ -517,7 +517,7 @@ notes: |
   OpenAI GPT-5 Provider Specification
   
   This specification defines the configuration for OpenAI's GPT-5 models,
-  using the new Responses API endpoint (/v1/responses).
+  using the standard chat completions endpoint (/v1/chat/completions).
   
   Key features:
   - Full tool/function calling support with strict mode
@@ -529,5 +529,6 @@ notes: |
   Authentication requires an OpenAI API key set as the OPENAI_API_KEY
   environment variable.
   
-  Note: The GPT-5 API endpoint and some parameters are hypothetical
-  and based on the expected evolution of OpenAI's API.
+  Note: GPT-5 models are defined in OpenAI's SDK but not yet publicly available.
+  This specification is based on the expected model capabilities following
+  the patterns established by GPT-4 models.
