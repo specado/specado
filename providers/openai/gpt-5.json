@@ -43,7 +43,9 @@
       "supported": true,
       "effort_levels": ["minimal", "low", "medium", "high"],
       "default_effort": "medium",
-      "passes_chain_of_thought": true
+      "passes_chain_of_thought": true,
+      "summary_modes": ["auto", "none"],
+      "default_summary": "none"
     },
     "verbosity": {
       "supported": true,
@@ -71,6 +73,12 @@
             "type": "string",
             "enum": ["minimal", "low", "medium", "high"],
             "default": "medium"
+          },
+          "summary": {
+            "type": "string",
+            "enum": ["auto", "none"],
+            "default": "none",
+            "description": "Request reasoning summary in the response"
           }
         }
       },
@@ -154,6 +162,22 @@
       "stream": {
         "type": "boolean",
         "default": false
+      },
+      "background": {
+        "type": "boolean",
+        "default": false,
+        "description": "Generate response in background for polling"
+      },
+      "store": {
+        "type": "boolean",
+        "default": false,
+        "description": "Store response for conversation persistence"
+      },
+      "max_output_tokens": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 128000,
+        "description": "Maximum tokens to generate in output"
       }
     },
     "mappings": {
@@ -178,8 +202,10 @@
         "content_path": "output_text",
         "reasoning_path": "reasoning_text",
         "tool_calls_path": "tool_calls",
-        "finish_reason_path": "finish_reason",
-        "response_id_path": "id"
+        "finish_reason_path": "status",
+        "response_id_path": "id",
+        "incomplete_details_path": "incomplete_details",
+        "output_array_path": "output"
       },
       "stream": {
         "protocol": "sse",

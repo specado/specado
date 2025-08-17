@@ -44,7 +44,9 @@
       "effort_levels": ["minimal", "low", "medium", "high"],
       "default_effort": "low",
       "passes_chain_of_thought": true,
-      "optimized_for": "cost_efficiency"
+      "optimized_for": "cost_efficiency",
+      "summary_modes": ["auto", "none"],
+      "default_summary": "none"
     },
     "verbosity": {
       "supported": true,
@@ -155,6 +157,22 @@
       "stream": {
         "type": "boolean",
         "default": false
+      },
+      "background": {
+        "type": "boolean",
+        "default": false,
+        "description": "Generate response in background for polling"
+      },
+      "store": {
+        "type": "boolean",
+        "default": false,
+        "description": "Store response for conversation persistence"
+      },
+      "max_output_tokens": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 64000,
+        "description": "Maximum tokens to generate in output"
       }
     },
     "mappings": {
@@ -179,8 +197,10 @@
         "content_path": "output_text",
         "reasoning_path": "reasoning_text",
         "tool_calls_path": "tool_calls",
-        "finish_reason_path": "finish_reason",
-        "response_id_path": "id"
+        "finish_reason_path": "status",
+        "response_id_path": "id",
+        "incomplete_details_path": "incomplete_details",
+        "output_array_path": "output"
       },
       "stream": {
         "protocol": "sse",
