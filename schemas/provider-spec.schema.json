@@ -145,6 +145,17 @@
               "default_level": { "type": "string" }
             }
           },
+          "thinking": {
+            "description": "Extended thinking/reasoning capabilities (Anthropic-style)",
+            "type": "object",
+            "properties": {
+              "supported": { "type": "boolean" },
+              "type": { "type": "string" },
+              "budget_tokens_min": { "type": "integer" },
+              "budget_tokens_max": { "type": "integer" },
+              "default_budget": { "type": "integer" }
+            }
+          },
   
           "endpoints": {
             "description": "API endpoints for this model",
@@ -439,6 +450,14 @@
                   },
                   "output_array_path": { 
                     "description": "JSONPath to output array",
+                    "type": "string"
+                  },
+                  "model_path": {
+                    "description": "JSONPath to model identifier in response",
+                    "type": "string"
+                  },
+                  "usage_path": {
+                    "description": "JSONPath to usage statistics in response",
                     "type": "string"
                   }
                 }
