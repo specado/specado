@@ -85,6 +85,9 @@ async fn run(cli: Cli) -> Result<()> {
         Commands::Translate(args) => {
             handlers::handle_translate(args, &config, &mut output).await
         }
+        Commands::Run(args) => {
+            handlers::handle_run(args, &config, &mut output).await
+        }
         Commands::Config(args) => {
             handlers::handle_config(args, &config, &mut output).await
         }

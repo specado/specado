@@ -58,6 +58,9 @@ pub enum Commands {
     /// Translate and execute a prompt against a provider (L2 feature)
     Translate(TranslateArgs),
     
+    /// Execute a provider request and get the normalized response
+    Run(RunArgs),
+    
     /// Manage configuration files and settings
     Config(ConfigArgs),
     
@@ -163,6 +166,30 @@ pub struct TranslateArgs {
     /// Save raw response to file
     #[arg(long)]
     pub save_raw: Option<PathBuf>,
+}
+
+/// Arguments for the run command (Issue #56, #57, #58)
+#[derive(Parser, Debug)]
+pub struct RunArgs {
+    /// Path to the provider request JSON file containing provider_spec, model_id, and request_body
+    #[arg(value_name = "REQUEST_FILE")]
+    pub request_file: PathBuf,
+
+    /// Save the normalized response to a file (Issue #57)
+    #[arg(long = "save-to", value_name = "OUTPUT_FILE")]
+    pub save_to: Option<PathBuf>,
+
+    /// Show execution metrics (timing, tokens, etc.) (Issue #58)
+    #[arg(long)]
+    pub metrics: bool,
+
+    /// Pretty-print JSON output
+    #[arg(long)]
+    pub pretty: bool,
+
+    /// Suppress all output except the response
+    #[arg(long)]
+    pub silent: bool,
 }
 
 /// Arguments for the config command

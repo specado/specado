@@ -1,0 +1,100 @@
+{
+  "provider_spec": {
+    "spec_version": "1.0.0",
+    "provider": {
+      "name": "openai",
+      "base_url": "https://api.openai.com",
+      "headers": {
+        "Authorization": "Bearer ${OPENAI_API_KEY}"
+      }
+    },
+    "models": [
+      {
+        "id": "gpt-4",
+        "aliases": ["gpt-4-0613"],
+        "family": "gpt-4",
+        "endpoints": {
+          "chat_completion": {
+            "method": "POST",
+            "path": "/v1/chat/completions",
+            "protocol": "http",
+            "query": null,
+            "headers": null
+          },
+          "streaming_chat_completion": {
+            "method": "POST",
+            "path": "/v1/chat/completions",
+            "protocol": "sse",
+            "query": {"stream": "true"},
+            "headers": null
+          }
+        },
+        "input_modes": {
+          "messages": true,
+          "single_text": false,
+          "images": false
+        },
+        "tooling": {
+          "tools_supported": true,
+          "parallel_tool_calls_default": true,
+          "can_disable_parallel_tool_calls": true,
+          "disable_switch": null
+        },
+        "json_output": {
+          "native_param": true,
+          "strategy": "json_mode"
+        },
+        "parameters": {},
+        "constraints": {
+          "system_prompt_location": "message_role",
+          "forbid_unknown_top_level_fields": false,
+          "mutually_exclusive": [],
+          "resolution_preferences": [],
+          "limits": {
+            "max_tool_schema_bytes": 200000,
+            "max_system_prompt_bytes": 32000
+          }
+        },
+        "mappings": {
+          "paths": {},
+          "flags": {}
+        },
+        "response_normalization": {
+          "sync": {
+            "content_path": "$.choices[0].message.content",
+            "finish_reason_path": "$.choices[0].finish_reason",
+            "finish_reason_map": {
+              "stop": "stop",
+              "length": "length",
+              "tool_calls": "tool_call",
+              "function_call": "tool_call"
+            }
+          },
+          "stream": {
+            "protocol": "sse",
+            "event_selector": {
+              "type_path": "$.object",
+              "routes": []
+            }
+          }
+        }
+      }
+    ]
+  },
+  "model_id": "gpt-4",
+  "request_body": {
+    "model": "gpt-4",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful assistant."
+      },
+      {
+        "role": "user",
+        "content": "What is 2+2?"
+      }
+    ],
+    "temperature": 0.7,
+    "max_tokens": 100
+  }
+}
