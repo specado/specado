@@ -1270,11 +1270,11 @@ mod tests {
         pipeline = pipeline.add_rule(rule);
 
         let input = json!({
-            "model": "gpt-4"
+            "model": "gpt-5"
         });
 
         let result = pipeline.transform(&input, TransformationDirection::Forward, &context).unwrap();
-        assert_eq!(result["model"], json!("claude-3-opus-20240229"));
+        assert_eq!(result["model"], json!("claude-opus-4-1-20250805"));
     }
 
     #[test]
@@ -1363,11 +1363,11 @@ mod tests {
 
         let input = json!({
             "provider": "openai",
-            "model": "gpt-4"
+            "model": "gpt-5"
         });
 
         let result = pipeline.transform(&input, TransformationDirection::Forward, &context).unwrap();
-        assert_eq!(result["model"], json!("claude-3-opus-20240229"));
+        assert_eq!(result["model"], json!("claude-opus-4-1-20250805"));
     }
 
     #[test]
@@ -1582,19 +1582,19 @@ mod tests {
         pipeline = pipeline.add_rule(rule);
         
         let input = json!({
-            "model": "gpt-4"
+            "model": "gpt-5"
         });
         
         let result = pipeline.transform(&input, TransformationDirection::Forward, &context).unwrap();
-        assert_eq!(result["model"], json!("claude-3-opus-20240229"));
+        assert_eq!(result["model"], json!("claude-opus-4-1-20250805"));
         
         // Verify enum mapping was tracked
         let tracker_guard = tracker.lock().unwrap();
         let mappings = tracker_guard.get_transformations_by_type(OperationType::EnumMapping);
         assert_eq!(mappings.len(), 1);
         assert_eq!(mappings[0].field_path, "$.model");
-        assert_eq!(mappings[0].before_value, Some(json!("gpt-4")));
-        assert_eq!(mappings[0].after_value, Some(json!("claude-3-opus-20240229")));
+        assert_eq!(mappings[0].before_value, Some(json!("gpt-5")));
+        assert_eq!(mappings[0].after_value, Some(json!("claude-opus-4-1-20250805")));
     }
     
     #[test]
@@ -1718,7 +1718,7 @@ mod tests {
             .add_rule(rename_rule);
 
         let input = json!({
-            "model": "gpt-4",
+            "model": "gpt-5",
             "temperature": 1.6,
             "max_tokens": "1000",
             "messages": [
@@ -1729,7 +1729,7 @@ mod tests {
         let result = pipeline.transform(&input, TransformationDirection::Forward, &context).unwrap();
 
         // Verify transformations were applied correctly
-        assert_eq!(result["model"], json!("claude-3-opus-20240229"));
+        assert_eq!(result["model"], json!("claude-opus-4-1-20250805"));
         assert_eq!(result["temperature"], json!(0.8)); // 1.6 * 0.5 = 0.8
         assert_eq!(result["max_tokens"], json!(1000.0));
         assert_eq!(result["conversation"], json!([{"role": "user", "content": "Hello"}]));
@@ -1795,7 +1795,7 @@ mod tests {
             .add_rule(rename_rule);
 
         let input = json!({
-            "model": "gpt-4",
+            "model": "gpt-5",
             "temperature": 1.6,
             "max_tokens": "1000",
             "messages": [
@@ -1806,7 +1806,7 @@ mod tests {
         let result = pipeline.transform(&input, TransformationDirection::Forward, &context).unwrap();
 
         // Verify transformations were applied correctly
-        assert_eq!(result["model"], json!("claude-3-opus-20240229"));
+        assert_eq!(result["model"], json!("claude-opus-4-1-20250805"));
         assert_eq!(result["temperature"], json!(0.8)); // 1.6 * 0.5 = 0.8
         assert_eq!(result["max_tokens"], json!(1000.0));
         assert_eq!(result["conversation"], json!([{"role": "user", "content": "Hello"}]));
