@@ -299,17 +299,88 @@ impl GoldenTestRunner {
     
     /// Load default provider spec
     fn load_default_provider_spec(&self, provider: &str) -> Result<specado_core::types::ProviderSpec> {
-        // For now, create a minimal provider spec
+        // For now, create a minimal provider spec with a basic model
         // In production, this would load from provider files
-        let spec = serde_json::json!({
-            "spec_version": "1.0.0",
-            "provider": {
-                "name": provider,
-                "base_url": format!("https://api.{}.com", provider),
-                "headers": {}
-            },
-            "models": []
-        });
+        let spec = match provider {
+            "openai" => serde_json::json!({
+                "spec_version": "1.0.0",
+                "provider": {
+                    "name": provider,
+                    "base_url": "https://api.openai.com/v1",
+                    "headers": {"Authorization": "Bearer $OPENAI_API_KEY"}
+                },
+                "models": [{
+                    "id": "gpt-5",
+                    "aliases": ["gpt5"],
+                    "family": "gpt",
+                    "endpoints": {
+                        "chat_completion": {
+                            "method": "POST",
+                            "path": "/chat/completions",
+                            "protocol": "http"
+                        },
+                        "streaming_chat_completion": {
+                            "method": "POST",
+                            "path": "/chat/completions",
+                            "protocol": "sse"
+                        }
+                    },
+                    "input_modes": {
+                        "messages": true,
+                        "single_text": false,
+                        "images": false
+                    },
+                    "tooling": {
+                        "tools_supported": true,
+                        "parallel_tool_calls_default": true,
+                        "can_disable_parallel_tool_calls": true,
+                        "disable_switch": {"parallel_tool_calls": false}
+                    },
+                    "json_output": {
+                        "native_param": true,
+                        "strategy": "response_format"
+                    },
+                    "parameters": {},
+                    "constraints": {
+                        "system_prompt_location": "first_message",
+                        "forbid_unknown_top_level_fields": true,
+                        "mutually_exclusive": [],
+                        "resolution_preferences": [],
+                        "limits": {
+                            "max_tool_schema_bytes": 16384,
+                            "max_system_prompt_bytes": 32768
+                        }
+                    },
+                    "mappings": {
+                        "paths": {},
+                        "flags": {}
+                    },
+                    "response_normalization": {
+                        "sync": {
+                            "content_path": "$.choices[0].message.content",
+                            "finish_reason_path": "$.choices[0].finish_reason",
+                            "finish_reason_map": {}
+                        },
+                        "stream": {
+                            "protocol": "sse",
+                            "event_selector": {
+                                "type_path": "$.choices[0].delta",
+                                "routes": []
+                            }
+                        }
+                    }
+                }]
+            }),
+            _ => serde_json::json!({
+                "spec_version": "1.0.0",
+                "provider": {
+                    "name": provider,
+                    "base_url": format!("https://api.{}.com", provider),
+                    "headers": {}
+                },
+                "models": []
+            })
+        };
         
         serde_json::from_value(spec)
             .map_err(|e| GoldenError::Json(e))

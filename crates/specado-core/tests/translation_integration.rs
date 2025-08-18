@@ -487,7 +487,7 @@ fn test_strict_mode_multiple_failures() {
 /// Integration test using golden corpus test cases
 #[test]
 fn test_golden_corpus_integration() {
-    let corpus_dir = PathBuf::from("golden-corpus");
+    let corpus_dir = PathBuf::from("../../golden-corpus");
     if !corpus_dir.exists() {
         eprintln!("Skipping golden corpus test - corpus directory not found");
         return;
@@ -519,7 +519,7 @@ fn test_golden_corpus_integration() {
 /// Test basic simple chat golden case
 #[test]
 fn test_golden_simple_chat() {
-    let test_path = PathBuf::from("golden-corpus/basic/simple-chat/test.json");
+    let test_path = PathBuf::from("../../golden-corpus/basic/simple-chat/test.json");
     if !test_path.exists() {
         eprintln!("Skipping test - golden corpus not found");
         return;
@@ -560,7 +560,7 @@ fn test_golden_simple_chat() {
 /// Test temperature clamping edge case from golden corpus
 #[test]
 fn test_golden_temperature_clamp() {
-    let test_path = PathBuf::from("golden-corpus/edge-cases/temperature-clamp/test.json");
+    let test_path = PathBuf::from("../../golden-corpus/edge-cases/temperature-clamp/test.json");
     if !test_path.exists() {
         eprintln!("Skipping test - golden corpus not found");
         return;

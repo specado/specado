@@ -1,0 +1,53 @@
+{
+  "name": "basic/with-sampling",
+  "metadata": {
+    "version": "1.0.0",
+    "created_at": "2025-08-18T14:03:17.180321+00:00",
+    "updated_at": "2025-08-18T14:03:17.180321+00:00",
+    "description": "Test with sampling parameters and token limits",
+    "tags": []
+  },
+  "content": {
+    "lossiness": {
+      "items": [],
+      "max_severity": "Info",
+      "summary": {
+        "by_code": {},
+        "by_severity": {},
+        "total_items": 0
+      }
+    },
+    "metadata": {
+      "duration_ms": 0,
+      "model": "gpt-5",
+      "provider": "openai",
+      "strict_mode": "Warn",
+      "timestamp": "2025-08-18T14:03:17.180274+00:00"
+    },
+    "provider_request_json": {
+      "frequency_penalty": 0.5,
+      "limits": {
+        "max_output_tokens": 100
+      },
+      "max_tokens": 100,
+      "messages": [
+        {
+          "content": "Write a creative story about a robot.",
+          "role": "user"
+        }
+      ],
+      "model": "gpt-5",
+      "model_class": "Chat",
+      "sampling": {
+        "frequency_penalty": 0.5,
+        "temperature": 0.800000011920929,
+        "top_p": 0.949999988079071
+      },
+      "strict_mode": "Warn",
+      "temperature": 0.800000011920929,
+      "top_p": 0.949999988079071
+    }
+  },
+  "ignore_fields": [],
+  "volatile_fields": []
+}

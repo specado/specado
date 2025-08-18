@@ -1,0 +1,45 @@
+{
+  "name": "basic/simple-chat",
+  "metadata": {
+    "version": "1.0.0",
+    "created_at": "2025-08-18T14:03:08.285456+00:00",
+    "updated_at": "2025-08-18T14:03:08.285456+00:00",
+    "description": "Simple chat completion test with system and user messages",
+    "tags": []
+  },
+  "content": {
+    "lossiness": {
+      "items": [],
+      "max_severity": "Info",
+      "summary": {
+        "by_code": {},
+        "by_severity": {},
+        "total_items": 0
+      }
+    },
+    "metadata": {
+      "duration_ms": 0,
+      "model": "gpt-5",
+      "provider": "openai",
+      "strict_mode": "Warn",
+      "timestamp": "2025-08-18T14:03:08.285421+00:00"
+    },
+    "provider_request_json": {
+      "messages": [
+        {
+          "content": "You are a helpful assistant.",
+          "role": "system"
+        },
+        {
+          "content": "What is 2+2?",
+          "role": "user"
+        }
+      ],
+      "model": "gpt-5",
+      "model_class": "Chat",
+      "strict_mode": "Warn"
+    }
+  },
+  "ignore_fields": [],
+  "volatile_fields": []
+}

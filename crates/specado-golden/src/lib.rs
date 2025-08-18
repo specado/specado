@@ -66,8 +66,8 @@ impl Default for GoldenConfig {
             .unwrap_or(false);
             
         Self {
-            corpus_dir: PathBuf::from("golden-corpus"),
-            snapshot_dir: PathBuf::from("golden-corpus/snapshots"),
+            corpus_dir: PathBuf::from("../../golden-corpus"),
+            snapshot_dir: PathBuf::from("../../golden-corpus/snapshots"),
             update_snapshots,
             create_missing: update_snapshots,
             diff_options: DiffOptions::default(),
