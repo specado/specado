@@ -1,0 +1,10 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 6785fc197835bfacb6e1191ae8513a5329bef5d2ff60dccb2e56feabd01a80ed # shrinks to mut messages = [Message { role: User, content: "a", name: None, metadata: None }, Message { role: System, content: "?", name: None, metadata: None }]
+cc c1e6823356645c1f221e5647f4ba62cffa1a71a2e500f52aca22bbf37a709517 # shrinks to mut prompt_spec = PromptSpec { model_class: "Chat", messages: [Message { role: System, content: ".", name: None, metadata: None }], tools: None, tool_choice: None, response_format: None, sampling: None, limits: None, media: None, strict_mode: Strict }, max_output = 1000001, max_prompt = 0, reasoning = 0
+cc 1b9716003c00fa9497b9fc98f85c9df0c7eb696108e4289e6e796f5b908aa400 # shrinks to mut prompt_spec = PromptSpec { model_class: "Chat", messages: [Message { role: System, content: "0", name: None, metadata: None }], tools: None, tool_choice: None, response_format: None, sampling: None, limits: None, media: None, strict_mode: Strict }, raw_freq = 0.0, raw_pres = 1.15977964e21
+cc b9197578dd97805b7241a149d7f8562b8fb68af0140c8018b6ffe0aa4b999bb5 # shrinks to prompt_spec = PromptSpec { model_class: "Chat", messages: [Message { role: System, content: "a", name: None, metadata: None }], tools: None, tool_choice: None, response_format: None, sampling: Some(SamplingParams { temperature: None, top_p: None, top_k: None, frequency_penalty: None, presence_penalty: None }), limits: None, media: None, strict_mode: Strict }
