@@ -1,0 +1,23 @@
+$
+$.store
+$.store.book
+$.store.book[0]
+$.store.book[*]
+$.store.book[0].title
+$.store.book[?(@.price < 10)]
+$..author
+$..book[2]
+$..*
+$['store']['book'][0]['title']
+$.store.book[0:2]
+$.store.book[-1]
+$.store.book[(@.length-1)]
+$.users[?(@.age >= 18)]
+$.items[?(@.status == 'active')]
+$..nested..value
+$.data.*.id
+$.results[0,2,4]
+$.matrix[*][*]
+$['special-key']
+$['key with spaces']
+$.employees[?(@.salary > 50000 && @.department == 'IT')]

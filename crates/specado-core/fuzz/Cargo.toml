@@ -1,0 +1,45 @@
+[package]
+name = "specado-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1.0"
+
+[dependencies.specado-core]
+path = ".."
+
+[[bin]]
+name = "jsonpath_parse"
+path = "fuzz_targets/jsonpath_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jsonpath_execute"
+path = "fuzz_targets/jsonpath_execute.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jsonpath_malformed"
+path = "fuzz_targets/jsonpath_malformed.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jsonpath_memory"
+path = "fuzz_targets/jsonpath_memory.rs"
+test = false
+doc = false
+bench = false

@@ -7,6 +7,7 @@ members = [
     "crates/specado-ffi",
     "crates/specado-wasm", "crates/specado-golden",
 ]
+exclude = ["crates/specado-core/fuzz"]
 resolver = "2"
 
 [workspace.package]
