@@ -172,6 +172,11 @@ impl HttpError {
         // Prefer Retry-After header if present
         self.retry_after.or_else(|| self.classification.retry_delay_hint())
     }
+    
+    /// Get the error classification
+    pub fn classification(&self) -> ErrorClassification {
+        self.classification
+    }
 }
 
 impl fmt::Display for HttpError {

@@ -10,9 +10,12 @@ use crate::http::{
     RequestBuilder,
     AuthHandler,
     HttpError,
+    ErrorClassification,
     RetryPolicy,
     retry::execute_with_retry,
     auth::create_auth_handler,
+    FallbackHandler, FallbackConfig, FallbackAttempt,
+    DiagnosticsBuilder,
 };
 use crate::Result;
 
@@ -25,6 +28,8 @@ pub struct HttpClientConfig {
     pub timeout_secs: u64,
     /// Whether to validate TLS certificates
     pub validate_tls: bool,
+    /// Fallback configuration
+    pub fallback_config: FallbackConfig,
 }
 
 impl Default for HttpClientConfig {
@@ -33,6 +38,7 @@ impl Default for HttpClientConfig {
             retry_policy: RetryPolicy::default(),
             timeout_secs: 30,
             validate_tls: true,
+            fallback_config: FallbackConfig::default(),
         }
     }
 }
@@ -49,6 +55,8 @@ pub struct HttpClient {
     config: HttpClientConfig,
     /// Provider specification
     provider_spec: ProviderSpec,
+    /// Fallback handler for error recovery
+    fallback_handler: std::sync::Mutex<FallbackHandler>,
 }
 
 impl HttpClient {
@@ -70,12 +78,18 @@ impl HttpClient {
         // Create authentication handler
         let auth_handler = Arc::from(create_auth_handler(&provider_spec.provider.name)?);
         
+        // Create fallback handler
+        let fallback_handler = std::sync::Mutex::new(
+            FallbackHandler::new(config.fallback_config.clone())
+        );
+        
         Ok(Self {
             client,
             request_builder,
             auth_handler,
             config,
             provider_spec,
+            fallback_handler,
         })
     }
     
@@ -104,29 +118,167 @@ impl HttpClient {
         self.execute_raw_request(endpoint, model, request_body).await
     }
     
-    /// Execute a generic request with retry logic
+    /// Execute a generic request with retry logic and fallback strategies
     async fn execute_request(
         &self,
         endpoint: &EndpointConfig,
         model: &ModelSpec,
         request_body: Value,
     ) -> Result<Value> {
-        let response = self.execute_raw_request(endpoint, model, request_body).await?;
+        // Try normal execution first
+        let mut last_error = None;
+        let start = std::time::Instant::now();
         
-        // Check if response is successful
-        if !response.status().is_success() {
-            let error = HttpError::from_response(response).await;
-            return Err(error.into());
+        // Primary attempt
+        match self.execute_raw_request(endpoint, model, request_body.clone()).await {
+            Ok(response) => {
+                // Check if response is successful
+                if !response.status().is_success() {
+                    let error = HttpError::from_response(response).await;
+                    last_error = Some(error);
+                } else {
+                    // Parse response body as JSON
+                    return response.json::<Value>().await
+                        .map_err(|e| crate::Error::Http {
+                            message: format!("Failed to parse response as JSON: {}", e),
+                            status_code: None,
+                            source: Some(anyhow::anyhow!("{}", e)),
+                        });
+                }
+            }
+            Err(e) => {
+                // Convert crate::Error to HttpError if possible
+                if let crate::Error::Http { message, status_code, .. } = &e {
+                    last_error = Some(HttpError {
+                        status_code: *status_code,
+                        classification: ErrorClassification::Unknown,
+                        provider_code: None,
+                        message: message.clone(),
+                        details: None,
+                        retry_after: None,
+                    });
+                } else {
+                    return Err(e);
+                }
+            }
         }
         
-        // Parse response body as JSON
-        let json_value = response.json::<Value>().await
-            .map_err(|e| crate::Error::Http {
-                message: format!("Failed to parse response as JSON: {}", e),
-                status_code: None,
-                source: Some(anyhow::anyhow!("{}", e)),
-            })?;
-        Ok(json_value)
+        // If primary attempt failed, try fallback strategies
+        if let Some(error) = last_error {
+            return self.execute_with_fallback(endpoint, model, request_body, error).await;
+        }
+        
+        Err(crate::Error::Http {
+            message: "Request failed without specific error".to_string(),
+            status_code: None,
+            source: None,
+        })
+    }
+    
+    /// Execute request with fallback strategies
+    async fn execute_with_fallback(
+        &self,
+        endpoint: &EndpointConfig,
+        model: &ModelSpec,
+        mut request_body: Value,
+        initial_error: HttpError,
+    ) -> Result<Value> {
+        let mut fallback = self.fallback_handler.lock().unwrap();
+        let mut attempt = 0;
+        let mut last_error = initial_error;
+        
+        while fallback.should_retry(&last_error, attempt) {
+            let start = std::time::Instant::now();
+            attempt += 1;
+            
+            // Apply degradation if needed
+            if fallback.config.allow_degradation {
+                request_body = fallback.apply_degradation(request_body.clone(), attempt);
+            }
+            
+            // Try with alternative URL if available
+            let alt_url = fallback.get_alternative_url(attempt as usize - 1);
+            
+            // Record attempt
+            let strategy = if alt_url.is_some() {
+                format!("Alternative URL attempt {}", attempt)
+            } else {
+                format!("Retry attempt {} with degradation", attempt)
+            };
+            
+            // Calculate delay with jitter
+            let delay = fallback.calculate_retry_delay(attempt - 1);
+            tokio::time::sleep(delay).await;
+            
+            // Execute request
+            match self.execute_raw_request(endpoint, model, request_body.clone()).await {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        // Record successful recovery
+                        fallback.record_attempt(FallbackAttempt {
+                            strategy: strategy.clone(),
+                            success: true,
+                            error: None,
+                            duration: start.elapsed(),
+                        });
+                        
+                        // Parse and return response
+                        return response.json::<Value>().await
+                            .map_err(|e| crate::Error::Http {
+                                message: format!("Failed to parse response as JSON: {}", e),
+                                status_code: None,
+                                source: Some(anyhow::anyhow!("{}", e)),
+                            });
+                    } else {
+                        let error = HttpError::from_response(response).await;
+                        fallback.record_attempt(FallbackAttempt {
+                            strategy: strategy.clone(),
+                            success: false,
+                            error: Some(error.to_string()),
+                            duration: start.elapsed(),
+                        });
+                        last_error = error;
+                    }
+                }
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    fallback.record_attempt(FallbackAttempt {
+                        strategy: strategy.clone(),
+                        success: false,
+                        error: Some(error_msg.clone()),
+                        duration: start.elapsed(),
+                    });
+                    
+                    // Convert crate::Error to HttpError if possible
+                    if let crate::Error::Http { message, status_code, .. } = e {
+                        last_error = HttpError {
+                            status_code,
+                            classification: ErrorClassification::Unknown,
+                            provider_code: None,
+                            message,
+                            details: None,
+                            retry_after: None,
+                        };
+                    } else {
+                        // Non-HTTP error, can't retry
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // All attempts failed, return enhanced error with diagnostics
+        let diagnostics = DiagnosticsBuilder::from_error(&last_error)
+            .provider(&self.provider_spec.provider.name)
+            .model(&model.id)
+            .endpoint(&endpoint.path)
+            .recovery_attempts(fallback.attempts())
+            .build();
+        
+        Err(crate::Error::HttpWithDiagnostics {
+            error: last_error,
+            diagnostics,
+        })
     }
     
     /// Execute a raw request (returns Response for streaming)

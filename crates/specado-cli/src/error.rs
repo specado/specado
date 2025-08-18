@@ -158,6 +158,13 @@ where
 
 /// Format an error for display to the user
 pub fn format_error(error: &Error, use_color: bool) -> String {
+    // Check if this is a Core error with enhanced diagnostics
+    if let Error::Core(core_error) = error {
+        // The HttpWithDiagnostics variant has its own formatting
+        // that will be displayed via the Display trait
+        return format!("{}", core_error);
+    }
+    
     if use_color {
         use colored::Colorize;
         format!("{} {}", "Error:".red().bold(), error)

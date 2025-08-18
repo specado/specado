@@ -58,6 +58,13 @@ pub enum Error {
         #[source]
         source: Option<anyhow::Error>,
     },
+    
+    /// HTTP error with enhanced diagnostics
+    #[error("{}", diagnostics.format_display(true))]
+    HttpWithDiagnostics {
+        error: crate::http::HttpError,
+        diagnostics: crate::http::ErrorDiagnostics,
+    },
 
     /// Configuration errors
     #[error("Configuration error: {message}")]
