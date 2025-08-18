@@ -63,7 +63,16 @@ pub enum Error {
     #[error("Configuration error: {message}")]
     Configuration {
         message: String,
-        key: Option<String>,
+        #[source]
+        source: Option<anyhow::Error>,
+    },
+    
+    /// HTTP request building errors
+    #[error("HTTP request error: {message}")]
+    HttpRequest {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
     /// Validation errors for inputs

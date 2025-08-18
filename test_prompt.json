@@ -1,0 +1,21 @@
+{
+  "model_class": "Chat",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "Hello! Can you explain what Specado does?"
+    }
+  ],
+  "sampling": {
+    "temperature": 0.7,
+    "top_p": 0.9
+  },
+  "limits": {
+    "max_output_tokens": 500
+  },
+  "strict_mode": "Warn"
+}

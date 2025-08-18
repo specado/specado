@@ -22,6 +22,7 @@
 //! ```
 
 pub mod error;
+pub mod http;
 pub mod provider_discovery;
 pub mod translation;
 pub mod types;
@@ -82,12 +83,68 @@ pub use translation::{
     ValueType, ConversionFormula, Condition,
 };
 
-/// Placeholder run function (to be implemented in L2)
-pub async fn run(_provider_request_json: &serde_json::Value) -> Result<UniformResponse> {
-    Err(Error::Unsupported {
-        message: "Run functionality not yet implemented (L2)".to_string(),
-        feature: Some("run".to_string()),
-    })
+/// Execute a provider request and return a normalized response
+///
+/// This function sends the compiled provider request to the provider's API
+/// and normalizes the response to the UniformResponse format.
+///
+/// # Arguments
+/// * `provider_request` - The compiled provider request containing:
+///   - `provider_spec`: The provider specification
+///   - `model_id`: The model to use
+///   - `request_body`: The request payload
+///
+/// # Returns
+/// A normalized UniformResponse or an error
+pub async fn run(provider_request: &serde_json::Value) -> Result<UniformResponse> {
+    // Extract components from the provider request
+    let provider_spec_json = provider_request.get("provider_spec")
+        .ok_or_else(|| Error::Validation {
+            field: "provider_spec".to_string(),
+            message: "Missing provider_spec in request".to_string(),
+            expected: Some("ProviderSpec object".to_string()),
+        })?;
+    
+    let model_id = provider_request.get("model_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| Error::Validation {
+            field: "model_id".to_string(),
+            message: "Missing or invalid model_id".to_string(),
+            expected: Some("String model ID".to_string()),
+        })?;
+    
+    let request_body = provider_request.get("request_body")
+        .ok_or_else(|| Error::Validation {
+            field: "request_body".to_string(),
+            message: "Missing request_body".to_string(),
+            expected: Some("Request payload object".to_string()),
+        })?;
+    
+    // Parse the provider spec
+    let provider_spec: ProviderSpec = serde_json::from_value(provider_spec_json.clone())
+        .map_err(|e| Error::Json {
+            message: format!("Failed to parse provider_spec: {}", e),
+            source: e,
+        })?;
+    
+    // Create HTTP client
+    let client = http::HttpClient::with_default_config(provider_spec)?;
+    
+    // Get the model spec
+    let model = client.get_model(model_id)
+        .ok_or_else(|| Error::Provider {
+            provider: client.provider_spec().provider.name.clone(),
+            message: format!("Model '{}' not found", model_id),
+            source: None,
+        })?;
+    
+    // Execute the request
+    let response = client.execute_chat_completion(model, request_body.clone()).await?;
+    
+    // Normalize the response using the model's response_normalization config
+    let normalized = http::normalize_response(&response, model, model_id)?;
+    
+    Ok(normalized)
 }
 
 /// Placeholder stream function (to be implemented in L3)
