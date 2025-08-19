@@ -245,12 +245,54 @@ pub struct TranslateOptions {
 #[napi(object)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslateResult {
-    /// Translated provider request
-    pub request: Value,
-    /// Translation metadata
-    pub metadata: TranslationMetadata,
-    /// Any warnings during translation
-    pub warnings: Vec<String>,
+    /// The provider-specific request JSON
+    pub provider_request_json: Value,
+    /// Lossiness report detailing any deviations
+    pub lossiness: LossinessReport,
+    /// Metadata about the translation
+    pub metadata: Option<TranslationMetadata>,
+}
+
+/// Lossiness report containing all deviations
+#[napi(object)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LossinessReport {
+    /// List of lossiness items
+    pub items: Vec<LossinessItem>,
+    /// Overall severity of the report
+    pub max_severity: String,
+    /// Summary statistics
+    pub summary: LossinessSummary,
+}
+
+/// Individual lossiness item
+#[napi(object)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LossinessItem {
+    /// Lossiness code identifier
+    pub code: String,
+    /// JSONPath to the affected field
+    pub path: String,
+    /// Human-readable message
+    pub message: String,
+    /// Severity level
+    pub severity: String,
+    /// Value before transformation (optional)
+    pub before: Option<Value>,
+    /// Value after transformation (optional)
+    pub after: Option<Value>,
+}
+
+/// Summary of lossiness statistics
+#[napi(object)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LossinessSummary {
+    /// Total number of lossiness items
+    pub total_items: u32,
+    /// Count by severity level
+    pub by_severity: HashMap<String, u32>,
+    /// Count by lossiness code
+    pub by_code: HashMap<String, u32>,
 }
 
 /// Translation metadata

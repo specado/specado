@@ -114,44 +114,68 @@ pub fn translate(
         result_string
     };
 
-    // Parse the JSON result
-    let result_value: Value = serde_json::from_str(&result_json)
+    // Parse the JSON result as TranslationResult from core
+    let core_result: specado_core::types::TranslationResult = serde_json::from_str(&result_json)
         .map_err(|e| Error::new(
             Status::GenericFailure,
             format!("Failed to parse translation result: {}", e)
         ))?;
 
-    // Extract the translated request
-    let request = result_value.get("request")
-        .ok_or_else(|| Error::new(Status::GenericFailure, "Missing request in translation result"))?
-        .clone();
+    // Convert to Node.js compatible result
+    let translate_result = convert_core_translation_result(core_result, &provider_spec.name, &model_id);
 
-    // Build metadata
-    let metadata = TranslationMetadata {
-        source_version: "1.0".to_string(),
-        target_provider: provider_spec.name.clone(),
-        target_model: model_id,
-        timestamp: chrono::Utc::now().to_rfc3339(),
-        features_used: extract_features_used(&prompt),
-        unsupported_features: result_value
-            .get("unsupported_features")
-            .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
-            .unwrap_or_default(),
+    Ok(translate_result)
+}
+
+/// Convert core TranslationResult to Node.js compatible format
+fn convert_core_translation_result(
+    core_result: specado_core::types::TranslationResult,
+    provider_name: &str,
+    model_id: &str,
+) -> TranslateResult {
+    use crate::types::*;
+    
+    // Convert lossiness report
+    let lossiness = LossinessReport {
+        items: core_result.lossiness.items.into_iter().map(|item| {
+            LossinessItem {
+                code: format!("{:?}", item.code),
+                path: item.path,
+                message: item.message,
+                severity: format!("{:?}", item.severity),
+                before: item.before,
+                after: item.after,
+            }
+        }).collect(),
+        max_severity: format!("{:?}", core_result.lossiness.max_severity),
+        summary: LossinessSummary {
+            total_items: core_result.lossiness.summary.total_items as u32,
+            by_severity: core_result.lossiness.summary.by_severity
+                .into_iter()
+                .map(|(k, v)| (k, v as u32))
+                .collect(),
+            by_code: core_result.lossiness.summary.by_code
+                .into_iter()
+                .map(|(k, v)| (k, v as u32))
+                .collect(),
+        },
     };
-
-    // Extract warnings
-    let warnings = result_value
-        .get("warnings")
-        .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
-        .unwrap_or_default();
-
-    Ok(TranslateResult {
-        request,
+    
+    // Convert metadata if present
+    let metadata = core_result.metadata.map(|meta| TranslationMetadata {
+        source_version: "1.0".to_string(),
+        target_provider: provider_name.to_string(),
+        target_model: model_id.to_string(),
+        timestamp: meta.timestamp,
+        features_used: vec![], // Would need to extract from somewhere
+        unsupported_features: vec![], // Would need to extract from lossiness
+    });
+    
+    TranslateResult {
+        provider_request_json: core_result.provider_request_json,
+        lossiness,
         metadata,
-        warnings,
-    })
+    }
 }
 
 /// Extract features used from a prompt
