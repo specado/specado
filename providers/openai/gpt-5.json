@@ -1,278 +1,118 @@
 {
-  "spec_version": "1.1.0",
+  "spec_version": "1.0.0",
   "provider": {
     "name": "openai",
-    "base_url": "https://api.openai.com",
+    "base_url": "https://api.openai.com/v1",
     "headers": {
-      "Content-Type": "application/json"
-    },
-    "auth": {
-      "type": "bearer",
-      "header_name": "Authorization",
-      "value_template": "Bearer ${ENV:OPENAI_API_KEY}"
+      "Authorization": "Bearer ${OPENAI_API_KEY}"
     }
   },
-  "models": [{
-    "id": "gpt-5",
-    "aliases": ["gpt-5-thinking"],
-    "family": "gpt-5",
-    "description": "Complex reasoning, broad world knowledge, and code-heavy or multi-step agentic tasks",
-    "endpoints": {
-      "chat_completion": {
-        "method": "POST",
-        "path": "/v1/responses",
-        "protocol": "https"
-      },
-      "streaming_chat_completion": {
-        "method": "POST",
-        "path": "/v1/responses",
-        "protocol": "https",
-        "headers": {
-          "Accept": "text/event-stream"
+  "models": [
+    {
+      "id": "gpt-5",
+      "aliases": ["gpt-5-thinking"],
+      "family": "gpt",
+      "endpoints": {
+        "chat_completion": {
+          "method": "POST",
+          "path": "/chat/completions",
+          "protocol": "http"
+        },
+        "streaming_chat_completion": {
+          "method": "POST",
+          "path": "/chat/completions",
+          "protocol": "sse"
         }
-      }
-    },
-    "input_modes": {
-      "messages": true,
-      "single_text": true,
-      "images": true,
-      "audio": false,
-      "video": false
-    },
-    "reasoning": {
-      "supported": true,
-      "effort_levels": ["low", "medium", "high"],
-      "default_effort": "medium",
-      "internal_chain_of_thought": true,
-      "summary_modes": ["auto", "none"],
-      "default_summary": "none"
-    },
-    "verbosity": {
-      "supported": true,
-      "levels": ["low", "medium", "high"],
-      "default_level": "medium"
-    },
-    "tooling": {
-      "tools_supported": true,
-      "parallel_tool_calls_default": true,
-      "can_disable_parallel_tool_calls": true,
-      "custom_tools": true,
-      "preambles_supported": true,
-      "tool_types": ["function", "custom"],
-      "context_free_grammars": true,
-      "tool_choice_modes": ["auto", "none", "required", "specific"]
-    },
-    "json_output": {
-      "native_param": true,
-      "strategy": "json_schema",
-      "notes": "Supports structured outputs via response_format parameter"
-    },
-    "parameters": {
-      "input": {
-        "type": "string",
-        "required": true,
-        "description": "The input prompt or conversation"
       },
-      "reasoning": {
-        "type": "object",
-        "properties": {
-          "effort": {
-            "type": "string",
-            "enum": ["low", "medium", "high"],
-            "default": "medium"
-          },
-          "summary": {
-            "type": "string",
-            "enum": ["auto", "none"],
-            "default": "none",
-            "description": "Request reasoning summary in the response"
+      "input_modes": {
+        "messages": true,
+        "single_text": false,
+        "images": false
+      },
+      "tooling": {
+        "tools_supported": true,
+        "parallel_tool_calls_default": true,
+        "can_disable_parallel_tool_calls": true,
+        "disable_switch": {
+          "parallel_tool_calls": false
+        }
+      },
+      "json_output": {
+        "native_param": true,
+        "strategy": "response_format"
+      },
+      "parameters": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "default": 1.0
+        },
+        "top_p": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 1.0
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128000
+        }
+      },
+      "constraints": {
+        "system_prompt_location": "first_message",
+        "forbid_unknown_top_level_fields": true,
+        "mutually_exclusive": [
+          ["temperature", "top_p"]
+        ],
+        "resolution_preferences": ["temperature"],
+        "limits": {
+          "max_tool_schema_bytes": 16384,
+          "max_system_prompt_bytes": 32768
+        }
+      },
+      "mappings": {
+        "paths": {
+          "$.limits.max_output_tokens": "$.max_tokens",
+          "$.sampling.temperature": "$.temperature",
+          "$.sampling.top_p": "$.top_p",
+          "$.sampling.frequency_penalty": "$.frequency_penalty",
+          "$.sampling.presence_penalty": "$.presence_penalty"
+        },
+        "flags": {}
+      },
+      "response_normalization": {
+        "sync": {
+          "content_path": "$.choices[0].message.content",
+          "finish_reason_path": "$.choices[0].finish_reason",
+          "finish_reason_map": {
+            "stop": "stop",
+            "length": "length",
+            "function_call": "tool_call",
+            "tool_calls": "tool_call"
           }
-        }
-      },
-      "text": {
-        "type": "object",
-        "properties": {
-          "verbosity": {
-            "type": "string",
-            "enum": ["low", "medium", "high"],
-            "default": "medium"
+        },
+        "stream": {
+          "protocol": "sse",
+          "event_selector": {
+            "type_path": "$.choices[0].delta",
+            "routes": [
+              {
+                "when": "content",
+                "emit": "text",
+                "text_path": "$.choices[0].delta.content"
+              },
+              {
+                "when": "tool_calls",
+                "emit": "tool_call",
+                "name_path": "$.choices[0].delta.tool_calls[0].function.name",
+                "args_path": "$.choices[0].delta.tool_calls[0].function.arguments"
+              }
+            ]
           }
-        }
-      },
-      "previous_response_id": {
-        "type": "string",
-        "description": "ID of previous response for chain-of-thought continuity"
-      },
-      "tools": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "enum": ["function", "custom"]
-            },
-            "name": {
-              "type": "string"
-            },
-            "description": {
-              "type": "string"
-            },
-            "cfg": {
-              "type": "string",
-              "description": "Context-free grammar for custom tools"
-            }
-          }
-        }
-      },
-      "tool_choice": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": ["auto", "none", "required", "specific"]
-          },
-          "mode": {
-            "type": "string",
-            "enum": ["auto", "required"]
-          },
-          "tools": {
-            "type": "array",
-            "items": {
-              "type": "object"
-            }
-          }
-        }
-      },
-      "temperature": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 2,
-        "default": 1
-      },
-      "top_p": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 1,
-        "default": 1
-      },
-      "max_tokens": {
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 128000
-      },
-      "seed": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 2147483647
-      },
-      "stream": {
-        "type": "boolean",
-        "default": false
-      },
-      "background": {
-        "type": "boolean",
-        "default": false,
-        "description": "Generate response in background for polling"
-      },
-      "store": {
-        "type": "boolean",
-        "default": false,
-        "description": "Store response for conversation persistence"
-      },
-      "max_output_tokens": {
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 128000,
-        "description": "Maximum tokens to generate in output"
-      }
-    },
-    "constraints": {
-      "system_prompt_location": "message_role",
-      "forbid_unknown_top_level_fields": true,
-      "mutually_exclusive": [
-        ["stream", "background"]
-      ],
-      "resolution_preferences": [
-        "max_output_tokens",
-        "max_tokens"
-      ],
-      "limits": {
-        "max_tool_schema_bytes": 1000000,
-        "max_system_prompt_bytes": 200000
-      }
-    },
-    "mappings": {
-      "paths": {
-        "$.prompt_spec.messages[0].content": "$.input",
-        "$.prompt_spec.sampling.temperature": "$.temperature",
-        "$.prompt_spec.sampling.top_p": "$.top_p",
-        "$.prompt_spec.limits.max_output_tokens": "$.max_tokens",
-        "$.prompt_spec.tools": "$.tools",
-        "$.prompt_spec.tool_choice": "$.tool_choice"
-      },
-      "transformations": {
-        "messages_to_input": {
-          "description": "Convert messages array to single input string",
-          "type": "join",
-          "separator": "\n"
-        }
-      },
-      "flags": {
-        "supports_reasoning": true,
-        "supports_response_api": true
-      }
-    },
-    "response_normalization": {
-      "sync": {
-        "content_path": "output_text",
-        "reasoning_path": "reasoning_text",
-        "tool_calls_path": "tool_calls",
-        "finish_reason_path": "status",
-      "finish_reason_map": {
-        "completed": "stop",
-        "max_tokens": "length",
-        "tool_calls": "tool_calls",
-        "error": "error"
-      },
-        "response_id_path": "id",
-        "incomplete_details_path": "incomplete_details",
-        "output_array_path": "output"
-      },
-      "stream": {
-        "protocol": "sse",
-        "event_selector": {
-          "type_path": "object",
-          "routes": [
-            {
-              "when": "response.output_text.delta",
-              "emit": "delta",
-              "text_path": "content"
-            },
-            {
-              "when": "response.reasoning_text.delta",
-              "emit": "delta",
-              "text_path": "content"
-            },
-            {
-              "when": "response.tool_calls.delta",
-              "emit": "tool",
-              "text_path": "arguments",
-              "name_path": "name"
-            },
-            {
-              "when": "response.completed",
-              "emit": "stop",
-              "text_path": "output_text"
-            },
-            {
-              "when": "response.error",
-              "emit": "error",
-              "text_path": "message"
-            }
-          ]
         }
       }
     }
-  }]
+  ]
 }
