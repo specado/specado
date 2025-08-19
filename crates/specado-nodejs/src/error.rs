@@ -91,9 +91,9 @@ impl fmt::Display for SpecadoError {
 impl std::error::Error for SpecadoError {}
 
 /// Convert FFI result codes to JavaScript errors
-impl From<specado_ffi::types::SpecadoResult> for SpecadoError {
-    fn from(result: specado_ffi::types::SpecadoResult) -> Self {
-        use specado_ffi::types::SpecadoResult as FFIResult;
+impl From<specado_ffi::SpecadoResult> for SpecadoError {
+    fn from(result: specado_ffi::SpecadoResult) -> Self {
+        use specado_ffi::SpecadoResult as FFIResult;
         
         let (kind, message) = match result {
             FFIResult::Success => return Self::new(SpecadoErrorKind::InternalError, "Unexpected success result"),

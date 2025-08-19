@@ -1,298 +1,114 @@
 {
-  "spec_version": "1.1.0",
+  "spec_version": "1.0.0",
   "provider": {
     "name": "anthropic",
     "base_url": "https://api.anthropic.com",
     "headers": {
-      "Content-Type": "application/json",
+      "x-api-key": "${ANTHROPIC_API_KEY}",
       "anthropic-version": "2023-06-01"
-    },
-    "auth": {
-      "type": "api-key",
-      "header_name": "x-api-key",
-      "value_template": "${ENV:ANTHROPIC_API_KEY}"
     }
   },
-  "models": [{
-    "id": "claude-opus-4-1-20250805",
-    "aliases": ["claude-opus-4.1", "claude-4-opus"],
-    "family": "claude-opus",
-    "description": "Most capable model for complex reasoning, analysis, and creative tasks with 200K context window",
-    "endpoints": {
-      "chat_completion": {
-        "method": "POST",
-        "path": "/v1/messages",
-        "protocol": "https"
-      },
-      "streaming_chat_completion": {
-        "method": "POST",
-        "path": "/v1/messages",
-        "protocol": "https",
-        "headers": {
-          "Accept": "text/event-stream"
-        }
-      }
-    },
-    "input_modes": {
-      "messages": true,
-      "single_text": false,
-      "images": true,
-      "audio": false,
-      "video": false,
-      "documents": true
-    },
-    "thinking": {
-      "supported": true,
-      "type": "enabled",
-      "budget_tokens_min": 1024,
-      "budget_tokens_max": 8192,
-      "default_budget": 4096
-    },
-    "tooling": {
-      "tools_supported": true,
-      "parallel_tool_calls_default": true,
-      "can_disable_parallel_tool_calls": false,
-      "tool_choice_modes": ["auto", "none", "required", "any"],
-      "strict_tools_support": false,
-      "tool_types": ["function"]
-    },
-    "json_output": {
-      "native_param": false,
-      "strategy": "prompt_only",
-      "notes": "JSON mode achieved through prompting and xml tags"
-    },
-    "parameters": {
-      "model": {
-        "type": "string",
-        "required": true,
-        "description": "The model identifier"
-      },
-      "messages": {
-        "type": "array",
-        "required": true,
-        "items": {
-          "type": "object",
-          "properties": {
-            "role": {
-              "type": "string",
-              "enum": ["user", "assistant"]
-            },
-            "content": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "max_tokens": {
-        "type": "integer",
-        "required": true,
-        "minimum": 1,
-        "maximum": 4096,
-        "description": "Maximum tokens to generate (required by Anthropic)"
-      },
-      "system": {
-        "type": "string",
-        "required": false,
-        "description": "System prompt (top-level parameter)"
-      },
-      "temperature": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 1,
-        "default": 1
-      },
-      "top_p": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 1,
-        "default": 1
-      },
-      "top_k": {
-        "type": "integer",
-        "minimum": 1,
-        "description": "Limits sampling to top K options"
-      },
-      "stop_sequences": {
-        "type": "array",
-        "items": {
-          "type": "string"
+  "models": [
+    {
+      "id": "claude-opus-4-1-20250805",
+      "aliases": ["claude-opus-4.1", "claude-4-opus"],
+      "family": "claude-opus",
+      "endpoints": {
+        "chat_completion": {
+          "method": "POST",
+          "path": "/v1/messages",
+          "protocol": "https"
         },
-        "maxItems": 4,
-        "description": "Custom sequences to stop generation"
-      },
-      "stream": {
-        "type": "boolean",
-        "default": false
-      },
-      "metadata": {
-        "type": "object",
-        "properties": {
-          "user_id": {
-            "type": "string",
-            "description": "Opaque user identifier for tracking"
-          }
+        "streaming_chat_completion": {
+          "method": "POST",
+          "path": "/v1/messages",
+          "protocol": "https"
         }
       },
-      "thinking": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": ["enabled", "disabled"],
-            "default": "disabled"
-          },
-          "budget_tokens": {
-            "type": "integer",
-            "minimum": 1024,
-            "maximum": 8192
-          }
-        }
+      "input_modes": {
+        "messages": true,
+        "single_text": false,
+        "images": true
       },
-      "tools": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "description": {
-              "type": "string"
-            },
-            "input_schema": {
-              "type": "object",
-              "description": "JSON Schema for tool parameters"
-            }
-          }
-        }
+      "tooling": {
+        "tools_supported": true,
+        "parallel_tool_calls_default": false,
+        "can_disable_parallel_tool_calls": false,
+        "disable_switch": null
       },
-      "tool_choice": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": ["auto", "none", "required", "any"]
-          },
-          "name": {
-            "type": "string",
-            "description": "Specific tool name when type is tool"
-          }
-        }
-      }
-    },
-    "constraints": {
-      "system_prompt_location": "top_level",
-      "forbid_unknown_top_level_fields": true,
-      "mutually_exclusive": [
-        ["stream", "thinking"]
-      ],
-      "resolution_preferences": [
-        "max_tokens",
-        "temperature",
-        "top_p"
-      ],
-      "limits": {
-        "max_tool_schema_bytes": 500000,
-        "max_system_prompt_bytes": 100000
+      "json_output": {
+        "native_param": false,
+        "strategy": "system_prompt"
       },
-      "prompt_truncation": {
-        "default_mode": "OFF",
-        "supported_modes": ["OFF"]
-      }
-    },
-    "mappings": {
-      "paths": {
-        "$.prompt_spec.system": "$.system",
-        "$.prompt_spec.messages": "$.messages",
-        "$.prompt_spec.limits.max_output_tokens": "$.max_tokens",
-        "$.prompt_spec.sampling.temperature": "$.temperature",
-        "$.prompt_spec.sampling.top_p": "$.top_p",
-        "$.prompt_spec.sampling.top_k": "$.top_k",
-        "$.prompt_spec.stop_sequences": "$.stop_sequences",
-        "$.prompt_spec.tools": "$.tools",
-        "$.prompt_spec.tool_choice": "$.tool_choice",
-        "$.prompt_spec.metadata": "$.metadata"
-      },
-      "transformations": {
-        "tool_format": {
-          "description": "Convert OpenAI tool format to Anthropic format",
-          "type": "custom",
-          "from": "parameters",
-          "to": "input_schema"
+      "parameters": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 1.0
         },
-        "system_to_top_level": {
-          "description": "Move system prompt from messages to top level",
-          "type": "extract",
-          "source": "messages[0].content",
-          "condition": "messages[0].role === 'system'",
-          "target": "system"
+        "top_p": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 1.0
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200000,
+          "required": true
         }
       },
-      "flags": {
-        "supports_thinking": true,
-        "supports_vision": true,
-        "requires_max_tokens": true,
-        "system_at_top_level": true
-      }
-    },
-    "response_normalization": {
-      "sync": {
-        "content_path": "content[0].text",
-        "finish_reason_path": "stop_reason",
-        "finish_reason_map": {
-          "end_turn": "stop",
-          "max_tokens": "length",
-          "stop_sequence": "stop",
-          "tool_use": "tool_calls"
-        },
-        "response_id_path": "id",
-        "model_path": "model",
-        "usage_path": "usage",
-        "tool_calls_path": "content[?type=='tool_use']"
+      "constraints": {
+        "system_prompt_location": "first_message",
+        "forbid_unknown_top_level_fields": true,
+        "mutually_exclusive": [],
+        "resolution_preferences": [],
+        "limits": {
+          "max_tool_schema_bytes": 65536,
+          "max_system_prompt_bytes": 100000
+        }
       },
-      "stream": {
-        "protocol": "sse",
-        "event_selector": {
-          "type_path": "type",
-          "routes": [
-            {
-              "when": "message_start",
-              "emit": "start",
-              "text_path": "message"
-            },
-            {
-              "when": "content_block_delta",
-              "emit": "delta",
-              "text_path": "delta.text"
-            },
-            {
-              "when": "content_block_start",
-              "emit": "delta",
-              "text_path": "content_block"
-            },
-            {
-              "when": "content_block_stop",
-              "emit": "delta",
-              "text_path": "index"
-            },
-            {
-              "when": "message_delta",
-              "emit": "delta",
-              "text_path": "delta"
-            },
-            {
-              "when": "message_stop",
-              "emit": "stop",
-              "text_path": "message"
-            },
-            {
-              "when": "error",
-              "emit": "error",
-              "text_path": "error.message"
-            }
-          ]
+      "mappings": {
+        "paths": {
+          "$.limits.max_output_tokens": "$.max_tokens",
+          "$.sampling.temperature": "$.temperature",
+          "$.sampling.top_p": "$.top_p"
+        },
+        "flags": {}
+      },
+      "response_normalization": {
+        "sync": {
+          "content_path": "$.content[0].text",
+          "finish_reason_path": "$.stop_reason",
+          "finish_reason_map": {
+            "end_turn": "stop",
+            "max_tokens": "length",
+            "stop_sequence": "stop",
+            "tool_use": "tool_call"
+          }
+        },
+        "stream": {
+          "protocol": "sse",
+          "event_selector": {
+            "type_path": "$.type",
+            "routes": [
+              {
+                "when": "content_block_delta",
+                "emit": "text",
+                "text_path": "$.delta.text"
+              },
+              {
+                "when": "tool_use",
+                "emit": "tool_call",
+                "name_path": "$.name",
+                "args_path": "$.input"
+              }
+            ]
+          }
         }
       }
     }
-  }]
+  ]
 }

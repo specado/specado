@@ -87,7 +87,7 @@ pub fn translate(
             &mut out_ptr,
         );
 
-        if result != specado_ffi::types::SpecadoResult::Success {
+        if result != specado_ffi::SpecadoResult::Success {
             // Get error message from FFI
             let error_msg = specado_ffi::specado_get_last_error();
             let error_str = if error_msg.is_null() {
