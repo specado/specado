@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 specado-core = { path = "../specado-core" }
+specado-schemas = { path = "../specado-schemas" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }

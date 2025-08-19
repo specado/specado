@@ -107,6 +107,25 @@ SpecadoResult specado_run(const char *provider_request_json,
                           int timeout_seconds,
                           char **out_response_json);
 
+/// Validate a specification against its schema
+///
+/// # Parameters
+/// - `spec_json`: JSON string containing the specification to validate
+/// - `spec_type`: Type of specification ("prompt_spec" or "provider_spec")
+/// - `mode`: Validation mode ("basic", "partial", or "strict")
+/// - `out_result_json`: Output parameter for the validation result JSON
+///
+/// # Returns
+/// A SpecadoResult indicating success or failure
+///
+/// # Safety
+/// - All string pointers must be valid null-terminated C strings
+/// - The output string must be freed with `specado_string_free`
+SpecadoResult specado_validate(const char *spec_json,
+                               const char *spec_type,
+                               const char *mode,
+                               char **out_result_json);
+
 /// Get version information
 ///
 /// # Returns

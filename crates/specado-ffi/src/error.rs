@@ -14,15 +14,18 @@ pub fn map_core_error(error: specado_core::Error) -> SpecadoResult {
     use specado_core::Error;
     
     match error {
-        Error::Json { .. } => {
-            set_last_error(format!("JSON error: {}", error));
+        Error::Json { message, .. } => {
+            set_last_error(format!("JSON error: {}", message));
             SpecadoResult::JsonError
         }
-        Error::Http { status_code, .. } => {
-            set_last_error(format!("HTTP error: {}", error));
+        Error::Http { status_code, message, .. } => {
+            set_last_error(format!("HTTP error ({}): {}", status_code.unwrap_or(0), message));
             match status_code {
                 Some(401) | Some(403) => SpecadoResult::AuthenticationError,
                 Some(429) => SpecadoResult::RateLimitError,
+                Some(404) => SpecadoResult::ProviderNotFound,
+                Some(400) => SpecadoResult::InvalidInput,
+                Some(408) => SpecadoResult::TimeoutError,
                 _ => SpecadoResult::NetworkError,
             }
         }
@@ -31,28 +34,57 @@ pub fn map_core_error(error: specado_core::Error) -> SpecadoResult {
             match diagnostics.classification.as_str() {
                 "AuthenticationError" => SpecadoResult::AuthenticationError,
                 "RateLimitError" => SpecadoResult::RateLimitError,
+                "ValidationError" => SpecadoResult::InvalidInput,
+                "TimeoutError" => SpecadoResult::TimeoutError,
                 _ => SpecadoResult::NetworkError,
             }
         }
-        Error::Provider { .. } => {
-            set_last_error(format!("Provider error: {}", error));
+        Error::Provider { provider, message, .. } => {
+            set_last_error(format!("Provider '{}' error: {}", provider, message));
             SpecadoResult::ProviderNotFound
         }
-        Error::Validation { .. } => {
-            set_last_error(format!("Validation error: {}", error));
+        Error::Validation { field, message, expected } => {
+            let full_message = if let Some(exp) = expected {
+                format!("Validation error in field '{}': {}. Expected: {}", field, message, exp)
+            } else {
+                format!("Validation error in field '{}': {}", field, message)
+            };
+            set_last_error(full_message);
             SpecadoResult::InvalidInput
         }
-        Error::Configuration { .. } => {
-            set_last_error(format!("Configuration error: {}", error));
+        Error::Configuration { message, .. } => {
+            set_last_error(format!("Configuration error: {}", message));
             SpecadoResult::InvalidInput
         }
-        Error::Unsupported { .. } => {
-            set_last_error(format!("Unsupported: {}", error));
+        Error::Unsupported { message, feature } => {
+            let full_message = if let Some(feat) = feature {
+                format!("Unsupported feature '{}': {}", feat, message)
+            } else {
+                format!("Unsupported: {}", message)
+            };
+            set_last_error(full_message);
             SpecadoResult::NotImplemented
         }
-        Error::Io { .. } => {
-            set_last_error(format!("IO error: {}", error));
+        Error::Io { message, .. } => {
+            set_last_error(format!("IO error: {}", message));
             SpecadoResult::InternalError
+        }
+        Error::Translation { message, context } => {
+            let full_message = if let Some(ctx) = context {
+                format!("Translation error in {}: {}", ctx, message)
+            } else {
+                format!("Translation error: {}", message)
+            };
+            set_last_error(full_message);
+            SpecadoResult::InternalError
+        }
+        Error::Timeout { message, timeout_duration } => {
+            set_last_error(format!("Timeout: {} (after {:?})", message, timeout_duration));
+            SpecadoResult::TimeoutError
+        }
+        Error::RateLimit { message, .. } => {
+            set_last_error(format!("Rate limit exceeded: {}", message));
+            SpecadoResult::RateLimitError
         }
         _ => {
             set_last_error(format!("Internal error: {}", error));

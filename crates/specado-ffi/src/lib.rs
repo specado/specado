@@ -21,11 +21,13 @@ mod memory;
 mod run;
 mod translate;
 mod types;
+mod validate;
 
 // Re-export public API
 pub use api::*;
 pub use memory::{specado_string_free, specado_buffer_free, specado_get_last_error, specado_clear_error};
 pub use types::{SpecadoResult, SpecadoContext, TranslationHandle, ResponseHandle};
+pub use validate::ValidationResult;
 
 #[cfg(test)]
 mod tests {

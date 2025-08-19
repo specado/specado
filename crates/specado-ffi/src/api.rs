@@ -177,6 +177,54 @@ pub unsafe extern "C" fn specado_run(
     })
 }
 
+/// Validate a specification against its schema
+///
+/// # Parameters
+/// - `spec_json`: JSON string containing the specification to validate
+/// - `spec_type`: Type of specification ("prompt_spec" or "provider_spec")
+/// - `mode`: Validation mode ("basic", "partial", or "strict")
+/// - `out_result_json`: Output parameter for the validation result JSON
+///
+/// # Returns
+/// A SpecadoResult indicating success or failure
+///
+/// # Safety
+/// - All string pointers must be valid null-terminated C strings
+/// - The output string must be freed with `specado_string_free`
+#[no_mangle]
+pub unsafe extern "C" fn specado_validate(
+    spec_json: *const c_char,
+    spec_type: *const c_char,
+    mode: *const c_char,
+    out_result_json: *mut *mut c_char,
+) -> SpecadoResult {
+    ffi_boundary!({
+        clear_last_error();
+        
+        // Validate inputs
+        validate_ptr(spec_json, "spec_json")?;
+        validate_ptr(spec_type, "spec_type")?;
+        validate_ptr(mode, "mode")?;
+        validate_ptr(out_result_json, "out_result_json")?;
+        
+        // Convert C strings to Rust strings
+        let spec_str = c_str_to_string(spec_json)?;
+        let type_str = c_str_to_string(spec_type)?;
+        let mode_str = c_str_to_string(mode)?;
+        
+        // Perform validation
+        let result = crate::validate::validate_json(&spec_str, &type_str, &mode_str)?;
+        
+        // Allocate output string
+        *out_result_json = allocate_string(&result);
+        if (*out_result_json).is_null() {
+            return Err(SpecadoResult::MemoryError);
+        }
+        
+        Ok(SpecadoResult::Success)
+    })
+}
+
 /// Get version information
 ///
 /// # Returns
