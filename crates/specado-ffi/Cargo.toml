@@ -12,4 +12,15 @@ description = "FFI bindings for Node.js and Python - Specado language bindings"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# Dependencies will be added as needed in L5
+specado-core = { path = "../specado-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+tokio = { version = "1", features = ["rt", "macros"] }
+
+[build-dependencies]
+cbindgen = "0.26"
+
+[dev-dependencies]
+tempfile = "3.8"
+serial_test = "3.0"
