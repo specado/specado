@@ -5,7 +5,9 @@ members = [
     "crates/specado-providers",
     "crates/specado-cli",
     "crates/specado-ffi",
-    "crates/specado-wasm", "crates/specado-golden",
+    "crates/specado-python",
+    "crates/specado-wasm", 
+    "crates/specado-golden",
 ]
 exclude = ["crates/specado-core/fuzz"]
 resolver = "2"
