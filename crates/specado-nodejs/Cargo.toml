@@ -1,0 +1,42 @@
+[package]
+name = "specado-nodejs"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Node.js bindings for Specado using NAPI-RS"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# NAPI-RS dependencies
+napi = { version = "2.16", default-features = false, features = ["napi8", "serde-json", "async"] }
+napi-derive = "2.16"
+
+# Specado dependencies
+specado-core = { path = "../specado-core" }
+specado-ffi = { path = "../specado-ffi" }
+
+# Serde for serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Async runtime
+tokio = { version = "1", features = ["rt", "macros"] }
+
+# Time handling
+chrono = { workspace = true }
+
+# Error handling
+anyhow = "1.0"
+
+[build-dependencies]
+napi-build = "2.1"
+
+[profile.release]
+# Optimize for size since this is a library
+opt-level = "s"
+lto = true
+strip = true
