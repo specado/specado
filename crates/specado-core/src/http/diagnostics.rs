@@ -145,6 +145,36 @@ impl ErrorDiagnostics {
                 "Check the provider's status page for outages".to_string(),
                 "Consider using an alternative model or provider".to_string(),
             ],
+            ErrorClassification::TimeoutError => vec![
+                "Request timed out - the server took too long to respond".to_string(),
+                "Try increasing timeout values in client configuration".to_string(),
+                "Check network connectivity and latency".to_string(),
+                "Consider using a different endpoint or region".to_string(),
+            ],
+            ErrorClassification::TlsError => vec![
+                "TLS/SSL handshake failed".to_string(),
+                "Check certificate validity and chain".to_string(),
+                "Verify TLS configuration and supported versions".to_string(),
+                "Ensure system time and date are correct".to_string(),
+            ],
+            ErrorClassification::DnsError => vec![
+                "DNS resolution failed - cannot resolve hostname".to_string(),
+                "Check DNS server configuration".to_string(),
+                "Verify the API endpoint hostname is correct".to_string(),
+                "Try using a different DNS resolver or network".to_string(),
+            ],
+            ErrorClassification::ConnectionError => vec![
+                "Failed to establish connection to the server".to_string(),
+                "Check firewall and network proxy settings".to_string(),
+                "Verify the server is accepting connections".to_string(),
+                "Try connecting from a different network".to_string(),
+            ],
+            ErrorClassification::CircuitBreakerOpen => vec![
+                "Circuit breaker is open - too many recent failures".to_string(),
+                "Wait for the circuit breaker recovery period".to_string(),
+                "Check server health and recent error patterns".to_string(),
+                "Consider using alternative endpoints".to_string(),
+            ],
             ErrorClassification::Unknown => vec![
                 "An unknown error occurred".to_string(),
                 "Check the error details for more information".to_string(),

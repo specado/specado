@@ -113,6 +113,35 @@ pub enum Error {
         feature: Option<String>,
     },
 
+    /// Timeout errors
+    #[error("Operation timed out: {message} (after {timeout_duration:?})")]
+    Timeout {
+        message: String,
+        timeout_duration: std::time::Duration,
+    },
+    
+    /// Rate limiting errors
+    #[error("Rate limit exceeded: {message}")]
+    RateLimit {
+        message: String,
+        retry_after: Option<u64>,
+    },
+    
+    /// Circuit breaker errors
+    #[error("Circuit breaker is open: {message}")]
+    CircuitBreakerOpen {
+        message: String,
+        retry_after: Option<u64>,
+    },
+    
+    /// TLS/SSL errors
+    #[error("TLS error: {message}")]
+    Tls {
+        message: String,
+        #[source]
+        source: Option<anyhow::Error>,
+    },
+
     /// Generic internal error with context
     #[error("Internal error: {message}")]
     Internal {
@@ -245,6 +274,19 @@ mod tests {
             source: None,
         };
         assert_eq!(err.to_string(), "Schema validation failed: Invalid schema");
+        
+        let timeout_err = Error::Timeout {
+            message: "Request took too long".to_string(),
+            timeout_duration: std::time::Duration::from_secs(30),
+        };
+        assert!(timeout_err.to_string().contains("Operation timed out"));
+        assert!(timeout_err.to_string().contains("30s"));
+        
+        let rate_limit_err = Error::RateLimit {
+            message: "Too many requests".to_string(),
+            retry_after: Some(60),
+        };
+        assert_eq!(rate_limit_err.to_string(), "Rate limit exceeded: Too many requests");
     }
 
     #[test]

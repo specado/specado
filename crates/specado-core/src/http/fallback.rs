@@ -112,6 +112,11 @@ impl FallbackHandler {
             ErrorClassification::NetworkError => true,
             ErrorClassification::ServerError => true,
             ErrorClassification::RateLimitError => true,
+            ErrorClassification::TimeoutError => true,
+            ErrorClassification::ConnectionError => true,
+            ErrorClassification::DnsError => true,
+            ErrorClassification::TlsError => false, // Don't retry TLS errors via fallback
+            ErrorClassification::CircuitBreakerOpen => false, // Circuit breaker handles this
             ErrorClassification::ClientError => false, // Don't retry bad requests
             ErrorClassification::AuthenticationError => false, // Don't retry auth errors
             ErrorClassification::Unknown => false, // Don't retry unknown errors by default

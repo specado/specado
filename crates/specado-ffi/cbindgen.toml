@@ -13,7 +13,6 @@ sys_includes = ["stdint.h", "stdbool.h", "stddef.h"]
 [export]
 include = ["SpecadoResult", "SpecadoContext", "TranslationHandle", "ResponseHandle", "SpecadoString", "SpecadoBuffer"]
 exclude = []
-prefix = "SPECADO_"
 
 [export.rename]
 "SpecadoResult" = "specado_result_t"
@@ -35,11 +34,7 @@ rename_variants = "SCREAMING_SNAKE_CASE"
 prefix_with_name = true
 
 [const]
-prefix = "SPECADO_"
+allow_static_const = true
 
 [macro_expansion]
 bitflags = false
-
-# Documentation settings
-documentation = true
-documentation_style = "c"

@@ -28,6 +28,7 @@ colored = "2.1"
 criterion = "0.5"
 specado-golden = { path = "../specado-golden" }
 proptest = "1.4"
+tempfile = "3.8"
 
 [[bench]]
 name = "jsonpath_benchmarks"

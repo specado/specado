@@ -20,6 +20,16 @@ pub enum ErrorClassification {
     RateLimitError,
     /// Authentication errors - should not retry
     AuthenticationError,
+    /// Timeout errors - should retry with backoff
+    TimeoutError,
+    /// TLS/SSL errors - might retry depending on type
+    TlsError,
+    /// DNS resolution errors - should retry
+    DnsError,
+    /// Connection errors - should retry
+    ConnectionError,
+    /// Circuit breaker open - should not retry immediately
+    CircuitBreakerOpen,
     /// Unknown errors - default to no retry
     Unknown,
 }
@@ -32,6 +42,9 @@ impl ErrorClassification {
             ErrorClassification::ServerError
                 | ErrorClassification::NetworkError
                 | ErrorClassification::RateLimitError
+                | ErrorClassification::TimeoutError
+                | ErrorClassification::DnsError
+                | ErrorClassification::ConnectionError
         )
     }
     
@@ -41,6 +54,11 @@ impl ErrorClassification {
             ErrorClassification::RateLimitError => Some(60), // 1 minute for rate limits
             ErrorClassification::ServerError => Some(5),     // 5 seconds for server errors
             ErrorClassification::NetworkError => Some(2),    // 2 seconds for network errors
+            ErrorClassification::TimeoutError => Some(3),    // 3 seconds for timeouts
+            ErrorClassification::DnsError => Some(10),       // 10 seconds for DNS issues
+            ErrorClassification::ConnectionError => Some(5), // 5 seconds for connection issues
+            ErrorClassification::TlsError => Some(30),       // 30 seconds for TLS issues
+            ErrorClassification::CircuitBreakerOpen => Some(60), // 1 minute for circuit breaker
             _ => None,
         }
     }
@@ -98,13 +116,7 @@ impl HttpError {
     
     /// Create from a network/request error
     pub fn from_request_error(error: reqwest::Error) -> Self {
-        let classification = if error.is_timeout() {
-            ErrorClassification::NetworkError
-        } else if error.is_connect() {
-            ErrorClassification::NetworkError
-        } else {
-            ErrorClassification::Unknown
-        };
+        let classification = Self::classify_request_error(&error);
         
         Self {
             status_code: None,
@@ -113,6 +125,21 @@ impl HttpError {
             message: error.to_string(),
             details: None,
             retry_after: None,
+        }
+    }
+    
+    /// Classify different types of request errors
+    fn classify_request_error(error: &reqwest::Error) -> ErrorClassification {
+        if error.is_timeout() {
+            ErrorClassification::TimeoutError
+        } else if error.is_connect() {
+            ErrorClassification::ConnectionError
+        } else if error.to_string().contains("dns") || error.to_string().contains("resolve") {
+            ErrorClassification::DnsError
+        } else if error.to_string().contains("tls") || error.to_string().contains("ssl") || error.to_string().contains("certificate") {
+            ErrorClassification::TlsError
+        } else {
+            ErrorClassification::NetworkError
         }
     }
     
