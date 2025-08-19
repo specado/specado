@@ -5,15 +5,16 @@
 
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyException, PyValueError, PyRuntimeError};
+use pyo3::create_exception;
 use specado_ffi::SpecadoResult;
 use std::fmt;
 
 // Define Python exception types directly
 create_exception!(specado, SpecadoError, PyException);
-create_exception!(specado, TranslationError, SpecadoError);
-create_exception!(specado, ValidationError, SpecadoError);
-create_exception!(specado, ProviderError, SpecadoError);
-create_exception!(specado, TimeoutError, SpecadoError);
+create_exception!(specado, TranslationError, PyException);
+create_exception!(specado, ValidationError, PyException);
+create_exception!(specado, ProviderError, PyException);
+create_exception!(specado, TimeoutError, PyException);
 
 /// Convert FFI result codes to Python exceptions
 pub fn map_ffi_result_to_py_err(result: SpecadoResult, message: Option<String>) -> PyErr {
@@ -23,12 +24,12 @@ pub fn map_ffi_result_to_py_err(result: SpecadoResult, message: Option<String>) 
         SpecadoResult::Success => unreachable!("Success should not be converted to error"),
         SpecadoResult::InvalidInput => ValidationError::new_err(error_msg),
         SpecadoResult::JsonError => ValidationError::new_err(error_msg),
-        SpecadoResult::ProviderNotFound => crate::error::ProviderError::new_err(error_msg),
-        SpecadoResult::ModelNotFound => crate::error::ProviderError::new_err(error_msg),
-        SpecadoResult::NetworkError => crate::error::ProviderError::new_err(error_msg),
-        SpecadoResult::AuthenticationError => crate::error::ProviderError::new_err(error_msg),
-        SpecadoResult::RateLimitError => crate::error::ProviderError::new_err(error_msg),
-        SpecadoResult::TimeoutError => crate::error::TimeoutError::new_err(error_msg),
+        SpecadoResult::ProviderNotFound => ProviderError::new_err(error_msg),
+        SpecadoResult::ModelNotFound => ProviderError::new_err(error_msg),
+        SpecadoResult::NetworkError => ProviderError::new_err(error_msg),
+        SpecadoResult::AuthenticationError => ProviderError::new_err(error_msg),
+        SpecadoResult::RateLimitError => ProviderError::new_err(error_msg),
+        SpecadoResult::TimeoutError => TimeoutError::new_err(error_msg),
         SpecadoResult::InternalError => SpecadoError::new_err(error_msg),
         SpecadoResult::MemoryError => PyRuntimeError::new_err(error_msg),
         SpecadoResult::Utf8Error => PyValueError::new_err(error_msg),

@@ -7,7 +7,8 @@ use napi_derive::napi;
 use std::fmt;
 
 /// Specado error types for JavaScript
-#[napi]
+#[napi(string_enum)]
+#[derive(Debug)]
 pub enum SpecadoErrorKind {
     /// Invalid input parameters
     InvalidInput,
@@ -119,27 +120,37 @@ impl From<specado_ffi::SpecadoResult> for SpecadoError {
 }
 
 /// Convert core library errors to JavaScript errors
-impl From<specado_core::error::Error> for SpecadoError {
-    fn from(error: specado_core::error::Error) -> Self {
-        use specado_core::error::Error as CoreError;
+impl From<specado_core::Error> for SpecadoError {
+    fn from(error: specado_core::Error) -> Self {
+        use specado_core::Error as CoreError;
         
         match error {
-            CoreError::InvalidInput { message } => Self::new(SpecadoErrorKind::InvalidInput, message),
-            CoreError::JsonError { message, .. } => Self::new(SpecadoErrorKind::JsonError, message),
-            CoreError::ProviderNotFound { provider, .. } => {
-                Self::with_details(SpecadoErrorKind::ProviderNotFound, "Provider not found", provider)
+            CoreError::SchemaValidation { message, .. } => Self::new(SpecadoErrorKind::InvalidInput, message),
+            CoreError::Translation { message, .. } => Self::new(SpecadoErrorKind::InternalError, message),
+            CoreError::Provider { provider, message, .. } => {
+                Self::with_details(SpecadoErrorKind::ProviderNotFound, message, provider)
             },
-            CoreError::ModelNotFound { model, provider, .. } => {
-                Self::with_details(
-                    SpecadoErrorKind::ModelNotFound, 
-                    format!("Model '{}' not found", model),
-                    format!("Provider: {}", provider)
-                )
+            CoreError::StrictnessViolation { message, .. } => Self::new(SpecadoErrorKind::InvalidInput, message),
+            CoreError::Json { message, .. } => Self::new(SpecadoErrorKind::JsonError, message),
+            CoreError::Http { message, status_code, .. } => {
+                // Map HTTP errors based on status code
+                let kind = match status_code {
+                    Some(401) | Some(403) => SpecadoErrorKind::AuthenticationError,
+                    Some(429) => SpecadoErrorKind::RateLimitError,
+                    Some(408) | Some(504) => SpecadoErrorKind::TimeoutError,
+                    _ => SpecadoErrorKind::NetworkError,
+                };
+                Self::new(kind, message)
             },
-            CoreError::NetworkError { message, .. } => Self::new(SpecadoErrorKind::NetworkError, message),
-            CoreError::AuthenticationError { message, .. } => Self::new(SpecadoErrorKind::AuthenticationError, message),
-            CoreError::RateLimitError { message, .. } => Self::new(SpecadoErrorKind::RateLimitError, message),
-            CoreError::TimeoutError { message, .. } => Self::new(SpecadoErrorKind::TimeoutError, message),
+            CoreError::HttpWithDiagnostics { error, .. } => {
+                Self::new(SpecadoErrorKind::NetworkError, error.to_string())
+            },
+            CoreError::Configuration { message, .. } => Self::new(SpecadoErrorKind::InvalidInput, message),
+            CoreError::HttpRequest { message, .. } => Self::new(SpecadoErrorKind::NetworkError, message),
+            CoreError::Validation { field, message, .. } => {
+                Self::with_details(SpecadoErrorKind::InvalidInput, message, field)
+            },
+            CoreError::Lossiness { message, .. } => Self::new(SpecadoErrorKind::InternalError, message),
             _ => Self::new(SpecadoErrorKind::InternalError, error.to_string()),
         }
     }

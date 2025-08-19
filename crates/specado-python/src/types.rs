@@ -4,7 +4,7 @@
 //! data structures, with proper serialization and type hints.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::{PyDict, PyString, PyType};
 use pyo3::exceptions::PyValueError;
 use serde_json::Value;
 use specado_core::types::*;

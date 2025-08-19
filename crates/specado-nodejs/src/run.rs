@@ -8,7 +8,6 @@ use napi_derive::napi;
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::error::SpecadoError;
 use crate::types::{ProviderRequest, ProviderSpec, RunOptions, UniformResponse, UsageStats, ResponseMetadata};
 
 /// Execute a provider request asynchronously
@@ -146,7 +145,7 @@ fn run_sync_internal(request_json: String, timeout_seconds: u32) -> Result<Strin
             &mut out_ptr,
         );
 
-        if result != specado_ffi::types::SpecadoResult::Success {
+        if result != specado_ffi::SpecadoResult::Success {
             // Get error message from FFI
             let error_msg = specado_ffi::specado_get_last_error();
             let error_str = if error_msg.is_null() {
@@ -216,7 +215,8 @@ fn parse_uniform_response(response: Value, provider_spec: &ProviderSpec) -> Resu
             .map(|s| s.to_string()),
         response_time_ms: response_obj.get("response_time_ms")
             .and_then(|v| v.as_u64())
-            .unwrap_or(0),
+            .map(|v| v as f64)
+            .unwrap_or(0.0),
     };
 
     Ok(UniformResponse {

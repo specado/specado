@@ -6,7 +6,6 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde_json::Value;
 
-use crate::error::SpecadoError;
 use crate::types::{ValidationResult, ValidationError, ValidationWarning};
 
 /// Schema types for validation

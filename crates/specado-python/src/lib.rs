@@ -5,6 +5,7 @@
 //! and execute provider requests.
 
 use pyo3::prelude::*;
+use pyo3::wrap_pyfunction;
 
 mod types;
 mod translate;
@@ -12,11 +13,8 @@ mod validate;
 mod run;
 mod error;
 
-pub use types::*;
-pub use translate::*;
-pub use validate::*;
-pub use run::*;
-pub use error::*;
+use types::*;
+use error::*;
 
 /// Specado Python module
 #[pymodule]
@@ -29,11 +27,11 @@ fn _specado(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add("TimeoutError", _py.get_type::<TimeoutError>())?;
     
     // Add core functions
-    m.add_function(wrap_pyfunction!(translate, m)?)?;
-    m.add_function(wrap_pyfunction!(validate, m)?)?;
-    m.add_function(wrap_pyfunction!(run_async, m)?)?;
-    m.add_function(wrap_pyfunction!(run_sync, m)?)?;
-    m.add_function(wrap_pyfunction!(create_provider_request, m)?)?;
+    m.add_function(wrap_pyfunction!(translate::translate, m)?)?;
+    m.add_function(wrap_pyfunction!(validate::validate, m)?)?;
+    m.add_function(wrap_pyfunction!(run::run_async, m)?)?;
+    m.add_function(wrap_pyfunction!(run::run_sync, m)?)?;
+    m.add_function(wrap_pyfunction!(run::create_provider_request, m)?)?;
     
     // Add utility functions
     m.add_function(wrap_pyfunction!(version, m)?)?;

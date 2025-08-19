@@ -302,11 +302,13 @@ mod tests {
             }
         };
         
-        PyProviderSpec::new(
-            "1.0.0".to_string(),
-            provider_info,
-            vec![model_spec]
-        )
+        PyProviderSpec {
+            inner: ProviderSpec {
+                spec_version: "1.0.0".to_string(),
+                provider: provider_info.inner.clone(),
+                models: vec![model_spec.inner.clone()],
+            },
+        }
     }
     
     #[test]
@@ -336,7 +338,7 @@ mod tests {
             let request = create_provider_request(py, &translation_result, &provider).unwrap();
             
             // Verify the request is a valid Python object
-            assert!(!request.is_none());
+            assert!(!request.is_none(py));
         });
     }
     

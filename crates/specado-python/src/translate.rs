@@ -104,13 +104,28 @@ mod tests {
     use serde_json::json;
     
     fn create_test_prompt() -> PyPromptSpec {
-        let message = PyMessage::new("user", "Hello, world!".to_string(), None, None).unwrap();
-        PyPromptSpec::new(
-            "Chat".to_string(),
-            vec![message],
-            None, None, None, None, None, None,
-            "warn"
-        ).unwrap()
+        let message = PyMessage {
+            inner: Message {
+                role: MessageRole::User,
+                content: "Hello, world!".to_string(),
+                name: None,
+                metadata: None,
+            },
+        };
+
+        PyPromptSpec {
+            inner: PromptSpec {
+                model_class: "Chat".to_string(),
+                messages: vec![message.inner.clone()],
+                tools: None,
+                tool_choice: None,
+                response_format: None,
+                sampling: None,
+                limits: None,
+                media: None,
+                strict_mode: StrictMode::Warn,
+            },
+        }
     }
     
     fn create_test_provider() -> PyProviderSpec {
@@ -190,11 +205,13 @@ mod tests {
             }
         };
         
-        PyProviderSpec::new(
-            "1.0.0".to_string(),
-            provider_info,
-            vec![model_spec]
-        )
+        PyProviderSpec {
+            inner: ProviderSpec {
+                spec_version: "1.0.0".to_string(),
+                provider: provider_info.inner.clone(),
+                models: vec![model_spec.inner.clone()],
+            },
+        }
     }
     
     #[test]

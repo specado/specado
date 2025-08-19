@@ -13,7 +13,7 @@ use crate::types::SpecadoResult;
 use crate::memory::set_last_error;
 
 /// Validation result for FFI
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ValidationResult {
     /// Whether validation passed
     pub is_valid: bool,

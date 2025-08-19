@@ -100,7 +100,7 @@ pub struct SamplingParams {
     /// Stop sequences
     pub stop: Option<Vec<String>>,
     /// Random seed
-    pub seed: Option<u64>,
+    pub seed: Option<f64>,
 }
 
 /// Token and output limits
@@ -124,7 +124,7 @@ pub struct MediaConfig {
     /// Supported output media types
     pub output_types: Option<Vec<String>>,
     /// Maximum file size in bytes
-    pub max_file_size: Option<u64>,
+    pub max_file_size: Option<f64>,
 }
 
 /// Tool call in a message
@@ -422,5 +422,5 @@ pub struct ResponseMetadata {
     /// Request ID for tracking
     pub request_id: Option<String>,
     /// Response time in milliseconds
-    pub response_time_ms: u64,
+    pub response_time_ms: f64,
 }

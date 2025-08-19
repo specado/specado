@@ -7,7 +7,6 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde_json::Value;
 
-use crate::error::SpecadoError;
 use crate::types::{PromptSpec, ProviderSpec, TranslateOptions, TranslateResult, TranslationMetadata};
 use chrono;
 

@@ -132,11 +132,30 @@ pub fn validate_spec(spec_json: &str, spec_type: &str, mode: &str) -> PyResult<P
         json_copy
     };
     
-    // Parse the result JSON
-    let validation_result: specado_ffi::ValidationResult = serde_json::from_str(&result_json)
+    // Parse the result JSON as a Value first
+    let validation_json: serde_json::Value = serde_json::from_str(&result_json)
         .map_err(|e| PyValueError::new_err(format!("Failed to parse result JSON: {}", e)))?;
     
-    Ok(PyValidationResult::new(validation_result.is_valid, validation_result.errors))
+    // Extract validation fields from JSON
+    let is_valid = validation_json.get("valid")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    
+    let errors = validation_json.get("errors")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|e| {
+                    let path = e.get("path")?.as_str()?.to_string();
+                    let message = e.get("message")?.as_str()?.to_string();
+                    let code = e.get("code").and_then(|c| c.as_str()).unwrap_or("ERROR").to_string();
+                    Some(format!("{} at {}: {}", code, path, message))
+                })
+                .collect()
+        })
+        .unwrap_or_else(Vec::new);
+    
+    Ok(PyValidationResult::new(is_valid, errors))
 }
 
 /// Helper function to convert Python dict to JSON value
