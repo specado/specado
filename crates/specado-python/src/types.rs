@@ -292,6 +292,49 @@ impl PyTranslationResult {
         self.inner.has_lossiness()
     }
 
+    #[getter]
+    fn lossiness(&self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            let json_str = serde_json::to_string(&self.inner.lossiness)
+                .map_err(|e| PyValueError::new_err(format!("Serialization error: {}", e)))?;
+            let json_value: Value = serde_json::from_str(&json_str)
+                .map_err(|e| PyValueError::new_err(format!("JSON error: {}", e)))?;
+            json_to_py(py, &json_value)
+        })
+    }
+
+    #[getter]
+    fn metadata(&self) -> PyResult<Option<PyObject>> {
+        if let Some(metadata) = &self.inner.metadata {
+            Python::with_gil(|py| {
+                let json_str = serde_json::to_string(metadata)
+                    .map_err(|e| PyValueError::new_err(format!("Serialization error: {}", e)))?;
+                let json_value: Value = serde_json::from_str(&json_str)
+                    .map_err(|e| PyValueError::new_err(format!("JSON error: {}", e)))?;
+                Ok(Some(json_to_py(py, &json_value)?))
+            })
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[getter]
+    fn lossiness_summary(&self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            let summary = &self.inner.lossiness.summary;
+            let json_str = serde_json::to_string(summary)
+                .map_err(|e| PyValueError::new_err(format!("Serialization error: {}", e)))?;
+            let json_value: Value = serde_json::from_str(&json_str)
+                .map_err(|e| PyValueError::new_err(format!("JSON error: {}", e)))?;
+            json_to_py(py, &json_value)
+        })
+    }
+
+    #[getter]
+    fn max_severity(&self) -> String {
+        format!("{:?}", self.inner.lossiness.max_severity)
+    }
+
     fn to_dict(&self) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let json_str = serde_json::to_string(&self.inner)
@@ -303,7 +346,8 @@ impl PyTranslationResult {
     }
 
     fn __repr__(&self) -> String {
-        format!("TranslationResult(has_lossiness={})", self.has_lossiness())
+        format!("TranslationResult(has_lossiness={}, max_severity={:?})", 
+                self.has_lossiness(), self.inner.lossiness.max_severity)
     }
 }
 

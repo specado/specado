@@ -20,6 +20,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 specado-core = { path = "../specado-core" }
 specado-ffi = { path = "../specado-ffi" }
+specado-schemas = { path = "../specado-schemas" }
 
 [features]
 default = ["pyo3/extension-module"]

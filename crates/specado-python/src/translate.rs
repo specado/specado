@@ -88,7 +88,7 @@ pub fn translate(
         json_copy
     };
     
-    // Parse the result JSON
+    // Parse the result JSON as TranslationResult (not the old wrapper)
     let result: TranslationResult = serde_json::from_str(&result_json)
         .map_err(|e| PyRuntimeError::new_err(format!("Failed to parse result JSON: {}", e)))?;
     

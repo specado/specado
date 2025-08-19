@@ -1,13 +1,18 @@
 //! Validation function implementation for Python bindings
 //!
 //! This module implements validation functions for prompt and provider
-//! specifications using schema validation.
+//! specifications using the specado-schemas crate.
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::exceptions::PyValueError;
 use crate::types::{PyPromptSpec, PyProviderSpec, PyValidationResult};
 use serde_json::Value;
+use specado_schemas::{
+    create_prompt_spec_validator, create_provider_spec_validator,
+    ValidationMode, ValidationResult as SchemaValidationResult,
+    SchemaValidator, ValidationContext,
+};
 
 /// Validate a specification against its schema
 /// 
@@ -56,318 +61,107 @@ pub fn validate(py: Python<'_>, spec: PyObject, schema_type: &str) -> PyResult<P
     Ok(validation_result)
 }
 
-/// Internal validation logic
+/// Internal validation logic using specado-schemas
 fn validate_spec_internal(spec: &Value, schema_type: &str) -> PyResult<PyValidationResult> {
-    let mut errors = Vec::new();
-    
-    match schema_type {
+    let result = match schema_type {
         "prompt" => {
-            validate_prompt_spec(spec, &mut errors);
+            let validator = create_prompt_spec_validator()
+                .map_err(|e| PyValueError::new_err(format!("Failed to create prompt validator: {}", e)))?;
+            let context = ValidationContext::new(ValidationMode::Strict);
+            validator.validate_with_context(spec, &context)
         }
         "provider" => {
-            validate_provider_spec(spec, &mut errors);
+            let validator = create_provider_spec_validator()
+                .map_err(|e| PyValueError::new_err(format!("Failed to create provider validator: {}", e)))?;
+            let context = ValidationContext::new(ValidationMode::Strict);
+            validator.validate_with_context(spec, &context)
         }
         _ => unreachable!(), // Already validated above
-    }
+    };
     
-    let is_valid = errors.is_empty();
-    Ok(PyValidationResult::new(is_valid, errors))
+    match result {
+        Ok(_) => Ok(PyValidationResult::new(true, vec![])),
+        Err(validation_error) => {
+            // Single validation error
+            let errors = vec![validation_error.to_string()];
+            Ok(PyValidationResult::new(false, errors))
+        }
+    }
 }
 
-/// Validate a prompt specification
-fn validate_prompt_spec(spec: &Value, errors: &mut Vec<String>) {
-    // Check required fields
-    if !spec.is_object() {
-        errors.push("Prompt spec must be an object".to_string());
-        return;
-    }
+
+/// Validate a specification using the FFI layer (alternative interface)
+/// 
+/// Args:
+///     spec_json (str): JSON string of the specification to validate
+///     spec_type (str): Type of specification ("prompt_spec" or "provider_spec")
+///     mode (str): Validation mode ("basic", "partial", or "strict")
+/// 
+/// Returns:
+///     ValidationResult: Validation result with errors if any
+/// 
+/// Raises:
+///     ValidationError: If validation setup fails
+#[pyfunction]
+pub fn validate_spec(spec_json: &str, spec_type: &str, mode: &str) -> PyResult<PyValidationResult> {
+    use std::ffi::{CString, CStr};
+    use std::ptr;
     
-    let obj = spec.as_object().unwrap();
+    // Convert strings to C strings
+    let spec_cstr = CString::new(spec_json)
+        .map_err(|e| PyValueError::new_err(format!("Invalid spec JSON: {}", e)))?;
+    let type_cstr = CString::new(spec_type)
+        .map_err(|e| PyValueError::new_err(format!("Invalid spec type: {}", e)))?;
+    let mode_cstr = CString::new(mode)
+        .map_err(|e| PyValueError::new_err(format!("Invalid mode: {}", e)))?;
     
-    // Check model_class
-    match obj.get("model_class") {
-        Some(Value::String(model_class)) => {
-            if model_class.is_empty() {
-                errors.push("model_class cannot be empty".to_string());
-            }
-        }
-        Some(_) => errors.push("model_class must be a string".to_string()),
-        None => errors.push("model_class is required".to_string()),
-    }
+    // Call FFI function
+    let mut result_ptr: *mut std::os::raw::c_char = ptr::null_mut();
     
-    // Check messages
-    match obj.get("messages") {
-        Some(Value::Array(messages)) => {
-            if messages.is_empty() {
-                errors.push("messages array cannot be empty".to_string());
+    let ffi_result = unsafe {
+        specado_ffi::specado_validate(
+            spec_cstr.as_ptr(),
+            type_cstr.as_ptr(),
+            mode_cstr.as_ptr(),
+            &mut result_ptr,
+        )
+    };
+    
+    // Check for success
+    if ffi_result != specado_ffi::SpecadoResult::Success {
+        let error_msg = unsafe {
+            let error_ptr = specado_ffi::specado_get_last_error();
+            if error_ptr.is_null() {
+                "Validation failed".to_string()
             } else {
-                for (i, message) in messages.iter().enumerate() {
-                    validate_message(message, i, errors);
-                }
+                CStr::from_ptr(error_ptr).to_string_lossy().to_string()
             }
-        }
-        Some(_) => errors.push("messages must be an array".to_string()),
-        None => errors.push("messages is required".to_string()),
+        };
+        return Err(PyValueError::new_err(error_msg));
     }
     
-    // Check strict_mode
-    match obj.get("strict_mode") {
-        Some(Value::String(mode)) => {
-            if !["warn", "error"].contains(&mode.as_str()) {
-                errors.push("strict_mode must be 'warn' or 'error'".to_string());
-            }
-        }
-        Some(_) => errors.push("strict_mode must be a string".to_string()),
-        None => errors.push("strict_mode is required".to_string()),
+    // Convert result back to Rust
+    if result_ptr.is_null() {
+        return Err(PyValueError::new_err("FFI returned null result"));
     }
     
-    // Validate optional fields if present
-    if let Some(tools) = obj.get("tools") {
-        validate_tools(tools, errors);
-    }
+    let result_json = unsafe {
+        let c_str = CStr::from_ptr(result_ptr);
+        let rust_str = c_str.to_str()
+            .map_err(|e| PyValueError::new_err(format!("Invalid UTF-8 in result: {}", e)))?;
+        let json_copy = rust_str.to_string();
+        
+        // Free the FFI-allocated string
+        specado_ffi::specado_string_free(result_ptr);
+        
+        json_copy
+    };
     
-    if let Some(sampling) = obj.get("sampling") {
-        validate_sampling_params(sampling, errors);
-    }
+    // Parse the result JSON
+    let validation_result: specado_ffi::ValidationResult = serde_json::from_str(&result_json)
+        .map_err(|e| PyValueError::new_err(format!("Failed to parse result JSON: {}", e)))?;
     
-    if let Some(limits) = obj.get("limits") {
-        validate_limits(limits, errors);
-    }
-}
-
-/// Validate a provider specification
-fn validate_provider_spec(spec: &Value, errors: &mut Vec<String>) {
-    if !spec.is_object() {
-        errors.push("Provider spec must be an object".to_string());
-        return;
-    }
-    
-    let obj = spec.as_object().unwrap();
-    
-    // Check spec_version
-    match obj.get("spec_version") {
-        Some(Value::String(version)) => {
-            if version.is_empty() {
-                errors.push("spec_version cannot be empty".to_string());
-            }
-            // Could add semver validation here
-        }
-        Some(_) => errors.push("spec_version must be a string".to_string()),
-        None => errors.push("spec_version is required".to_string()),
-    }
-    
-    // Check provider
-    match obj.get("provider") {
-        Some(provider) => validate_provider_info(provider, errors),
-        None => errors.push("provider is required".to_string()),
-    }
-    
-    // Check models
-    match obj.get("models") {
-        Some(Value::Array(models)) => {
-            if models.is_empty() {
-                errors.push("models array cannot be empty".to_string());
-            } else {
-                for (i, model) in models.iter().enumerate() {
-                    validate_model_spec(model, i, errors);
-                }
-            }
-        }
-        Some(_) => errors.push("models must be an array".to_string()),
-        None => errors.push("models is required".to_string()),
-    }
-}
-
-/// Validate a single message
-fn validate_message(message: &Value, index: usize, errors: &mut Vec<String>) {
-    if !message.is_object() {
-        errors.push(format!("Message {} must be an object", index));
-        return;
-    }
-    
-    let obj = message.as_object().unwrap();
-    
-    // Check role
-    match obj.get("role") {
-        Some(Value::String(role)) => {
-            if !["system", "user", "assistant"].contains(&role.as_str()) {
-                errors.push(format!("Message {} role must be 'system', 'user', or 'assistant'", index));
-            }
-        }
-        Some(_) => errors.push(format!("Message {} role must be a string", index)),
-        None => errors.push(format!("Message {} role is required", index)),
-    }
-    
-    // Check content
-    match obj.get("content") {
-        Some(Value::String(content)) => {
-            if content.is_empty() {
-                errors.push(format!("Message {} content cannot be empty", index));
-            }
-        }
-        Some(_) => errors.push(format!("Message {} content must be a string", index)),
-        None => errors.push(format!("Message {} content is required", index)),
-    }
-}
-
-/// Validate tools array
-fn validate_tools(tools: &Value, errors: &mut Vec<String>) {
-    if let Value::Array(tools_array) = tools {
-        for (i, tool) in tools_array.iter().enumerate() {
-            if !tool.is_object() {
-                errors.push(format!("Tool {} must be an object", i));
-                continue;
-            }
-            
-            let obj = tool.as_object().unwrap();
-            
-            // Check name
-            match obj.get("name") {
-                Some(Value::String(name)) => {
-                    if name.is_empty() {
-                        errors.push(format!("Tool {} name cannot be empty", i));
-                    }
-                }
-                Some(_) => errors.push(format!("Tool {} name must be a string", i)),
-                None => errors.push(format!("Tool {} name is required", i)),
-            }
-            
-            // Check json_schema
-            if !obj.contains_key("json_schema") {
-                errors.push(format!("Tool {} json_schema is required", i));
-            }
-        }
-    } else {
-        errors.push("tools must be an array".to_string());
-    }
-}
-
-/// Validate sampling parameters
-fn validate_sampling_params(sampling: &Value, errors: &mut Vec<String>) {
-    if !sampling.is_object() {
-        errors.push("sampling must be an object".to_string());
-        return;
-    }
-    
-    let obj = sampling.as_object().unwrap();
-    
-    // Validate temperature
-    if let Some(temp) = obj.get("temperature") {
-        if let Some(t) = temp.as_f64() {
-            if t < 0.0 || t > 2.0 {
-                errors.push("temperature must be between 0.0 and 2.0".to_string());
-            }
-        } else {
-            errors.push("temperature must be a number".to_string());
-        }
-    }
-    
-    // Validate top_p
-    if let Some(top_p) = obj.get("top_p") {
-        if let Some(p) = top_p.as_f64() {
-            if p < 0.0 || p > 1.0 {
-                errors.push("top_p must be between 0.0 and 1.0".to_string());
-            }
-        } else {
-            errors.push("top_p must be a number".to_string());
-        }
-    }
-}
-
-/// Validate limits
-fn validate_limits(limits: &Value, errors: &mut Vec<String>) {
-    if !limits.is_object() {
-        errors.push("limits must be an object".to_string());
-        return;
-    }
-    
-    let obj = limits.as_object().unwrap();
-    
-    // Validate max_output_tokens
-    if let Some(max_tokens) = obj.get("max_output_tokens") {
-        if let Some(tokens) = max_tokens.as_u64() {
-            if tokens == 0 {
-                errors.push("max_output_tokens must be greater than 0".to_string());
-            }
-        } else {
-            errors.push("max_output_tokens must be a positive integer".to_string());
-        }
-    }
-}
-
-/// Validate provider info
-fn validate_provider_info(provider: &Value, errors: &mut Vec<String>) {
-    if !provider.is_object() {
-        errors.push("provider must be an object".to_string());
-        return;
-    }
-    
-    let obj = provider.as_object().unwrap();
-    
-    // Check name
-    match obj.get("name") {
-        Some(Value::String(name)) => {
-            if name.is_empty() {
-                errors.push("provider name cannot be empty".to_string());
-            }
-        }
-        Some(_) => errors.push("provider name must be a string".to_string()),
-        None => errors.push("provider name is required".to_string()),
-    }
-    
-    // Check base_url
-    match obj.get("base_url") {
-        Some(Value::String(url)) => {
-            if url.is_empty() {
-                errors.push("provider base_url cannot be empty".to_string());
-            }
-            // Could add URL validation here
-        }
-        Some(_) => errors.push("provider base_url must be a string".to_string()),
-        None => errors.push("provider base_url is required".to_string()),
-    }
-}
-
-/// Validate model specification
-fn validate_model_spec(model: &Value, index: usize, errors: &mut Vec<String>) {
-    if !model.is_object() {
-        errors.push(format!("Model {} must be an object", index));
-        return;
-    }
-    
-    let obj = model.as_object().unwrap();
-    
-    // Check id
-    match obj.get("id") {
-        Some(Value::String(id)) => {
-            if id.is_empty() {
-                errors.push(format!("Model {} id cannot be empty", index));
-            }
-        }
-        Some(_) => errors.push(format!("Model {} id must be a string", index)),
-        None => errors.push(format!("Model {} id is required", index)),
-    }
-    
-    // Check family
-    match obj.get("family") {
-        Some(Value::String(family)) => {
-            if family.is_empty() {
-                errors.push(format!("Model {} family cannot be empty", index));
-            }
-        }
-        Some(_) => errors.push(format!("Model {} family must be a string", index)),
-        None => errors.push(format!("Model {} family is required", index)),
-    }
-    
-    // Check required objects
-    let required_objects = ["endpoints", "input_modes", "tooling", "json_output", 
-                           "constraints", "mappings", "response_normalization"];
-    
-    for field in &required_objects {
-        if !obj.contains_key(*field) {
-            errors.push(format!("Model {} {} is required", index, field));
-        }
-    }
+    Ok(PyValidationResult::new(validation_result.is_valid, validation_result.errors))
 }
 
 /// Helper function to convert Python dict to JSON value
