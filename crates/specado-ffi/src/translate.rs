@@ -57,10 +57,6 @@ pub struct TranslationConfig {
     pub validate: Option<bool>,
 }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> feat/epic47-nodejs-binding
 /// Perform translation from prompt to provider request
 pub fn translate(
     prompt_json: &str,
@@ -127,7 +123,6 @@ fn convert_to_prompt_spec(prompt: &PromptInput, config: &Option<TranslationConfi
                 set_last_error(format!("Invalid message role: {}", msg.role));
                 return Err(SpecadoResult::InvalidInput);
             }
-<<<<<<< HEAD
         };
         
         messages.push(Message {
@@ -136,115 +131,6 @@ fn convert_to_prompt_spec(prompt: &PromptInput, config: &Option<TranslationConfi
             name: None,
             metadata: None,
         });
-    }
-    
-    // Build sampling parameters if present
-    let sampling = if prompt.temperature.is_some() {
-        Some(SamplingParams {
-            temperature: prompt.temperature,
-            top_p: None,
-            top_k: None,
-            frequency_penalty: None,
-            presence_penalty: None,
-        })
-    } else {
-        None
-    };
-    
-    // Build limits if max_tokens is present
-    let limits = if let Some(max_tokens) = prompt.max_tokens {
-        Some(Limits {
-            max_output_tokens: Some(max_tokens),
-            reasoning_tokens: None,
-            max_prompt_tokens: None,
-        })
-    } else {
-        None
-    };
-    
-    // Convert tools if present
-    let tools = if let Some(tool_values) = &prompt.tools {
-        let mut converted_tools = Vec::new();
-        for tool_value in tool_values {
-            // For now, pass through as-is since we'd need more complex conversion
-            let tool: Tool = serde_json::from_value(tool_value.clone())
-                .map_err(|e| {
-                    set_last_error(format!("Failed to parse tool: {}", e));
-                    SpecadoResult::JsonError
-                })?;
-            converted_tools.push(tool);
-        }
-        Some(converted_tools)
-    } else {
-        None
-    };
-    
-    // Determine strict mode from config
-    let strict_mode = if let Some(cfg) = config {
-        match cfg.strict_mode.as_deref() {
-            Some("strict") => StrictMode::Strict,
-            Some("warn") => StrictMode::Warn,
-            Some("coerce") => StrictMode::Coerce,
-            _ => StrictMode::Warn,
-        }
-    } else {
-        StrictMode::Warn
-    };
-    
-    Ok(PromptSpec {
-        model_class: "Chat".to_string(), // Default to Chat for FFI compatibility
-        messages,
-        tools,
-        tool_choice: None,
-        response_format: None,
-        sampling,
-        limits,
-        media: None,
-        strict_mode,
-    })
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[test]
-    fn test_convert_to_prompt_spec() {
-        let prompt = PromptInput {
-            system: Some("You are a helpful assistant".to_string()),
-            messages: vec![
-                Message {
-                    role: "user".to_string(),
-                    content: "Hello".to_string(),
-                },
-            ],
-            temperature: Some(0.7),
-            max_tokens: Some(100),
-            tools: None,
-        };
-        
-        let config = Some(TranslationConfig {
-            strict_mode: Some("warn".to_string()),
-            validate: Some(true),
-        });
-        
-        let result = convert_to_prompt_spec(&prompt, &config).unwrap();
-        assert_eq!(result.messages.len(), 2); // System + user message
-        assert!(result.sampling.is_some());
-        let sampling = result.sampling.unwrap();
-        assert!((sampling.temperature.unwrap() - 0.7).abs() < 0.001);
-        assert_eq!(sampling.max_tokens.unwrap(), 100);
-=======
-        };
-        
-        messages.push(Message {
-            role,
-            content: msg.content.clone(),
-            name: None,
-            metadata: None,
-        });
->>>>>>> feat/epic47-nodejs-binding
     }
     
     // Build sampling parameters if present

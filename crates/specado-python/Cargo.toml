@@ -1,0 +1,26 @@
+[package]
+name = "specado-python"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+description = "Python bindings for Specado - Universal LLM Specification Language"
+
+[lib]
+name = "specado"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.20", features = ["extension-module", "abi3-py38"] }
+pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+specado-core = { path = "../specado-core" }
+specado-ffi = { path = "../specado-ffi" }
+specado-schemas = { path = "../specado-schemas" }
+
+[features]
+default = ["pyo3/extension-module"]
