@@ -136,7 +136,7 @@ impl MigrationRegistry {
                 if let Some(ref example) = hint.example {
                     guide.push_str(&format!("\n**Example**:\n```json\n{}\n```\n", example));
                 }
-                guide.push_str("\n");
+                guide.push('\n');
             }
         }
 
@@ -155,7 +155,7 @@ impl MigrationRegistry {
                 if let Some(ref example) = hint.example {
                     guide.push_str(&format!("\n**Example**:\n```json\n{}\n```\n", example));
                 }
-                guide.push_str("\n");
+                guide.push('\n');
             }
         }
 

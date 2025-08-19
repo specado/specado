@@ -6,7 +6,6 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde_json::Value;
-use std::collections::HashMap;
 
 use crate::types::{ProviderRequest, ProviderSpec, RunOptions, UniformResponse, UsageStats, ResponseMetadata};
 

@@ -323,6 +323,7 @@ impl DiffEngine {
         self.mask_field_recursive(value, &parts, pattern);
     }
     
+    #[allow(clippy::only_used_in_recursion)]
     fn mask_field_recursive(&self, value: &mut Value, path_parts: &[&str], pattern: &Regex) {
         if path_parts.is_empty() {
             return;
@@ -396,7 +397,7 @@ mod tests {
             ..Default::default()
         });
         
-        let val1 = json!({"pi": 3.14159});
+        let val1 = json!({"pi": std::f64::consts::PI});
         let val2 = json!({"pi": 3.14160});
         
         assert!(engine.values_match(&val1, &val2));
@@ -432,7 +433,7 @@ mod tests {
         let result = engine.compare(&expected, &actual);
         
         assert!(!result.matches);
-        assert!(result.summary.differing_paths.len() > 0);
+        assert!(!result.summary.differing_paths.is_empty());
     }
     
     #[test]

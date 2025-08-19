@@ -230,7 +230,7 @@ mod tests {
 
         let parse_err = LoaderError::yaml_parse_error(
             PathBuf::from("test.yaml"),
-            serde_yaml::Error::from(serde_yaml::from_str::<serde_yaml::Value>("{").unwrap_err()),
+            serde_yaml::from_str::<serde_yaml::Value>("{").unwrap_err(),
         );
         assert!(!parse_err.is_recoverable());
     }

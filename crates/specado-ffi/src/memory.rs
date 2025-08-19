@@ -12,7 +12,7 @@ use crate::types::{SpecadoResult, SpecadoString, SpecadoBuffer};
 
 // Thread-local storage for last error message
 thread_local! {
-    static LAST_ERROR: Mutex<Option<CString>> = Mutex::new(None);
+    static LAST_ERROR: Mutex<Option<CString>> = const { Mutex::new(None) };
 }
 
 /// Set the last error message for the current thread
@@ -65,9 +65,10 @@ pub unsafe extern "C" fn specado_string_free(s: *mut c_char) {
 ///
 /// # Safety
 /// The caller must free this buffer using `specado_buffer_free`
+#[allow(dead_code)]
 pub unsafe fn allocate_buffer(data: &[u8]) -> *mut SpecadoBuffer {
     let len = data.len();
-    let capacity = len;
+    let _capacity = len;
     
     // Allocate memory for the data
     let layout = std::alloc::Layout::array::<u8>(len).unwrap();
@@ -150,6 +151,7 @@ pub extern "C" fn specado_clear_error() {
 }
 
 /// Create a SpecadoString from a Rust string
+#[allow(dead_code)]
 pub fn create_specado_string(s: &str) -> SpecadoString {
     let c_string = CString::new(s).unwrap_or_else(|_| CString::new("").unwrap());
     let data = c_string.as_ptr();

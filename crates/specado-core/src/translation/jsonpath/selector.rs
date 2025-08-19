@@ -289,6 +289,12 @@ pub struct RecursiveDescentSelector {
     pub target: Option<Cow<'static, str>>,
 }
 
+impl Default for RecursiveDescentSelector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RecursiveDescentSelector {
     pub fn new() -> Self {
         Self { target: None }

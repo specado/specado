@@ -256,7 +256,7 @@ pub fn validate_pem_format(pem_content: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    
     use tempfile::NamedTempFile;
     
     #[test]
@@ -309,19 +309,25 @@ mod tests {
         assert!(config.validate().is_ok());
         
         // Invalid version range should fail
-        let mut config = TlsConfig::default();
-        config.min_tls_version = TlsVersion::TLS1_3;
-        config.max_tls_version = Some(TlsVersion::TLS1_2);
+        let config = TlsConfig {
+            min_tls_version: TlsVersion::TLS1_3,
+            max_tls_version: Some(TlsVersion::TLS1_2),
+            ..TlsConfig::default()
+        };
         assert!(config.validate().is_err());
         
         // Incomplete client cert files should fail
-        let mut config = TlsConfig::default();
-        config.client_cert_path = Some(PathBuf::from("cert.pem"));
+        let config = TlsConfig {
+            client_cert_path: Some(PathBuf::from("cert.pem")),
+            ..TlsConfig::default()
+        };
         assert!(config.validate().is_err());
         
         // Incomplete client cert PEM should fail
-        let mut config = TlsConfig::default();
-        config.client_cert_pem = Some("cert content".to_string());
+        let config = TlsConfig {
+            client_cert_pem: Some("cert content".to_string()),
+            ..TlsConfig::default()
+        };
         assert!(config.validate().is_err());
     }
     

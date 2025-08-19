@@ -206,7 +206,7 @@ proptest! {
     ) {
         let provider_spec = minimal_provider_spec();
         let model_id = "test-model";
-        let mode = prompt_spec.strict_mode.clone();
+        let mode = prompt_spec.strict_mode;
         
         // Run translation twice with the same input
         let result1 = translate(&prompt_spec, &provider_spec, model_id, mode);
@@ -256,13 +256,13 @@ proptest! {
             if let Some(temp) = result.provider_request_json.get("temperature") {
                 if let Some(temp_val) = temp.as_f64() {
                     // Temperature must be within valid range
-                    assert!(temp_val >= 0.0 && temp_val <= 2.0, 
+                    assert!((0.0..=2.0).contains(&temp_val), 
                            "Temperature {} should be clamped to [0.0, 2.0]", temp_val);
                 }
             }
             
             // If temperature was out of range, there should be a Clamp lossiness
-            if raw_temp < 0.0 || raw_temp > 2.0 {
+            if !(0.0..=2.0).contains(&raw_temp) {
                 let has_clamp = result.lossiness.items.iter()
                     .any(|item| matches!(item.code, LossinessCode::Clamp) && 
                                 item.path.contains("temperature"));
@@ -298,11 +298,11 @@ proptest! {
                     if top_p_val.is_finite() && !top_p_val.is_nan() {
                         // Only check range for valid float values
                         // The engine might pass through invalid values unchanged
-                        if raw_top_p.is_finite() && !raw_top_p.is_nan() && (raw_top_p < 0.0 || raw_top_p > 1.0) {
+                        if raw_top_p.is_finite() && !raw_top_p.is_nan() && !(0.0..=1.0).contains(&raw_top_p) {
                             // If input was out of range, we should have clamped or have lossiness
                             let has_clamp = result.lossiness.items.iter()
                                 .any(|item| matches!(item.code, LossinessCode::Clamp));
-                            assert!(has_clamp || (top_p_val >= 0.0 && top_p_val <= 1.0),
+                            assert!(has_clamp || (0.0..=1.0).contains(&top_p_val),
                                    "top_p {} should be clamped to [0.0, 1.0] or marked as clamped", top_p_val);
                         }
                     }
@@ -310,7 +310,7 @@ proptest! {
             }
             
             // If top_p was out of range, there should be a Clamp lossiness
-            if raw_top_p < 0.0 || raw_top_p > 1.0 {
+            if !(0.0..=1.0).contains(&raw_top_p) {
                 let has_clamp = result.lossiness.items.iter()
                     .any(|item| matches!(item.code, LossinessCode::Clamp) && 
                                 item.path.contains("top_p"));
@@ -380,10 +380,10 @@ proptest! {
                     // Only check range for finite values
                     if freq_val.is_finite() && raw_freq.is_finite() {
                         // If input was out of range, output should be clamped
-                        if raw_freq < -2.0 || raw_freq > 2.0 {
+                        if !(-2.0..=2.0).contains(&raw_freq) {
                             let has_clamp = result.lossiness.items.iter()
                                 .any(|item| matches!(item.code, LossinessCode::Clamp));
-                            assert!(has_clamp || (freq_val >= -2.0 && freq_val <= 2.0),
+                            assert!(has_clamp || (-2.0..=2.0).contains(&freq_val),
                                    "frequency_penalty {} should be clamped or marked", freq_val);
                         }
                     }
@@ -396,10 +396,10 @@ proptest! {
                     // Only check range for finite values
                     if pres_val.is_finite() && raw_pres.is_finite() {
                         // If input was out of range, output should be clamped
-                        if raw_pres < -2.0 || raw_pres > 2.0 {
+                        if !(-2.0..=2.0).contains(&raw_pres) {
                             let has_clamp = result.lossiness.items.iter()
                                 .any(|item| matches!(item.code, LossinessCode::Clamp));
-                            assert!(has_clamp || (pres_val >= -2.0 && pres_val <= 2.0),
+                            assert!(has_clamp || (-2.0..=2.0).contains(&pres_val),
                                    "presence_penalty {} should be clamped or marked", pres_val);
                         }
                     }
@@ -407,14 +407,14 @@ proptest! {
             }
             
             // Check for clamping lossiness if values were out of range
-            if raw_freq < -2.0 || raw_freq > 2.0 {
+            if !(-2.0..=2.0).contains(&raw_freq) {
                 let has_clamp = result.lossiness.items.iter()
                     .any(|item| matches!(item.code, LossinessCode::Clamp) && 
                                 item.path.contains("frequency_penalty"));
                 assert!(has_clamp || raw_freq.is_nan() || raw_freq.is_infinite());
             }
             
-            if raw_pres < -2.0 || raw_pres > 2.0 {
+            if !(-2.0..=2.0).contains(&raw_pres) {
                 let has_clamp = result.lossiness.items.iter()
                     .any(|item| matches!(item.code, LossinessCode::Clamp) && 
                                 item.path.contains("presence_penalty"));
@@ -846,12 +846,12 @@ proptest! {
                     }
                     LossinessCode::Drop => {
                         // Drop should record what was dropped
-                        assert!(item.before.is_some() || item.path.len() > 0,
+                        assert!(item.before.is_some() || !item.path.is_empty(),
                                "Drop should record what was lost");
                     }
                     LossinessCode::Relocate => {
                         // Relocate should preserve content
-                        assert!(item.path.len() > 0,
+                        assert!(!item.path.is_empty(),
                                "Relocate should specify what was moved");
                     }
                     _ => {}

@@ -324,7 +324,7 @@ mod tests {
             "b": 2,
             "a": 1,
             "c": {
-                "d": 3.14159265359,
+                "d": std::f64::consts::PI,
                 "e": "  spaced  "
             }
         });
@@ -342,7 +342,7 @@ mod tests {
         
         // Check float rounding
         let d_val = c_val["d"].as_f64().unwrap();
-        assert!((d_val - 3.141593).abs() < 0.000001);
+        assert!((d_val - std::f64::consts::PI).abs() < 0.000001);
         
         // Check string trimming
         assert_eq!(c_val["e"].as_str().unwrap(), "spaced");

@@ -7,7 +7,6 @@ use pyo3::prelude::*;
 use pyo3::exceptions::{PyException, PyValueError, PyRuntimeError};
 use pyo3::create_exception;
 use specado_ffi::SpecadoResult;
-use std::fmt;
 
 // Define Python exception types directly
 create_exception!(specado, SpecadoError, PyException);

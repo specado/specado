@@ -171,11 +171,9 @@ impl ProviderRegistry {
     
     /// Check if a model name matches a pattern
     fn matches_pattern(&self, model: &str, pattern: &str) -> bool {
-        if pattern.ends_with('*') {
-            let prefix = &pattern[..pattern.len() - 1];
+        if let Some(prefix) = pattern.strip_suffix('*') {
             model.starts_with(prefix)
-        } else if pattern.starts_with('*') {
-            let suffix = &pattern[1..];
+        } else if let Some(suffix) = pattern.strip_prefix('*') {
             model.ends_with(suffix)
         } else if pattern.contains('*') {
             let parts: Vec<&str> = pattern.split('*').collect();
@@ -270,6 +268,12 @@ impl Default for ProviderRegistry {
 /// Builder for custom provider registration
 pub struct ProviderRegistryBuilder {
     registry: ProviderRegistry,
+}
+
+impl Default for ProviderRegistryBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ProviderRegistryBuilder {

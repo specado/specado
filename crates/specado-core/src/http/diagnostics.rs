@@ -243,7 +243,7 @@ impl ErrorDiagnostics {
         // Context
         if self.context.provider.is_some() || self.context.model.is_some() {
             output.push_str(&format!("\n{} Context:\n", 
-                if use_color { "📍".to_string() } else { "📍".to_string() }
+"📍"
             ));
             
             if let Some(ref provider) = self.context.provider {
@@ -260,7 +260,7 @@ impl ErrorDiagnostics {
         // Recovery attempts
         if !self.recovery_attempts.is_empty() {
             output.push_str(&format!("\n{} Recovery attempted:\n", 
-                if use_color { "🔄".to_string() } else { "🔄".to_string() }
+"🔄"
             ));
             
             for (i, attempt) in self.recovery_attempts.iter().enumerate() {
@@ -270,12 +270,10 @@ impl ErrorDiagnostics {
                     } else {
                         "✓".to_string()
                     }
+                } else if use_color {
+                    "✗".red().to_string()
                 } else {
-                    if use_color {
-                        "✗".red().to_string()
-                    } else {
-                        "✗".to_string()
-                    }
+                    "✗".to_string()
                 };
                 
                 output.push_str(&format!("  {} Attempt {}: {} - {} ({}ms)\n",
@@ -291,7 +289,7 @@ impl ErrorDiagnostics {
         // Suggested actions
         if !self.suggested_actions.is_empty() {
             output.push_str(&format!("\n{} Suggested actions:\n", 
-                if use_color { "💡".to_string() } else { "💡".to_string() }
+"💡"
             ));
             
             for (i, action) in self.suggested_actions.iter().enumerate() {
@@ -302,7 +300,7 @@ impl ErrorDiagnostics {
         // Help links
         if !self.help_links.is_empty() {
             output.push_str(&format!("\n{} More information:\n", 
-                if use_color { "📚".to_string() } else { "📚".to_string() }
+"📚"
             ));
             
             for link in &self.help_links {

@@ -3,7 +3,6 @@
 //! This module provides TypeScript-compatible type definitions for all
 //! Specado data structures and function parameters.
 
-use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

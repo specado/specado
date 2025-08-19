@@ -476,8 +476,7 @@ impl TransformationPipeline {
                 }
             }
             TransformationType::Custom { transformer, .. } => {
-                transformer(value, context).map_err(Into::into)
-            }
+                transformer(value, context)}
         };
         
         // Handle specific error cases for tracking
@@ -665,6 +664,7 @@ impl TransformationPipeline {
     }
 
     /// Evaluate a condition
+    #[allow(clippy::only_used_in_recursion)]
     fn evaluate_condition(
         &mut self,
         condition: &Condition,
@@ -675,7 +675,7 @@ impl TransformationPipeline {
             Condition::Equals { path, value } => {
                 let jsonpath = self.get_or_compile_path(path)?;
                 let found_values = jsonpath.execute(data)?;
-                Ok(found_values.iter().any(|v| *v == value))
+                Ok(found_values.contains(&value))
             }
             Condition::Exists { path } => {
                 let jsonpath = self.get_or_compile_path(path)?;
@@ -835,12 +835,11 @@ impl TransformationPipeline {
 
     /// Check if a rule applies to the given direction
     fn rule_applies_to_direction(&self, rule: &TransformationRule, direction: &TransformationDirection) -> bool {
-        match (&rule.direction, direction) {
-            (TransformationDirection::Bidirectional, _) => true,
-            (TransformationDirection::Forward, TransformationDirection::Forward) => true,
-            (TransformationDirection::Reverse, TransformationDirection::Reverse) => true,
-            _ => false,
-        }
+        matches!((&rule.direction, direction), 
+            (TransformationDirection::Bidirectional, _) | 
+            (TransformationDirection::Forward, TransformationDirection::Forward) | 
+            (TransformationDirection::Reverse, TransformationDirection::Reverse)
+        )
     }
 
     /// Get the number of rules in the pipeline

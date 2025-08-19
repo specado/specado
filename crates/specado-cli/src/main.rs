@@ -14,7 +14,7 @@ mod output;
 use cli::{Cli, Commands};
 use colored::control;
 use config::Config;
-use error::{Error, Result};
+use error::Result;
 use logging::{LoggingConfig, timing::Timer};
 use output::OutputWriter;
 use std::process;
@@ -123,15 +123,15 @@ mod tests {
     #[test]
     fn test_cli_parsing() {
         // Test basic command parsing
-        let cli = Cli::parse_from(&["specado", "--help"]);
+        let cli = Cli::parse_from(["specado", "--help"]);
         assert_eq!(cli.verbosity_level(), 0);
         
         // Test verbose flag
-        let cli = Cli::parse_from(&["specado", "-vv", "validate", "test.json"]);
+        let cli = Cli::parse_from(["specado", "-vv", "validate", "test.json"]);
         assert_eq!(cli.verbosity_level(), 2);
         
         // Test quiet flag
-        let cli = Cli::parse_from(&["specado", "--quiet", "validate", "test.json"]);
+        let cli = Cli::parse_from(["specado", "--quiet", "validate", "test.json"]);
         assert_eq!(cli.verbosity_level(), 0);
     }
 }

@@ -33,28 +33,28 @@ fn main() -> LoaderResult<()> {
     env::set_var("USER_NAME", "Demo User");
 
     // Create example schema files
-    create_example_files(&base_path)?;
+    create_example_files(base_path)?;
 
     // Demonstrate basic loading
-    demo_basic_loading(&base_path)?;
+    demo_basic_loading(base_path)?;
 
     // Demonstrate reference resolution
-    demo_reference_resolution(&base_path)?;
+    demo_reference_resolution(base_path)?;
 
     // Demonstrate environment variable expansion
-    demo_environment_expansion(&base_path)?;
+    demo_environment_expansion(base_path)?;
 
     // Demonstrate caching
-    demo_caching(&base_path)?;
+    demo_caching(base_path)?;
 
     // Demonstrate batch loading
-    demo_batch_loading(&base_path)?;
+    demo_batch_loading(base_path)?;
 
     // Demonstrate metadata extraction
-    demo_metadata_extraction(&base_path)?;
+    demo_metadata_extraction(base_path)?;
 
     // Demonstrate error handling
-    demo_error_handling(&base_path)?;
+    demo_error_handling(base_path)?;
 
     println!("\n✅ All demonstrations completed successfully!");
 
@@ -284,11 +284,9 @@ fn demo_batch_loading(base_path: &Path) -> LoaderResult<()> {
     let mut loader = create_schema_loader();
     
     println!("\n🔄 Loading multiple schemas in batch...");
-    let file_paths = vec![
-        base_path.join("prompt.yaml"),
+    let file_paths = [base_path.join("prompt.yaml"),
         base_path.join("provider.json"),
-        base_path.join("models.yaml"),
-    ];
+        base_path.join("models.yaml")];
     let paths: Vec<&Path> = file_paths.iter().map(|p| p.as_path()).collect();
 
     let start = std::time::Instant::now();

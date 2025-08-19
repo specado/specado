@@ -437,7 +437,7 @@ impl ReferenceResolver {
                 let mut var_spec = String::new();
                 let mut brace_count = 1;
                 
-                while let Some(ch) = chars.next() {
+                for ch in chars.by_ref() {
                     if ch == '{' {
                         brace_count += 1;
                     } else if ch == '}' {

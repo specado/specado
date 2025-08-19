@@ -95,6 +95,12 @@ pub struct RetryHandler {
     backoff: ExponentialBackoff,
 }
 
+impl Default for RetryHandler {
+    fn default() -> Self {
+        Self::new(RetryPolicy::default())
+    }
+}
+
 impl RetryHandler {
     /// Create a new retry handler with the given policy
     pub fn new(policy: RetryPolicy) -> Self {
@@ -106,10 +112,6 @@ impl RetryHandler {
         }
     }
     
-    /// Create with default policy
-    pub fn default() -> Self {
-        Self::new(RetryPolicy::default())
-    }
     
     /// Determine if a request should be retried based on the error
     pub fn should_retry(&mut self, error: &HttpError) -> RetryDecision {

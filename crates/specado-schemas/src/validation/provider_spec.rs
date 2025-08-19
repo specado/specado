@@ -20,9 +20,11 @@ impl ProviderSpecValidator {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let schema_path = Self::resolve_schema_path()?;
         // Create loader config that doesn't validate structure (for JSON Schema files)
-        let mut config = LoaderConfig::default();
-        config.validate_basic_structure = false;
-        config.allow_env_expansion = false;  // Don't expand env vars in schema definitions
+        let config = LoaderConfig {
+            validate_basic_structure: false,
+            allow_env_expansion: false,  // Don't expand env vars in schema definitions
+            ..LoaderConfig::default()
+        };
         let mut loader = SchemaLoader::with_config(config);
         let schema = loader.load_schema(&schema_path)?;
         Ok(Self {
@@ -33,9 +35,11 @@ impl ProviderSpecValidator {
     /// Load validator with a specific schema path
     pub fn from_path(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
         // Create loader config that doesn't validate structure (for JSON Schema files)
-        let mut config = LoaderConfig::default();
-        config.validate_basic_structure = false;
-        config.allow_env_expansion = false;  // Don't expand env vars in schema definitions
+        let config = LoaderConfig {
+            validate_basic_structure: false,
+            allow_env_expansion: false,  // Don't expand env vars in schema definitions
+            ..LoaderConfig::default()
+        };
         let mut loader = SchemaLoader::with_config(config);
         let schema = loader.load_schema(path)?;
         Ok(Self {

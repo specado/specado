@@ -352,6 +352,7 @@ pub enum Shell {
     /// Fish shell
     Fish,
     /// PowerShell
+    #[allow(clippy::enum_variant_names)]
     PowerShell,
     /// Elvish shell
     Elvish,

@@ -286,7 +286,6 @@ impl Optimizer {
         &self,
         selectors: Vec<CompiledSelector>,
     ) -> Result<Vec<CompiledSelector>> {
-        let selectors = selectors;
         if selectors.len() < 2 {
             return Ok(selectors);
         }
@@ -644,7 +643,7 @@ mod tests {
         // Root is at index 0, filter at index 1
         if let CompiledSelector::Filter { filter } = &compiled.selectors[1] {
             if let CompiledFilter::Literal(FilterLiteral::Boolean(result)) = filter {
-                assert_eq!(*result, false);
+                assert!(!(*result));
             } else {
                 panic!("Expected folded boolean literal");
             }

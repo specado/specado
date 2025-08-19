@@ -310,8 +310,7 @@ impl FilterExecutor {
                 self.get_values(target)
             }
             FilterFunction::Custom { implementation, .. } => {
-                implementation(&evaluated_args).map_err(Into::into)
-            }
+                implementation(&evaluated_args)}
         }
     }
 

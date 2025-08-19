@@ -252,7 +252,7 @@ impl<'a> PreValidator<'a> {
         // Check system prompt size limits
         let max_system_bytes = self.context.model_spec.constraints.limits.max_system_prompt_bytes;
         for (index, message) in &system_messages {
-            let byte_count = message.content.as_bytes().len();
+            let byte_count = message.content.len();
             if byte_count > max_system_bytes as usize {
                 errors.push(ValidationError {
                     field_path: format!("messages[{}].content", index),
@@ -293,7 +293,7 @@ impl<'a> PreValidator<'a> {
         
         if let Some(ref sampling) = self.context.prompt_spec.sampling {
             if let Some(temp) = sampling.temperature {
-                if temp < 0.0 || temp > 2.0 {
+                if !(0.0..=2.0).contains(&temp) {
                     errors.push(ValidationError {
                         field_path: "sampling.temperature".to_string(),
                         message: "Temperature must be between 0.0 and 2.0".to_string(),
@@ -305,7 +305,7 @@ impl<'a> PreValidator<'a> {
             }
             
             if let Some(top_p) = sampling.top_p {
-                if top_p < 0.0 || top_p > 1.0 {
+                if !(0.0..=1.0).contains(&top_p) {
                     errors.push(ValidationError {
                         field_path: "sampling.top_p".to_string(),
                         message: "Top-p must be between 0.0 and 1.0".to_string(),
@@ -317,7 +317,7 @@ impl<'a> PreValidator<'a> {
             }
             
             if let Some(freq_penalty) = sampling.frequency_penalty {
-                if freq_penalty < -2.0 || freq_penalty > 2.0 {
+                if !(-2.0..=2.0).contains(&freq_penalty) {
                     errors.push(ValidationError {
                         field_path: "sampling.frequency_penalty".to_string(),
                         message: "Frequency penalty must be between -2.0 and 2.0".to_string(),
@@ -329,7 +329,7 @@ impl<'a> PreValidator<'a> {
             }
             
             if let Some(pres_penalty) = sampling.presence_penalty {
-                if pres_penalty < -2.0 || pres_penalty > 2.0 {
+                if !(-2.0..=2.0).contains(&pres_penalty) {
                     errors.push(ValidationError {
                         field_path: "sampling.presence_penalty".to_string(),
                         message: "Presence penalty must be between -2.0 and 2.0".to_string(),
@@ -475,21 +475,16 @@ impl<'a> PreValidator<'a> {
             }
             
             // Validate tool_choice if present
-            if let Some(ref tool_choice) = self.context.prompt_spec.tool_choice {
-                match tool_choice {
-                    crate::ToolChoice::Specific { name } => {
-                        // Check that the specified tool exists
-                        if !tools.iter().any(|t| t.name == *name) {
-                            errors.push(ValidationError {
-                                field_path: "tool_choice".to_string(),
-                                message: format!("Tool choice '{}' does not match any available tool", name),
-                                expected: Some(format!("One of: {:?}", tools.iter().map(|t| &t.name).collect::<Vec<_>>())),
-                                actual: Some(name.clone()),
-                                severity: ValidationSeverity::Error,
-                            });
-                        }
-                    }
-                    _ => {} // Auto and Required are always valid
+            if let Some(crate::ToolChoice::Specific { name }) = &self.context.prompt_spec.tool_choice {
+                // Check that the specified tool exists
+                if !tools.iter().any(|t| t.name == *name) {
+                    errors.push(ValidationError {
+                        field_path: "tool_choice".to_string(),
+                        message: format!("Tool choice '{}' does not match any available tool", name),
+                        expected: Some(format!("One of: {:?}", tools.iter().map(|t| &t.name).collect::<Vec<_>>())),
+                        actual: Some(name.clone()),
+                        severity: ValidationSeverity::Error,
+                    });
                 }
             }
         } else if self.context.prompt_spec.tool_choice.is_some() {

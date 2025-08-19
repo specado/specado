@@ -234,7 +234,7 @@ impl SchemaLoader {
 
             if path.is_file() {
                 // Check if it's a schema file
-                if let Ok(_) = crate::loader::parser::Format::from_path(&path) {
+                if crate::loader::parser::Format::from_path(&path).is_ok() {
                     match self.load_schema(&path) {
                         Ok(_) => loaded_count += 1,
                         Err(_) => {
@@ -272,7 +272,7 @@ impl SchemaLoader {
         // Check for PromptSpec-specific fields
         let required_fields = ["spec_version", "model_class"];
         for field in &required_fields {
-            if !schema.get(field).is_some() {
+            if schema.get(field).is_none() {
                 return Err(LoaderError::validation_error(
                     path.to_path_buf(),
                     format!("PromptSpec requires '{}' field", field),
@@ -297,7 +297,7 @@ impl SchemaLoader {
         // Check for ProviderSpec-specific fields
         let required_fields = ["spec_version", "provider_name"];
         for field in &required_fields {
-            if !schema.get(field).is_some() {
+            if schema.get(field).is_none() {
                 return Err(LoaderError::validation_error(
                     path.to_path_buf(),
                     format!("ProviderSpec requires '{}' field", field),
@@ -355,7 +355,7 @@ impl SchemaLoader {
         let parts: Vec<&str> = version.split('.').collect();
         if let Ok(major) = parts[0].parse::<u32>() {
             // Support versions 1.x and 2.x
-            major >= 1 && major <= 2
+            (1..=2).contains(&major)
         } else {
             false
         }
@@ -692,12 +692,12 @@ model_class: "Chat"
         let mut loader = SchemaLoader::new();
 
         // Test non-recursive preloading
-        let loaded_count = loader.preload_directory(&dir.path(), false)?;
+        let loaded_count = loader.preload_directory(dir.path(), false)?;
         assert_eq!(loaded_count, 3); // Only files in root directory
 
         // Clear cache and test recursive preloading
         loader.clear_cache();
-        let loaded_count_recursive = loader.preload_directory(&dir.path(), true)?;
+        let loaded_count_recursive = loader.preload_directory(dir.path(), true)?;
         assert_eq!(loaded_count_recursive, 6); // Files in root + subdirectory
 
         Ok(())

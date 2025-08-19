@@ -218,13 +218,13 @@ impl<'a> JSONPathMapper<'a> {
     /// This creates transformation rules based on the provider spec's mapping configuration.
     /// In the future, this could be extended to read transformation configs from the spec.
     pub fn create_transformation_pipeline(&self) -> TransformationPipeline {
-        let pipeline = TransformationPipeline::new();
+        
         
         // Add transformation rules based on provider mappings
         // This is a placeholder - in practice, transformation rules would be
         // defined in the provider specification
         
-        pipeline
+        TransformationPipeline::new()
     }
 
     /// Apply flag mappings (boolean transformations)

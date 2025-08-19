@@ -46,7 +46,7 @@ impl Template {
             result.push_str(&format!("{}- [{}](#{})\n", indent, title, anchor));
         }
         
-        result.push_str("\n");
+        result.push('\n');
         result
     }
 
@@ -140,7 +140,7 @@ impl Template {
             result.push_str(&format!("- `{}`\n", value_str));
         }
         
-        result.push_str("\n");
+        result.push('\n');
         result
     }
 
@@ -152,7 +152,7 @@ impl Template {
             result.push_str(&format!("- {}\n", constraint));
         }
         
-        result.push_str("\n");
+        result.push('\n');
         result
     }
 

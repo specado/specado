@@ -153,7 +153,7 @@ pub fn validate_spec(spec_json: &str, spec_type: &str, mode: &str) -> PyResult<P
                 })
                 .collect()
         })
-        .unwrap_or_else(Vec::new);
+        .unwrap_or_default();
     
     Ok(PyValidationResult::new(is_valid, errors))
 }

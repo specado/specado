@@ -113,7 +113,7 @@ pub fn translate(
     let model_spec = provider_spec
         .models
         .iter()
-        .find(|m| m.id == model_id || m.aliases.as_ref().map_or(false, |a| a.contains(&model_id.to_string())))
+        .find(|m| m.id == model_id || m.aliases.as_ref().is_some_and(|a| a.contains(&model_id.to_string())))
         .ok_or_else(|| Error::Validation {
             field: "model_id".to_string(),
             message: format!("Model '{}' not found in provider '{}'", model_id, provider_spec.provider.name),
@@ -248,7 +248,7 @@ pub fn translate(
                 serde_json::json!(temp),
                 0.0,
                 2.0,
-                &context.provider_name(),
+                context.provider_name(),
             );
             
             match policy_result.action {
@@ -605,7 +605,7 @@ mod tests {
         
         // Should have lossiness due to dropped tools
         assert!(result.has_lossiness());
-        assert!(result.lossiness.items.len() > 0);
+        assert!(!result.lossiness.items.is_empty());
         
         // Check that metadata includes timing
         assert!(result.metadata.is_some());

@@ -227,7 +227,7 @@ impl DocGenerator {
         let mut rules = Vec::new();
         
         // Collect all validation rules
-        self.collect_validation_rules(root_info, "", &mut rules);
+        Self::collect_validation_rules(root_info, "", &mut rules);
         
         if rules.is_empty() {
             doc.push_str("No additional validation rules defined.\n\n");
@@ -235,14 +235,14 @@ impl DocGenerator {
             for (path, rule) in rules {
                 doc.push_str(&format!("- **{}**: {}\n", path, rule));
             }
-            doc.push_str("\n");
+            doc.push('\n');
         }
         
         doc
     }
 
     /// Recursively collect validation rules
-    fn collect_validation_rules(&self, prop: &PropertyInfo, path: &str, rules: &mut Vec<(String, String)>) {
+    fn collect_validation_rules(prop: &PropertyInfo, path: &str, rules: &mut Vec<(String, String)>) {
         let current_path = if path.is_empty() {
             prop.name.clone()
         } else {
@@ -309,7 +309,7 @@ impl DocGenerator {
         
         // Recurse into nested properties
         for nested_prop in prop.properties.values() {
-            self.collect_validation_rules(nested_prop, &current_path, rules);
+            Self::collect_validation_rules(nested_prop, &current_path, rules);
         }
     }
 
@@ -495,9 +495,11 @@ mod tests {
             }
         });
         
-        let mut config = GeneratorConfig::default();
-        config.include_deprecated = false;
-        config.include_toc = false;
+        let config = GeneratorConfig {
+            include_deprecated: false,
+            include_toc: false,
+            ..GeneratorConfig::default()
+        };
         
         let generator = DocGenerator::with_config(config);
         let doc = generator.generate(&schema).unwrap();

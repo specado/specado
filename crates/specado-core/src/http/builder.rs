@@ -28,7 +28,7 @@ impl RequestBuilder {
     pub fn build_request(
         &self,
         endpoint: &EndpointConfig,
-        model: &ModelSpec,
+        _model: &ModelSpec,
         body: Option<Value>,
     ) -> Result<reqwest::Request> {
         // Construct full URL
@@ -138,7 +138,7 @@ impl RequestBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ProviderInfo, Endpoints};
+    use crate::types::ProviderInfo;
     
     fn create_test_provider_spec() -> ProviderSpec {
         ProviderSpec {

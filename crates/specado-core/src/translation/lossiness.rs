@@ -345,6 +345,7 @@ impl LossinessTracker {
     }
 
     /// Track a transformation operation with timing
+    #[allow(clippy::too_many_arguments)]
     pub fn track_transformation_with_timing<F, R>(
         &mut self,
         field_path: &str,
@@ -395,6 +396,7 @@ impl LossinessTracker {
     }
 
     /// Track a transformation operation
+    #[allow(clippy::too_many_arguments)]
     pub fn track_transformation(
         &mut self,
         field_path: &str,
@@ -422,7 +424,7 @@ impl LossinessTracker {
         // Update field index
         self.field_index
             .entry(field_path.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(record_index);
 
         // Update counters

@@ -6,7 +6,7 @@
 use serde_json::Value;
 use specado_schemas::{
     create_prompt_spec_validator, create_provider_spec_validator,
-    ValidationMode, ValidationResult as SchemaValidationResult,
+    ValidationMode,
     SchemaValidator, ValidationContext,
 };
 use crate::types::SpecadoResult;

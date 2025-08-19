@@ -150,7 +150,7 @@ fn validate_internal(spec_json: &str, schema_type: &str) -> Result<ValidationRes
                 })
                 .collect()
         })
-        .unwrap_or_else(Vec::new);
+        .unwrap_or_default();
     
     let warnings = validation_response.get("warnings")
         .and_then(|v| v.as_array())
@@ -165,7 +165,7 @@ fn validate_internal(spec_json: &str, schema_type: &str) -> Result<ValidationRes
                 })
                 .collect()
         })
-        .unwrap_or_else(Vec::new);
+        .unwrap_or_default();
     
     let schema_version = validation_response.get("schema_version")
         .and_then(|v| v.as_str())

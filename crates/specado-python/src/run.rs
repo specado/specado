@@ -8,12 +8,10 @@ use pyo3::exceptions::{PyValueError, PyRuntimeError};
 use pyo3_asyncio::tokio::future_into_py;
 use std::ffi::{CString, CStr};
 use std::ptr;
-use std::time::Duration;
 use specado_ffi::SpecadoResult;
 use crate::error::{map_ffi_result_to_py_err, get_last_ffi_error};
 use crate::types::PyUniformResponse;
 use specado_core::types::UniformResponse;
-use serde_json::Value;
 
 /// Run a provider request asynchronously
 /// 
@@ -30,11 +28,11 @@ use serde_json::Value;
 ///     TimeoutError: If the request times out
 ///     NetworkError: If there are network issues
 #[pyfunction]
-#[pyo3(signature = (request, provider_spec, timeout=None))]
+#[pyo3(signature = (request, _provider_spec, timeout=None))]
 pub fn run_async<'p>(
     py: Python<'p>,
     request: PyObject,
-    provider_spec: &crate::types::PyProviderSpec,
+    _provider_spec: &crate::types::PyProviderSpec,
     timeout: Option<u32>,
 ) -> PyResult<&'p PyAny> {
     // Convert inputs to the format expected by the async function
@@ -64,11 +62,11 @@ pub fn run_async<'p>(
 ///     TimeoutError: If the request times out
 ///     NetworkError: If there are network issues
 #[pyfunction]
-#[pyo3(signature = (request, provider_spec, timeout=None))]
+#[pyo3(signature = (request, _provider_spec, timeout=None))]
 pub fn run_sync(
-    py: Python<'_>,
+    _py: Python<'_>,
     request: PyObject,
-    provider_spec: &crate::types::PyProviderSpec,
+    _provider_spec: &crate::types::PyProviderSpec,
     timeout: Option<u32>,
 ) -> PyResult<PyUniformResponse> {
     // Convert request to JSON
@@ -208,7 +206,7 @@ fn execute_provider_request_blocking(
 pub fn create_provider_request(
     py: Python<'_>,
     translation_result: &crate::types::PyTranslationResult,
-    provider_spec: &crate::types::PyProviderSpec,
+    _provider_spec: &crate::types::PyProviderSpec,
 ) -> PyResult<PyObject> {
     // Extract the provider request JSON from the translation result
     let provider_request = &translation_result.inner.provider_request_json;
@@ -350,7 +348,7 @@ mod tests {
             "messages": [{"role": "user", "content": "Hello"}]
         });
         
-        let provider_spec = create_test_provider().inner;
+        let _provider_spec = create_test_provider().inner;
         
         // This would normally fail because we don't have a real provider,
         // but we can test that the setup is correct

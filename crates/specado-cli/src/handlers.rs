@@ -10,9 +10,8 @@ use crate::cli::{
 use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::logging::{timing::Timer, redaction};
-use crate::output::{OutputFormatter, OutputWriter};
+use crate::output::OutputWriter;
 use clap::CommandFactory;
-use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use specado_core::{PromptSpec, ProviderSpec};
 use specado_schemas::validation::{
@@ -410,17 +409,17 @@ pub async fn handle_run(
     let request_json: serde_json::Value = serde_json::from_str(&content)?;
     
     // Validate required fields
-    if !request_json.get("provider_spec").is_some() {
+    if request_json.get("provider_spec").is_none() {
         return Err(Error::other(
             "Missing required field 'provider_spec' in request file",
         ));
     }
-    if !request_json.get("model_id").is_some() {
+    if request_json.get("model_id").is_none() {
         return Err(Error::other(
             "Missing required field 'model_id' in request file",
         ));
     }
-    if !request_json.get("request_body").is_some() {
+    if request_json.get("request_body").is_none() {
         return Err(Error::other(
             "Missing required field 'request_body' in request file",
         ));
@@ -522,8 +521,8 @@ async fn handle_config_init(
     let mut created_any = false;
     
     // If no specific option is given, default to both
-    let init_user = args.user || (!args.project && !args.user);
-    let init_project = args.project || (!args.project && !args.user);
+    let init_user = args.user || !args.project;
+    let init_project = args.project || !args.user;
     
     if init_user {
         let user_config_path = Config::user_config_path()
@@ -642,7 +641,7 @@ async fn handle_config_set(
 async fn handle_config_get(
     args: ConfigGetArgs,
     config: &Config,
-    output: &mut OutputWriter,
+    _output: &mut OutputWriter,
 ) -> Result<()> {
     let value = get_config_value(config, &args.key)?;
     

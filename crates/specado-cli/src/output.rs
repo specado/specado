@@ -27,6 +27,7 @@ pub trait OutputFormatter {
     fn format_translation_result(&self, result: &TranslationResult) -> Result<String>;
     
     /// Format validation errors with detailed violation reporting
+    #[allow(dead_code)]
     fn format_validation_errors(&self, errors: &ValidationErrors) -> Result<String>;
     
     /// Format a single validation error
@@ -92,6 +93,7 @@ pub struct OutputWriter {
     use_color: bool,
     show_progress: bool,
     quiet: bool,
+    #[allow(dead_code)]
     verbose: u8,
     writer: Box<dyn Write>,
 }
@@ -110,6 +112,7 @@ impl OutputWriter {
     }
     
     /// Create an output writer with a custom writer
+    #[allow(dead_code)]
     pub fn with_writer(
         format: OutputFormat,
         use_color: bool,
@@ -133,6 +136,7 @@ impl OutputWriter {
     }
     
     /// Check if progress indicators should be shown
+    #[allow(dead_code)]
     pub fn show_progress(&self) -> bool {
         self.show_progress
     }
@@ -259,6 +263,7 @@ impl OutputWriter {
     }
     
     /// Write validation errors with specialized formatting
+    #[allow(dead_code)]
     pub fn validation_errors(&mut self, errors: &ValidationErrors) -> Result<()> {
         let formatted = self.format.format_validation_errors(errors)?;
         self.writeln(&formatted)
@@ -277,6 +282,7 @@ impl OutputWriter {
     }
     
     /// Create a progress bar for long operations
+    #[allow(dead_code)]
     pub fn progress_bar(&self, length: u64, message: &str) -> Option<ProgressBar> {
         if !self.show_progress {
             return None;
@@ -302,16 +308,19 @@ impl OutputWriter {
     }
     
     /// Get verbosity level
+    #[allow(dead_code)]
     pub fn verbosity(&self) -> u8 {
         self.verbose
     }
     
     /// Check if verbose output should be shown
+    #[allow(dead_code)]
     pub fn is_verbose(&self) -> bool {
         self.verbose > 0
     }
     
     /// Write debug information if verbose mode is enabled
+    #[allow(dead_code)]
     pub fn debug(&mut self, message: &str) -> Result<()> {
         if self.verbose > 0 && self.format == OutputFormat::Human {
             if self.use_color {
@@ -325,6 +334,7 @@ impl OutputWriter {
     }
     
     /// Write trace information if high verbosity is enabled
+    #[allow(dead_code)]
     pub fn trace(&mut self, message: &str) -> Result<()> {
         if self.verbose > 1 && self.format == OutputFormat::Human {
             if self.use_color {
@@ -338,6 +348,7 @@ impl OutputWriter {
     }
     
     /// Write a table (for human format)
+    #[allow(dead_code)]
     pub fn table(&mut self, headers: &[&str], rows: Vec<Vec<String>>) -> Result<()> {
         if self.quiet || self.format != OutputFormat::Human {
             return Ok(());
@@ -397,6 +408,7 @@ impl OutputWriter {
 }
 
 /// Helper function to create a progress bar style
+#[allow(dead_code)]
 pub fn default_progress_style() -> ProgressStyle {
     ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
@@ -416,7 +428,7 @@ fn format_translation_result_human(result: &TranslationResult) -> Result<String>
     let mut output = String::new();
     
     // Translation summary
-    output.push_str(&format!("═══ Translation Result ═══\n\n"));
+    output.push_str("═══ Translation Result ═══\n\n");
     
     // Metadata section
     if let Some(metadata) = &result.metadata {
@@ -426,7 +438,7 @@ fn format_translation_result_human(result: &TranslationResult) -> Result<String>
     
     // Lossiness summary
     if !result.lossiness.items.is_empty() {
-        output.push_str(&format!("🔍 Lossiness Summary:\n"));
+        output.push_str("🔍 Lossiness Summary:\n");
         output.push_str(&format!("  Total Issues: {}\n", result.lossiness.summary.total_items));
         output.push_str(&format!("  Max Severity: {:?}\n", result.lossiness.max_severity));
         
@@ -471,6 +483,7 @@ fn format_translation_metadata_human(metadata: &TranslationMetadata) -> Result<S
 }
 
 /// Format validation errors for human reading
+#[allow(dead_code)]
 fn format_validation_errors_human(errors: &ValidationErrors) -> Result<String> {
     let mut output = String::new();
     

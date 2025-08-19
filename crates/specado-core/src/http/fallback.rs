@@ -60,6 +60,12 @@ pub struct FallbackHandler {
     attempts: Vec<FallbackAttempt>,
 }
 
+impl Default for FallbackHandler {
+    fn default() -> Self {
+        Self::new(FallbackConfig::default())
+    }
+}
+
 impl FallbackHandler {
     /// Create a new fallback handler
     pub fn new(config: FallbackConfig) -> Self {
@@ -69,10 +75,6 @@ impl FallbackHandler {
         }
     }
     
-    /// Create with default configuration
-    pub fn default() -> Self {
-        Self::new(FallbackConfig::default())
-    }
     
     /// Record a fallback attempt
     pub fn record_attempt(&mut self, attempt: FallbackAttempt) {
@@ -175,7 +177,7 @@ impl FallbackHandler {
         original: &EndpointConfig,
         alternative_url: Option<&str>,
     ) -> EndpointConfig {
-        let mut fallback = original.clone();
+        let fallback = original.clone();
         
         // Update headers if we're using an alternative URL
         if let Some(alt_url) = alternative_url {

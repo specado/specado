@@ -57,7 +57,7 @@ fn test_invalid_utf8_handling() {
         let mut output: *mut c_char = ptr::null_mut();
         
         // Create invalid UTF-8 sequence
-        let invalid_utf8 = vec![0xFF, 0xFE, 0x00];
+        let invalid_utf8 = [0xFF, 0xFE, 0x00];
         let invalid_ptr = invalid_utf8.as_ptr() as *const c_char;
         
         let valid_json = to_c_string("{}");
@@ -201,8 +201,7 @@ fn test_version_string() {
 
 #[test]
 fn test_concurrent_access() {
-    use std::sync::Arc;
-    use std::thread;
+        use std::thread;
     
     let threads: Vec<_> = (0..10)
         .map(|i| {

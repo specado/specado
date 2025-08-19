@@ -5,10 +5,8 @@
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use serde_json::Value;
 
-use crate::types::{PromptSpec, ProviderSpec, TranslateOptions, TranslateResult, TranslationMetadata};
-use chrono;
+use crate::types::{PromptSpec, ProviderSpec, TranslateOptions, TranslateResult};
 
 /// Translate a uniform prompt to a provider-specific request
 ///
@@ -178,6 +176,7 @@ fn convert_core_translation_result(
 }
 
 /// Extract features used from a prompt
+#[allow(dead_code)]
 fn extract_features_used(prompt: &PromptSpec) -> Vec<String> {
     let mut features = vec!["messages".to_string()];
 

@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 use specado_core::{translate, StrictMode};
 use specado_core::error::LossinessCode;
 use specado_core::types::{
-    PromptSpec, ProviderSpec, Message, MessageRole, 
+    PromptSpec, 
     Tool, ToolChoice, ResponseFormat, SamplingParams, Limits
 };
 use std::fs;
@@ -266,7 +266,7 @@ fn test_metadata_generation() {
     assert_eq!(metadata.provider, "anthropic");
     assert_eq!(metadata.model, "claude-opus-4.1");
     assert_eq!(metadata.strict_mode, StrictMode::Strict);
-    assert!(metadata.timestamp.len() > 0);
+    assert!(!metadata.timestamp.is_empty());
     assert!(metadata.duration_ms.is_some());
 }
 
@@ -291,7 +291,7 @@ fn test_comprehensive_lossiness_tracking() {
     // Should have lossiness items (either for tools, temperature, or both)
     // The exact severity levels depend on how the translation engine categorizes issues
     if result.lossiness.summary.total_items > 0 {
-        assert!(result.lossiness.items.len() > 0);
+        assert!(!result.lossiness.items.is_empty());
         
         // Check that we have some severity categorization
         assert!(!result.lossiness.summary.by_severity.is_empty(), 
@@ -312,7 +312,7 @@ fn test_comprehensive_lossiness_tracking() {
 /// Test OpenAI-specific translation with tools
 #[test]
 fn test_openai_translation_with_tools() {
-    let mut prompt = test_support::prompt_with_tools();
+    let prompt = test_support::prompt_with_tools();
     
     let provider = test_support::openai_provider();
     let result = translate(&prompt, &provider, "gpt-5", StrictMode::Warn)
@@ -579,7 +579,7 @@ fn test_golden_temperature_clamp() {
     // Should have lossiness for clamped temperature
     if let Some(sampling) = &prompt_spec.sampling {
         if let Some(temp) = sampling.temperature {
-            if temp > 2.0 || temp < 0.0 {
+            if !(0.0..=2.0).contains(&temp) {
                 // Temperature is out of typical range
                 // Might have lossiness tracking
                 if result.lossiness.summary.total_items > 0 {

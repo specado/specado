@@ -271,7 +271,7 @@ mod tests {
         
         for (path, name) in specs {
             let spec = load_provider_spec(path)
-                .expect(&format!("Failed to load {} spec", name));
+                .unwrap_or_else(|_| panic!("Failed to load {} spec", name));
             
             for model in &spec.models {
                 // Sync normalization paths
@@ -337,7 +337,7 @@ mod tests {
         
         for path in specs {
             let spec = load_provider_spec(path)
-                .expect(&format!("Failed to load spec: {}", path));
+                .unwrap_or_else(|_| panic!("Failed to load spec: {}", path));
             
             // Check spec version is valid semver-like
             assert!(!spec.spec_version.is_empty());

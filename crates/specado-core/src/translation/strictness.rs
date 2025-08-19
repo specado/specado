@@ -947,7 +947,7 @@ mod tests {
         let translation_result = result.unwrap();
         
         // Should have lossiness items for unsupported tools and clamped temperature
-        assert!(translation_result.lossiness.items.len() > 0);
+        assert!(!translation_result.lossiness.items.is_empty());
         
         // Should contain warning about tools being dropped
         let has_tool_warning = translation_result.lossiness.items.iter()

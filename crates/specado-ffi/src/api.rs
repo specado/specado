@@ -4,11 +4,10 @@
 //! the public API of the Specado FFI layer.
 
 use std::os::raw::{c_char, c_int};
-use std::ffi::CStr;
 
-use crate::types::{SpecadoResult, SpecadoContext, TranslationHandle, ResponseHandle};
+use crate::types::{SpecadoResult, SpecadoContext};
 use crate::memory::{allocate_string, c_str_to_string, set_last_error, clear_last_error};
-use crate::error::{validate_ptr, map_core_error};
+use crate::error::validate_ptr;
 use crate::ffi_boundary;
 
 /// Initialize a new Specado context
@@ -239,6 +238,7 @@ pub unsafe extern "C" fn specado_version() -> *const c_char {
 
 // Internal implementation structures
 struct SpecadoContextImpl {
+    #[allow(dead_code)]
     initialized: bool,
 }
 

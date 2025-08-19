@@ -2,7 +2,6 @@
 //!
 //! This module provides error mapping between Rust errors and JavaScript exceptions.
 
-use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::fmt;
 

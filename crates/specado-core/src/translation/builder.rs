@@ -12,7 +12,6 @@ use crate::{
     TranslationMetadata, TranslationResult,
 };
 use crate::translation::{TranslationContext, LossinessTracker};
-use crate::translation::lossiness::{AuditTrail, PerformanceReport, SummaryStats};
 use std::sync::{Arc, Mutex};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -504,14 +503,14 @@ impl TranslationResultBuilder {
     }
 
     /// Generate summary statistics from lossiness tracker
-    pub fn with_summary_statistics(mut self, tracker: &LossinessTracker) -> Self {
+    pub fn with_summary_statistics(self, tracker: &LossinessTracker) -> Self {
         let _stats = tracker.get_summary_statistics();
         // Could include these in the final result metadata
         self
     }
 
     /// Attach performance metrics to the result
-    pub fn with_performance_metrics(mut self, tracker: &LossinessTracker) -> Self {
+    pub fn with_performance_metrics(self, tracker: &LossinessTracker) -> Self {
         let _perf_report = tracker.get_performance_report();
         // Could store performance metrics in metadata
         self
@@ -519,7 +518,7 @@ impl TranslationResultBuilder {
 
     /// Create a builder from an Arc<Mutex<LossinessTracker>>
     pub fn from_shared_tracker(
-        tracker: &Arc<Mutex<LossinessTracker>>,
+        _tracker: &Arc<Mutex<LossinessTracker>>,
         context: &TranslationContext,
     ) -> Self {
         let metadata = TranslationMetadata {

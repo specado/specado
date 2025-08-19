@@ -8,8 +8,6 @@
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use serde_json::Value;
-use std::collections::HashMap;
 
 mod error;
 mod translate;

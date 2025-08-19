@@ -176,7 +176,7 @@ impl AuthHandler for GenericAuth {
     
     fn validate_credentials(&self) -> Result<()> {
         // Try to expand all environment variables to validate they exist
-        for (_, value) in &self.auth_headers {
+        for value in self.auth_headers.values() {
             self.expand_env_vars(value)?;
         }
         Ok(())

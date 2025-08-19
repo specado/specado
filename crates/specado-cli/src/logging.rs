@@ -234,6 +234,7 @@ pub fn create_operation_span(operation: &str, details: Option<&str>) -> Span {
 }
 
 /// Record operation duration in the current span
+#[allow(dead_code)]
 pub fn record_duration(span: &Span, start_time: std::time::Instant) {
     let duration = start_time.elapsed();
     span.record("duration_ms", duration.as_millis() as u64);
@@ -361,11 +362,13 @@ pub mod timing {
         }
         
         /// Get elapsed time without finishing the timer
+        #[allow(dead_code)]
         pub fn elapsed(&self) -> std::time::Duration {
             self.start.elapsed()
         }
         
         /// Finish the timer and log the duration
+        #[allow(dead_code)]
         pub fn finish(self) {
             let duration = self.start.elapsed();
             self.span.record("duration_ms", duration.as_millis() as u64);

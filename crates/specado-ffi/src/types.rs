@@ -3,7 +3,7 @@
 //! All types in this module are designed to be safely passed across
 //! the FFI boundary with C ABI compatibility.
 
-use std::os::raw::{c_char, c_int};
+use std::os::raw::c_char;
 
 /// Result codes for FFI operations
 #[repr(C)]
@@ -63,6 +63,7 @@ pub struct ResponseHandle {
 
 /// FFI-safe string wrapper
 #[repr(C)]
+#[allow(dead_code)]
 pub struct SpecadoString {
     /// Pointer to UTF-8 string data
     pub data: *const c_char,

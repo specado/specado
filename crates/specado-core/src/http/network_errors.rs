@@ -189,6 +189,7 @@ impl CircuitBreaker {
     }
     
     /// Get current circuit state
+    #[allow(dead_code)]
     fn get_state(&self) -> CircuitState {
         self.state
     }
@@ -433,9 +434,11 @@ mod tests {
     
     #[test]
     fn test_circuit_breaker_opening() {
-        let mut config = CircuitBreakerConfig::default();
-        config.failure_threshold = 2;
-        config.min_request_rate = 1; // Allow with minimal requests
+        let config = CircuitBreakerConfig {
+            failure_threshold: 2,
+            min_request_rate: 1, // Allow with minimal requests
+            ..CircuitBreakerConfig::default()
+        };
         
         let mut cb = CircuitBreaker::new(config);
         
@@ -457,11 +460,13 @@ mod tests {
     
     #[test]
     fn test_circuit_breaker_recovery() {
-        let mut config = CircuitBreakerConfig::default();
-        config.failure_threshold = 1;
-        config.success_threshold = 2;
-        config.recovery_timeout = Duration::from_millis(100);
-        config.min_request_rate = 1;
+        let config = CircuitBreakerConfig {
+            failure_threshold: 1,
+            success_threshold: 2,
+            recovery_timeout: Duration::from_millis(100),
+            min_request_rate: 1,
+            ..CircuitBreakerConfig::default()
+        };
         
         let mut cb = CircuitBreaker::new(config);
         
@@ -551,9 +556,11 @@ mod tests {
     
     #[test]
     fn test_minimum_request_rate() {
-        let mut config = CircuitBreakerConfig::default();
-        config.failure_threshold = 1;
-        config.min_request_rate = 5;
+        let config = CircuitBreakerConfig {
+            failure_threshold: 1,
+            min_request_rate: 5,
+            ..CircuitBreakerConfig::default()
+        };
         
         let mut cb = CircuitBreaker::new(config);
         

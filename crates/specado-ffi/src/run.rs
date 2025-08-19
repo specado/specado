@@ -5,10 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::time::Duration;
 use specado_core::{
     http::HttpClient,
-    types::{ProviderSpec, ModelSpec},
+    types::ProviderSpec,
 };
 
 use crate::types::SpecadoResult;
@@ -25,6 +24,7 @@ pub struct RunInput {
     /// The request to execute
     pub request: Value,
     /// Optional configuration
+    #[allow(dead_code)]
     pub config: Option<RunConfig>,
 }
 
@@ -32,10 +32,13 @@ pub struct RunInput {
 #[derive(Debug, Deserialize)]
 pub struct RunConfig {
     /// Timeout in seconds
+    #[allow(dead_code)]
     pub timeout_seconds: Option<u32>,
     /// Retry attempts
+    #[allow(dead_code)]
     pub max_retries: Option<u32>,
     /// Enable fallback strategies
+    #[allow(dead_code)]
     pub enable_fallback: Option<bool>,
 }
 
@@ -107,7 +110,7 @@ pub struct TimingInfo {
 /// Execute a provider request
 pub async fn run(
     request_json: &str,
-    timeout_seconds: Option<u32>,
+    _timeout_seconds: Option<u32>,
 ) -> Result<String, SpecadoResult> {
     let start_time = std::time::Instant::now();
     let start_timestamp = chrono::Utc::now();
@@ -124,7 +127,7 @@ pub async fn run(
         .models
         .iter()
         .find(|m| m.id == input.model_id || 
-              m.aliases.as_ref().map_or(false, |a| a.contains(&input.model_id)))
+              m.aliases.as_ref().is_some_and(|a| a.contains(&input.model_id)))
         .ok_or_else(|| {
             set_last_error(format!("Model '{}' not found", input.model_id));
             SpecadoResult::ModelNotFound
@@ -143,7 +146,7 @@ pub async fn run(
         .execute_chat_completion(model, input.request.clone())
         .await
         .map_err(|e| {
-            let error_info = ErrorInfo {
+            let _error_info = ErrorInfo {
                 code: "REQUEST_FAILED".to_string(),
                 message: e.to_string(),
                 provider_code: None,

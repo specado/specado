@@ -11,14 +11,13 @@ use crate::{Error, Result, StrictMode, LossinessItem, LossinessCode, Severity};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use chrono::Utc;
 
 use super::{
     TranslationContext,
     StrictnessPolicy,
     StrictnessAction,
     LossinessTracker,
-    lossiness::{OperationType, TransformationRecord},
+    lossiness::OperationType,
 };
 
 /// Represents a conflict between mutually exclusive fields
@@ -813,7 +812,7 @@ mod tests {
         });
         
         let conflicts = resolver.detect_conflicts(&request);
-        assert!(conflicts.len() > 0);
+        assert!(!conflicts.is_empty());
         
         // Should detect the nested conflict
         let nested_conflict = conflicts.iter()

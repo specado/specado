@@ -2,7 +2,7 @@
 
 use crate::{
     corpus::{CorpusManager, TestCase},
-    diff::{DiffEngine, DiffOptions},
+    diff::DiffEngine,
     snapshot::SnapshotManager,
     GoldenConfig, GoldenError, Result,
 };
@@ -269,13 +269,13 @@ impl GoldenTestRunner {
     fn perform_translation(&self, test_case: &TestCase) -> Result<Value> {
         // Convert input to PromptSpec
         let prompt_spec: specado_core::types::PromptSpec = serde_json::from_value(test_case.input.prompt_spec.clone())
-            .map_err(|e| GoldenError::Json(e))?;
+            .map_err(GoldenError::Json)?;
         
         // Get provider spec (use default if not specified)
         let provider_name = test_case.provider.as_deref().unwrap_or("openai");
         let provider_spec = if let Some(ref spec) = test_case.input.provider_spec {
             serde_json::from_value(spec.clone())
-                .map_err(|e| GoldenError::Json(e))?
+                .map_err(GoldenError::Json)?
         } else {
             // Load default provider spec
             self.load_default_provider_spec(provider_name)?
@@ -292,7 +292,7 @@ impl GoldenTestRunner {
         
         // Convert to JSON for comparison
         let json_result = serde_json::to_value(result)
-            .map_err(|e| GoldenError::Json(e))?;
+            .map_err(GoldenError::Json)?;
         
         Ok(json_result)
     }
@@ -383,7 +383,7 @@ impl GoldenTestRunner {
         };
         
         serde_json::from_value(spec)
-            .map_err(|e| GoldenError::Json(e))
+            .map_err(GoldenError::Json)
     }
     
     /// Initialize the corpus with sample tests
@@ -418,7 +418,7 @@ mod tests {
             snapshot_dir: temp_dir.path().join("snapshots"),
             update_snapshots: false,
             create_missing: false,
-            diff_options: DiffOptions::default(),
+            diff_options: crate::DiffOptions::default(),
             verbose: false,
         };
         
@@ -426,6 +426,6 @@ mod tests {
         runner.init_corpus().unwrap();
         
         let tests = runner.list_tests().unwrap();
-        assert!(tests.len() > 0);
+        assert!(!tests.is_empty());
     }
 }

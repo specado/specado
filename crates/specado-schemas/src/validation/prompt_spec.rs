@@ -20,9 +20,11 @@ impl PromptSpecValidator {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let schema_path = Self::resolve_schema_path()?;
         // Create loader config that doesn't validate structure (for JSON Schema files)
-        let mut config = LoaderConfig::default();
-        config.validate_basic_structure = false;
-        config.allow_env_expansion = false;  // Don't expand env vars in schema definitions
+        let config = LoaderConfig {
+            validate_basic_structure: false,
+            allow_env_expansion: false,  // Don't expand env vars in schema definitions
+            ..LoaderConfig::default()
+        };
         let mut loader = SchemaLoader::with_config(config);
         let schema = loader.load_schema(&schema_path)?;
         Ok(Self {
@@ -33,9 +35,11 @@ impl PromptSpecValidator {
     /// Load validator with a specific schema path
     pub fn from_path(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
         // Create loader config that doesn't validate structure (for JSON Schema files)
-        let mut config = LoaderConfig::default();
-        config.validate_basic_structure = false;
-        config.allow_env_expansion = false;  // Don't expand env vars in schema definitions
+        let config = LoaderConfig {
+            validate_basic_structure: false,
+            allow_env_expansion: false,  // Don't expand env vars in schema definitions
+            ..LoaderConfig::default()
+        };
         let mut loader = SchemaLoader::with_config(config);
         let schema = loader.load_schema(path)?;
         Ok(Self {
@@ -328,7 +332,7 @@ mod tests {
         
         // Invalid: reasoning_tokens with wrong model_class
         let mut spec = create_basic_prompt_spec();
-        spec["reasoning_tokens"] = json!(100);
+        spec["limits"] = json!({"reasoning_tokens": 100});
         assert!(validator.validate(&spec).is_err());
         
         // Valid: reasoning_tokens with ReasoningChat

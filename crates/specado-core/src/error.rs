@@ -63,7 +63,7 @@ pub enum Error {
     #[error("{}", diagnostics.format_display(true))]
     HttpWithDiagnostics {
         error: crate::http::HttpError,
-        diagnostics: crate::http::ErrorDiagnostics,
+        diagnostics: Box<crate::http::ErrorDiagnostics>,
     },
 
     /// Configuration errors

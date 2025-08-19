@@ -4,11 +4,10 @@
 //! data structures, with proper serialization and type hints.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString, PyType};
+use pyo3::types::{PyDict, PyType};
 use pyo3::exceptions::PyValueError;
 use serde_json::Value;
 use specado_core::types::*;
-use std::collections::HashMap;
 
 /// Python wrapper for PromptSpec
 #[pyclass(name = "PromptSpec")]
@@ -21,6 +20,7 @@ pub struct PyPromptSpec {
 impl PyPromptSpec {
     #[new]
     #[pyo3(signature = (model_class, messages, tools=None, tool_choice=None, response_format=None, sampling=None, limits=None, media=None, strict_mode="warn"))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         model_class: String,
         messages: Vec<PyMessage>,
@@ -460,6 +460,7 @@ pub fn json_to_py(py: Python<'_>, value: &Value) -> PyResult<PyObject> {
     }
 }
 
+#[allow(clippy::only_used_in_recursion)]
 pub fn py_to_json(py: Python<'_>, obj: &PyAny) -> PyResult<Value> {
     if obj.is_none() {
         Ok(Value::Null)

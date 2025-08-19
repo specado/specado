@@ -300,8 +300,10 @@ impl CorpusManager {
     pub fn get_statistics(&self) -> Result<CorpusStatistics> {
         let tests = self.discover_tests()?;
         
-        let mut stats = CorpusStatistics::default();
-        stats.total_tests = tests.len();
+        let mut stats = CorpusStatistics {
+            total_tests: tests.len(),
+            ..Default::default()
+        };
         
         for test in tests {
             if test.metadata.enabled {

@@ -30,7 +30,7 @@ pub fn map_core_error(error: specado_core::Error) -> SpecadoResult {
             }
         }
         Error::HttpWithDiagnostics { diagnostics, .. } => {
-            set_last_error(format!("{}", diagnostics.format_display(false)));
+            set_last_error(diagnostics.format_display(false).to_string());
             match diagnostics.classification.as_str() {
                 "AuthenticationError" => SpecadoResult::AuthenticationError,
                 "RateLimitError" => SpecadoResult::RateLimitError,
@@ -144,6 +144,7 @@ pub fn validate_ptr<T>(ptr: *const T, name: &str) -> Result<(), SpecadoResult> {
 }
 
 /// Validate that a mutable pointer is not null
+#[allow(dead_code)]
 pub fn validate_mut_ptr<T>(ptr: *mut T, name: &str) -> Result<(), SpecadoResult> {
     if ptr.is_null() {
         set_last_error(format!("{} is null", name));

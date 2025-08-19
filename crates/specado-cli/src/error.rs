@@ -3,7 +3,6 @@
 //! This module provides error types and utilities for handling
 //! various failure modes in the CLI application.
 
-use std::fmt;
 use std::io;
 use std::path::PathBuf;
 
@@ -35,6 +34,7 @@ pub enum Error {
 
     /// Invalid argument combination
     #[error("Invalid arguments: {0}")]
+    #[allow(dead_code)]
     InvalidArgs(String),
 
     /// Provider not found
@@ -43,18 +43,22 @@ pub enum Error {
 
     /// Model not found
     #[error("Model '{}' not found for provider '{}'", model, provider)]
+    #[allow(dead_code)]
     ModelNotFound { provider: String, model: String },
 
     /// API key missing
     #[error("API key required for provider '{}'. Set via --api-key or SPECADO_API_KEY", provider)]
+    #[allow(dead_code)]
     ApiKeyMissing { provider: String },
 
     /// Network error
     #[error("Network error: {0}")]
+    #[allow(dead_code)]
     Network(String),
 
     /// Timeout error
     #[error("Operation timed out after {} seconds", seconds)]
+    #[allow(dead_code)]
     Timeout { seconds: u64 },
 
     /// JSON serialization/deserialization error
@@ -77,11 +81,13 @@ impl Error {
     }
 
     /// Create an invalid arguments error
+    #[allow(dead_code)]
     pub fn invalid_args(message: impl Into<String>) -> Self {
         Self::InvalidArgs(message.into())
     }
 
     /// Create a network error
+    #[allow(dead_code)]
     pub fn network(message: impl Into<String>) -> Self {
         Self::Network(message.into())
     }
@@ -120,6 +126,7 @@ impl Error {
 }
 
 /// Extension trait for displaying errors with context
+#[allow(dead_code)]
 pub trait ErrorContext<T> {
     /// Add context to an error
     fn context(self, msg: &str) -> Result<T>;
@@ -174,10 +181,11 @@ pub fn format_error(error: &Error, use_color: bool) -> String {
 }
 
 /// Format a chain of errors (with causes) for display
+#[allow(dead_code)]
 pub fn format_error_chain(error: &Error, use_color: bool) -> String {
-    let output = format_error(error, use_color);
+    
     
     // If we had error sources, we'd iterate through them here
     // For now, just return the main error
-    output
+    format_error(error, use_color)
 }

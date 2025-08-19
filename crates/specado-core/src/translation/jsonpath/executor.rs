@@ -69,9 +69,7 @@ impl Executor {
 
         // Full execution path
         let mut current_results = SelectionIterator::single(data);
-        let mut depth = 0;
-
-        for selector in &expression.selectors {
+        for (depth, selector) in expression.selectors.iter().enumerate() {
             if depth >= self.context.max_depth {
                 return Err(JSONPathError::execution(
                     "Maximum recursion depth exceeded",
@@ -81,7 +79,6 @@ impl Executor {
             }
 
             current_results = self.execute_selector(selector, current_results, depth)?;
-            depth += 1;
 
             // Short-circuit if we have no results
             if current_results.is_empty() && !self.context.short_circuit {

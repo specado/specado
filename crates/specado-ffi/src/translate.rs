@@ -3,12 +3,11 @@
 //! This module implements the translate function that converts
 //! prompts to provider-specific requests using the core translation engine.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 use specado_core::{
-    types::{ProviderSpec, PromptSpec, StrictMode, TranslationResult},
+    types::{ProviderSpec, PromptSpec, StrictMode},
     translation::translate as core_translate,
-    Error as CoreError,
 };
 
 use crate::types::SpecadoResult;
@@ -54,6 +53,7 @@ pub struct TranslationConfig {
     /// Strictness mode
     pub strict_mode: Option<String>,
     /// Enable validation
+    #[allow(dead_code)]
     pub validate: Option<bool>,
 }
 
@@ -147,15 +147,11 @@ fn convert_to_prompt_spec(prompt: &PromptInput, config: &Option<TranslationConfi
     };
     
     // Build limits if max_tokens is present
-    let limits = if let Some(max_tokens) = prompt.max_tokens {
-        Some(Limits {
+    let limits = prompt.max_tokens.map(|max_tokens| Limits {
             max_output_tokens: Some(max_tokens),
             reasoning_tokens: None,
             max_prompt_tokens: None,
-        })
-    } else {
-        None
-    };
+        });
     
     // Convert tools if present
     let tools = if let Some(tool_values) = &prompt.tools {

@@ -20,6 +20,7 @@ use tracing::{instrument, info, warn, debug};
 /// Main configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct Config {
     /// Default provider to use if not specified
     pub default_provider: Option<String>,
@@ -163,6 +164,7 @@ pub struct PathConfig {
 /// Profile configuration for different environments
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct ProfileConfig {
     /// Override default provider for this profile
     pub default_provider: Option<String>,
@@ -183,22 +185,6 @@ pub struct ProfileConfig {
     pub logging: Option<LoggingConfig>,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            default_provider: None,
-            default_model: None,
-            strict_mode: false,
-            provider_dir: None,
-            providers: HashMap::new(),
-            output: OutputConfig::default(),
-            logging: LoggingConfig::default(),
-            paths: PathConfig::default(),
-            profiles: HashMap::new(),
-            active_profile: None,
-        }
-    }
-}
 
 impl Default for OutputConfig {
     fn default() -> Self {
@@ -239,18 +225,6 @@ impl Default for PathConfig {
     }
 }
 
-impl Default for ProfileConfig {
-    fn default() -> Self {
-        Self {
-            default_provider: None,
-            default_model: None,
-            strict_mode: None,
-            providers: HashMap::new(),
-            output: None,
-            logging: None,
-        }
-    }
-}
 
 impl OutputConfig {
     /// Merge with another output config (other takes precedence)
@@ -340,6 +314,7 @@ impl Config {
     
     /// Load configuration with full precedence handling
     #[instrument]
+    #[allow(dead_code)]
     pub fn load() -> Result<Self> {
         Self::load_with_file(None)
     }
@@ -546,6 +521,7 @@ impl Config {
     }
     
     /// Get provider configuration, considering active profile
+    #[allow(dead_code)]
     pub fn get_provider(&self, name: &str) -> Option<&ProviderConfig> {
         self.providers.get(name)
     }
@@ -629,12 +605,14 @@ impl Config {
 }
 
 /// Builder for creating configurations programmatically
+#[allow(dead_code)]
 pub struct ConfigBuilder {
     config: Config,
 }
 
 impl ConfigBuilder {
     /// Create a new config builder
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             config: Config::default(),
@@ -642,18 +620,21 @@ impl ConfigBuilder {
     }
     
     /// Set default provider
+    #[allow(dead_code)]
     pub fn default_provider(mut self, provider: impl Into<String>) -> Self {
         self.config.default_provider = Some(provider.into());
         self
     }
     
     /// Set default model
+    #[allow(dead_code)]
     pub fn default_model(mut self, model: impl Into<String>) -> Self {
         self.config.default_model = Some(model.into());
         self
     }
     
     /// Add a provider configuration
+    #[allow(dead_code)]
     pub fn add_provider(
         mut self,
         name: impl Into<String>,
@@ -664,6 +645,7 @@ impl ConfigBuilder {
     }
     
     /// Build the configuration
+    #[allow(dead_code)]
     pub fn build(self) -> Config {
         self.config
     }

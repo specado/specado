@@ -135,7 +135,7 @@ impl HttpClient {
         // Create rate limiter if configured
         let rate_limiter = config.rate_limit_config
             .clone()
-            .map(|rate_config| RateLimiter::new(rate_config));
+            .map(RateLimiter::new);
         
         // Create network error handler
         let network_error_handler = NetworkErrorHandler::new(config.circuit_breaker_config.clone());
@@ -271,6 +271,7 @@ impl HttpClient {
     }
     
     /// Execute a generic request with retry logic and fallback strategies
+    #[allow(dead_code)]
     async fn execute_request(
         &self,
         endpoint: &EndpointConfig,
@@ -315,6 +316,7 @@ impl HttpClient {
             })?;
         
         // Try normal execution first
+        #[allow(unused_assignments)]
         let mut last_error: Option<HttpError> = None;
         let _start = std::time::Instant::now();
         
@@ -390,6 +392,7 @@ impl HttpClient {
     }
     
     /// Execute request with fallback strategies and timeout
+    #[allow(clippy::await_holding_lock)]
     async fn execute_with_fallback_and_timeout(
         &self,
         endpoint: &EndpointConfig,
@@ -504,11 +507,12 @@ impl HttpClient {
         
         Err(crate::Error::HttpWithDiagnostics {
             error: last_error,
-            diagnostics,
+            diagnostics: Box::new(diagnostics),
         })
     }
     
     /// Execute a raw request (returns Response for streaming)
+    #[allow(dead_code)]
     async fn execute_raw_request(
         &self,
         endpoint: &EndpointConfig,
@@ -573,7 +577,7 @@ impl HttpClient {
                 
                 // Execute the request
                 let response = client.execute(request).await
-                    .map_err(|e| HttpError::from_request_error(e))?;
+                    .map_err(HttpError::from_request_error)?;
                 
                 // Check for errors
                 if !response.status().is_success() {
@@ -647,7 +651,7 @@ impl HttpClient {
                 })?;
         }
         
-        self.rate_limiter = config.clone().map(|rate_config| RateLimiter::new(rate_config));
+        self.rate_limiter = config.clone().map(RateLimiter::new);
         self.config.rate_limit_config = config;
         Ok(())
     }
