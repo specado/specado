@@ -10,6 +10,7 @@ use specado_schemas::{
 };
 
 /// Helper to create a minimal valid ProviderSpec
+#[allow(dead_code)]
 fn minimal_valid_spec() -> serde_json::Value {
     json!({
         "spec_version": "1.0.0",

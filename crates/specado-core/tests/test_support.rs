@@ -489,6 +489,7 @@ pub fn assert_translation_succeeds(
 }
 
 /// Assert that translation fails
+#[allow(dead_code)]
 pub fn assert_translation_fails(prompt: &PromptSpec, provider: &ProviderSpec, model: &str) {
     if specado_core::translate(prompt, provider, model, StrictMode::Strict).is_ok() {
         panic!("Translation should have failed but succeeded");

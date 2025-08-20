@@ -4,6 +4,8 @@
 //! Python applications to translate prompts, validate specifications,
 //! and execute provider requests.
 
+#![allow(non_local_definitions)] // PyO3 macros generate non-local impl blocks
+
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
 

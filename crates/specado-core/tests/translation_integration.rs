@@ -117,7 +117,7 @@ fn test_translation_with_unsupported_tools() {
     } else {
         // Tools were dropped entirely - also valid
         // Just verify this was an intentional decision
-        assert!(result.lossiness.summary.total_items >= 0);
+        // total_items is usize, so it's always >= 0 (removed redundant check)
     }
 }
 
@@ -452,7 +452,7 @@ fn test_max_output_tokens_capping() {
     
     // If capped, should track in lossiness
     if result.lossiness.summary.total_items > 0 {
-        let has_clamp = result.lossiness.items.iter()
+        let _has_clamp = result.lossiness.items.iter()
             .any(|item| item.code == LossinessCode::Clamp);
         // Clamping is expected if the limit exceeds model capacity
     }
@@ -583,7 +583,7 @@ fn test_golden_temperature_clamp() {
                 // Temperature is out of typical range
                 // Might have lossiness tracking
                 if result.lossiness.summary.total_items > 0 {
-                    let has_clamp = result.lossiness.items.iter()
+                    let _has_clamp = result.lossiness.items.iter()
                         .any(|item| item.code == LossinessCode::Clamp);
                     // Clamping might be tracked
                 }
@@ -685,6 +685,7 @@ fn test_complex_multi_feature_request() {
 }
 
 /// Helper to load a golden test case
+#[allow(dead_code)]
 fn load_golden_test_case(path: &Path) -> Result<Value, Box<dyn std::error::Error>> {
     let content = fs::read_to_string(path)?;
     Ok(serde_json::from_str(&content)?)

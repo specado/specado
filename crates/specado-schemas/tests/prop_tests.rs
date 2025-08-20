@@ -91,6 +91,7 @@ fn prompt_spec_like_strategy() -> impl Strategy<Value = Value> {
 }
 
 /// Strategy for generating ProviderSpec-like JSON
+#[allow(dead_code)]
 fn provider_spec_like_strategy() -> impl Strategy<Value = Value> {
     (
         proptest::option::of("1.0|2.0|1.0.0"),  // spec_version
