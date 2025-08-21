@@ -156,6 +156,55 @@
               "default_budget": { "type": "integer" }
             }
           },
+
+          "capabilities": {
+            "description": "Model capabilities (optional, inferred if not specified)",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "text_generation": {
+                "description": "Supports text generation",
+                "type": "boolean",
+                "default": true
+              },
+              "vision": {
+                "description": "Supports image/visual input",
+                "type": "boolean",
+                "default": false
+              },
+              "function_calling": {
+                "description": "Supports function/tool calling",
+                "type": "boolean",
+                "default": false
+              },
+              "streaming": {
+                "description": "Supports streaming responses",
+                "type": "boolean",
+                "default": false
+              },
+              "reasoning": {
+                "description": "Supports enhanced reasoning capabilities",
+                "type": "boolean"
+              },
+              "extended_context": {
+                "description": "Supports extended context windows (>100k tokens)",
+                "type": "boolean"
+              },
+              "multimodal": {
+                "description": "Supported modalities beyond text",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["text", "image", "audio", "video"]
+                }
+              },
+              "experimental": {
+                "description": "Experimental or provider-specific capabilities",
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          },
   
           "endpoints": {
             "description": "API endpoints for this model",

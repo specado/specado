@@ -87,11 +87,32 @@ impl CapabilityDetector {
     pub fn extract_capabilities_from_spec(model_spec: &crate::types::ModelSpec) -> Capabilities {
         // First, check if capabilities are explicitly defined in the typed field
         if let Some(explicit_capabilities) = &model_spec.capabilities {
+            log::debug!(
+                "Using explicit capabilities for model '{}': vision={}, function_calling={}, streaming={}, reasoning={:?}",
+                model_spec.id,
+                explicit_capabilities.vision,
+                explicit_capabilities.function_calling,
+                explicit_capabilities.streaming,
+                explicit_capabilities.reasoning
+            );
             return explicit_capabilities.clone();
         }
         
         // If no explicit capabilities, infer from spec structure
-        Self::infer_capabilities_from_spec(model_spec)
+        log::debug!(
+            "No explicit capabilities found for model '{}', inferring from spec structure",
+            model_spec.id
+        );
+        let inferred = Self::infer_capabilities_from_spec(model_spec);
+        log::debug!(
+            "Inferred capabilities for model '{}': vision={}, function_calling={}, streaming={}, reasoning={:?}",
+            model_spec.id,
+            inferred.vision,
+            inferred.function_calling,
+            inferred.streaming,
+            inferred.reasoning
+        );
+        inferred
     }
     
     /// Infer capabilities from ModelSpec structure (spec-driven detection)
@@ -140,23 +161,72 @@ impl CapabilityDetector {
     }
     
     /// Detect streaming support from endpoints configuration
+    /// 
+    /// Analyzes endpoint configuration to determine if streaming is supported through:
+    /// 1. **Protocol Analysis**: Checks for SSE ('sse') or streaming protocols
+    /// 2. **Header Analysis**: Looks for streaming indicators in headers (resilient to missing headers)
+    /// 3. **Endpoint Differentiation**: Compares regular vs streaming endpoints for differences
+    /// 
+    /// # Resilience
+    /// - Handles missing headers gracefully (None case)
+    /// - Performs case-insensitive protocol checks
+    /// - Falls back to endpoint comparison if other methods fail
+    /// 
+    /// # Returns
+    /// `true` if streaming support is detected, `false` otherwise
     fn detect_streaming_support(endpoints: &crate::types::Endpoints) -> bool {
-        // Check for SSE/streaming protocol indicators
-        if endpoints.streaming_chat_completion.protocol == "sse" 
-            || endpoints.streaming_chat_completion.protocol.contains("stream") {
+        // 1. Check for SSE/streaming protocol indicators (case-insensitive)
+        let streaming_protocol = &endpoints.streaming_chat_completion.protocol.to_lowercase();
+        if streaming_protocol == "sse" || streaming_protocol.contains("stream") {
             return true;
         }
         
-        // Check headers for SSE indicators (e.g., Accept: text/event-stream)
+        // 2. Check headers for SSE indicators (resilient to missing headers)
         if let Some(headers) = &endpoints.streaming_chat_completion.headers {
-            if headers.values().any(|v| v.contains("text/event-stream") || v.contains("stream")) {
-                return true;
+            for (key, value) in headers {
+                let key_lower = key.to_lowercase();
+                let value_lower = value.to_lowercase();
+                
+                // Look for streaming-related headers
+                if (key_lower.contains("accept") && value_lower.contains("text/event-stream"))
+                    || value_lower.contains("stream")
+                    || key_lower.contains("stream") {
+                    return true;
+                }
             }
         }
         
-        // Check if streaming endpoint differs from regular endpoint
-        endpoints.chat_completion.protocol != endpoints.streaming_chat_completion.protocol
-            || endpoints.chat_completion.path != endpoints.streaming_chat_completion.path
+        // 3. Check if streaming endpoint differs from regular endpoint
+        // Different protocols indicate streaming capability
+        if endpoints.chat_completion.protocol != endpoints.streaming_chat_completion.protocol {
+            return true;
+        }
+        
+        // Different paths indicate separate streaming endpoint
+        if endpoints.chat_completion.path != endpoints.streaming_chat_completion.path {
+            return true;
+        }
+        
+        // 4. Check for streaming-specific query parameters
+        let regular_query = endpoints.chat_completion.query.as_ref();
+        let streaming_query = endpoints.streaming_chat_completion.query.as_ref();
+        
+        if let (Some(reg_q), Some(stream_q)) = (regular_query, streaming_query) {
+            // If streaming endpoint has stream=true or similar parameters
+            if stream_q.values().any(|v| v.to_lowercase().contains("true") || v.to_lowercase().contains("stream")) {
+                return true;
+            }
+            
+            // If queries differ, likely indicates streaming support
+            if reg_q != stream_q {
+                return true;
+            }
+        } else if streaming_query.is_some() && regular_query.is_none() {
+            // Streaming endpoint has query params while regular doesn't
+            return true;
+        }
+        
+        false
     }
     
     /// Detect extended context from parameters (look for large max_tokens values)
