@@ -44,6 +44,7 @@ fn create_openai_model_spec() -> ModelSpec {
             native_param: true,
             strategy: "json_schema".to_string(),
         },
+        capabilities: None,
         parameters: json!({}),
         constraints: Constraints {
             system_prompt_location: "message_role".to_string(),
@@ -118,6 +119,7 @@ fn create_anthropic_model_spec() -> ModelSpec {
             native_param: false,
             strategy: "tools".to_string(),
         },
+        capabilities: None,
         parameters: json!({}),
         constraints: Constraints {
             system_prompt_location: "top_level".to_string(),

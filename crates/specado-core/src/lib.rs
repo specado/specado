@@ -26,6 +26,7 @@ pub mod http;
 pub mod llm;
 pub mod provider_discovery;
 pub mod response;
+pub mod specs;
 pub mod translation;
 pub mod types;
 
@@ -73,6 +74,9 @@ pub use llm::{LLM, GenerationMode};
 
 // Re-export response extensions
 pub use response::{ResponseExt, TokenUsage, ToolCallInfo};
+
+// Re-export specs types
+pub use specs::{Capabilities, CapabilityDetector};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

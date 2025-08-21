@@ -155,6 +155,7 @@ pub fn openai_gpt5_model() -> ModelSpec {
             native_param: true,
             strategy: "response_format".to_string(),
         },
+        capabilities: None,
         parameters: json!({
             "temperature": {
                 "type": "number",
@@ -306,6 +307,7 @@ pub fn anthropic_claude_model() -> ModelSpec {
             native_param: false,
             strategy: "system_prompt".to_string(),
         },
+        capabilities: None,
         parameters: json!({
             "temperature": {
                 "type": "number",
@@ -396,6 +398,7 @@ pub fn limited_provider() -> ProviderSpec {
                 native_param: false,
                 strategy: "none".to_string(),
             },
+            capabilities: None,
             parameters: json!({}),
             constraints: Constraints {
                 system_prompt_location: "first_message".to_string(),

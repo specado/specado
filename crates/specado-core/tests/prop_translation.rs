@@ -165,6 +165,7 @@ fn minimal_provider_spec() -> ProviderSpec {
                 native_param: false,
                 strategy: "system_prompt".to_string(),
             },
+            capabilities: None,
             parameters: Value::Object(Default::default()),
             constraints: Constraints {
                 system_prompt_location: "first_message".to_string(),

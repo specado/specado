@@ -79,6 +79,7 @@ mod tests {
                 native_param: true,
                 strategy: "native".to_string(),
             },
+            capabilities: None,
             parameters: json!({}),
             constraints: crate::Constraints {
                 system_prompt_location: "first".to_string(),

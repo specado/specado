@@ -85,11 +85,9 @@ pub struct CapabilityDetector;
 impl CapabilityDetector {
     /// Extract capabilities from a ModelSpec's capabilities field or infer from spec structure
     pub fn extract_capabilities_from_spec(model_spec: &crate::types::ModelSpec) -> Capabilities {
-        // First, check if capabilities are explicitly defined in the spec
-        if let Some(capabilities_value) = model_spec.parameters.get("capabilities") {
-            if let Ok(capabilities) = serde_json::from_value::<Capabilities>(capabilities_value.clone()) {
-                return capabilities;
-            }
+        // First, check if capabilities are explicitly defined in the typed field
+        if let Some(explicit_capabilities) = &model_spec.capabilities {
+            return explicit_capabilities.clone();
         }
         
         // If no explicit capabilities, infer from spec structure
@@ -101,18 +99,23 @@ impl CapabilityDetector {
         let mut capabilities = Capabilities::default();
         
         // Infer from input_modes
-        capabilities.vision = model_spec.input_modes.images.unwrap_or(false);
+        capabilities.vision = model_spec.input_modes.images;
         
         // Infer from tooling config
         capabilities.function_calling = model_spec.tooling.tools_supported;
-        capabilities.streaming = model_spec.endpoints.streaming_chat_completion.is_some();
+        
+        // Infer streaming capability: check if streaming endpoint differs from regular endpoint
+        capabilities.streaming = Self::detect_streaming_support(&model_spec.endpoints);
         
         // Infer from parameters (check for reasoning/thinking parameters)
         if let Some(params_obj) = model_spec.parameters.as_object() {
-            capabilities.reasoning = params_obj.contains_key("reasoning_depth")
-                .or(params_obj.contains_key("thinking_budget"))
-                .or(params_obj.contains_key("reasoning_mode"))
-                .then_some(true);
+            capabilities.reasoning = if params_obj.contains_key("reasoning_depth") 
+                || params_obj.contains_key("thinking_budget") 
+                || params_obj.contains_key("reasoning_mode") {
+                Some(true)
+            } else {
+                None
+            };
                 
             capabilities.extended_context = Self::detect_extended_context(params_obj);
             
@@ -126,19 +129,34 @@ impl CapabilityDetector {
         
         // Infer multimodal from input modes
         let mut modalities = vec!["text".to_string()];
-        if model_spec.input_modes.images.unwrap_or(false) {
+        if model_spec.input_modes.images {
             modalities.push("image".to_string());
-        }
-        if let Some(audio) = model_spec.input_modes.audio {
-            if audio {
-                modalities.push("audio".to_string());
-            }
         }
         if modalities.len() > 1 {
             capabilities.multimodal = Some(modalities);
         }
         
         capabilities
+    }
+    
+    /// Detect streaming support from endpoints configuration
+    fn detect_streaming_support(endpoints: &crate::types::Endpoints) -> bool {
+        // Check for SSE/streaming protocol indicators
+        if endpoints.streaming_chat_completion.protocol == "sse" 
+            || endpoints.streaming_chat_completion.protocol.contains("stream") {
+            return true;
+        }
+        
+        // Check headers for SSE indicators (e.g., Accept: text/event-stream)
+        if let Some(headers) = &endpoints.streaming_chat_completion.headers {
+            if headers.values().any(|v| v.contains("text/event-stream") || v.contains("stream")) {
+                return true;
+            }
+        }
+        
+        // Check if streaming endpoint differs from regular endpoint
+        endpoints.chat_completion.protocol != endpoints.streaming_chat_completion.protocol
+            || endpoints.chat_completion.path != endpoints.streaming_chat_completion.path
     }
     
     /// Detect extended context from parameters (look for large max_tokens values)
@@ -167,7 +185,7 @@ impl CapabilityDetector {
     /// Check if a model has capabilities defined (either explicit or inferable)
     pub fn has_enhanced_capabilities(model_spec: &crate::types::ModelSpec) -> bool {
         // Check for explicit capabilities field
-        if model_spec.parameters.get("capabilities").is_some() {
+        if model_spec.capabilities.is_some() {
             return true;
         }
         
@@ -183,14 +201,14 @@ impl CapabilityDetector {
     
     /// Get confidence score based on spec completeness
     pub fn get_detection_confidence(model_spec: &crate::types::ModelSpec) -> f64 {
-        let mut confidence = 0.5; // Base confidence
+        let mut confidence: f64 = 0.5; // Base confidence
         
         // Higher confidence if explicit capabilities are defined
-        if model_spec.parameters.get("capabilities").is_some() {
+        if model_spec.capabilities.is_some() {
             confidence = 0.95;
         } else {
             // Increase confidence based on spec completeness
-            if model_spec.input_modes.images.is_some() {
+            if model_spec.input_modes.images {
                 confidence += 0.1;
             }
             if model_spec.tooling.tools_supported {
@@ -254,7 +272,7 @@ mod tests {
         assert!(!old_cached.is_fresh());
     }
     
-    use crate::types::{ModelSpec, ProviderInfo, Endpoints, EndpointConfig, InputModes, ToolingConfig, JsonOutputConfig, Constraints, Mappings, ResponseNormalization};
+    use crate::types::{ModelSpec, Endpoints, EndpointConfig, InputModes, ToolingConfig, JsonOutputConfig, Constraints, ConstraintLimits, Mappings, ResponseNormalization, SyncNormalization, StreamNormalization, EventSelector};
     use serde_json::json;
     
     fn create_test_model_spec() -> ModelSpec {
@@ -267,35 +285,33 @@ mod tests {
                     method: "POST".to_string(),
                     path: "/chat".to_string(),
                     protocol: "https".to_string(),
+                    query: None,
+                    headers: None,
                 },
-                streaming_chat_completion: Some(EndpointConfig {
+                streaming_chat_completion: EndpointConfig {
                     method: "POST".to_string(),
                     path: "/chat".to_string(),
                     protocol: "sse".to_string(),
-                }),
+                    query: None,
+                    headers: None,
+                },
             },
             input_modes: InputModes {
                 messages: true,
-                single_text: Some(true),
-                images: Some(true),
-                audio: Some(false),
-                video: Some(false),
+                single_text: true,
+                images: true,
             },
             tooling: ToolingConfig {
                 tools_supported: true,
                 parallel_tool_calls_default: true,
-                can_disable_parallel_tool_calls: Some(true),
-                custom_tools: Some(true),
-                preambles_supported: Some(true),
-                tool_types: Some(vec!["function".to_string()]),
-                context_free_grammars: Some(false),
-                tool_choice_modes: Some(vec!["auto".to_string(), "required".to_string()]),
+                can_disable_parallel_tool_calls: true,
+                disable_switch: None,
             },
             json_output: JsonOutputConfig {
                 native_param: true,
                 strategy: "json_schema".to_string(),
-                notes: Some("Test JSON output".to_string()),
             },
+            capabilities: None, // Test inference from spec structure
             parameters: json!({
                 "max_tokens": {
                     "type": "integer",
@@ -315,20 +331,31 @@ mod tests {
             }),
             constraints: Constraints {
                 system_prompt_location: "system_parameter".to_string(),
-                forbid_unknown_top_level_fields: Some(true),
-                required_fields: Some(vec!["model".to_string()]),
-                mutually_exclusive: Some(vec![]),
-                resolution_preferences: Some(vec!["max_tokens".to_string()]),
-                limits: Some(json!({})),
+                forbid_unknown_top_level_fields: true,
+                mutually_exclusive: vec![],
+                resolution_preferences: vec!["max_tokens".to_string()],
+                limits: ConstraintLimits {
+                    max_tool_schema_bytes: 16384,
+                    max_system_prompt_bytes: 32768,
+                },
             },
             mappings: Mappings {
-                paths: Some(std::collections::HashMap::new()),
-                transformations: Some(std::collections::HashMap::new()),
-                flags: Some(std::collections::HashMap::new()),
+                paths: std::collections::HashMap::new(),
+                flags: std::collections::HashMap::new(),
             },
             response_normalization: ResponseNormalization {
-                sync: json!({}),
-                stream: Some(json!({})),
+                sync: SyncNormalization {
+                    content_path: "content".to_string(),
+                    finish_reason_path: "finish_reason".to_string(),
+                    finish_reason_map: std::collections::HashMap::new(),
+                },
+                stream: StreamNormalization {
+                    protocol: "sse".to_string(),
+                    event_selector: EventSelector {
+                        type_path: "type".to_string(),
+                        routes: vec![],
+                    },
+                },
             },
         }
     }
@@ -394,14 +421,16 @@ mod tests {
         
         // Test with explicit capabilities field
         let mut explicit_spec = create_test_model_spec();
-        explicit_spec.parameters.as_object_mut().unwrap().insert(
-            "capabilities".to_string(), 
-            json!({
-                "text_generation": true,
-                "vision": true,
-                "reasoning": true
-            })
-        );
+        explicit_spec.capabilities = Some(Capabilities {
+            text_generation: true,
+            vision: true,
+            function_calling: true,
+            streaming: true,
+            reasoning: Some(true),
+            extended_context: None,
+            multimodal: None,
+            experimental: HashMap::new(),
+        });
         
         let explicit_confidence = CapabilityDetector::get_detection_confidence(&explicit_spec);
         assert_eq!(explicit_confidence, 0.95); // Maximum confidence for explicit capabilities

@@ -10,6 +10,9 @@ use std::collections::HashMap;
 // Re-export error types for convenience
 pub use crate::error::{LossinessCode, Severity, StrictMode};
 
+// Import capability types for optional model capability metadata
+use crate::specs::Capabilities;
+
 /// Represents a uniform prompt specification
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptSpec {
@@ -97,6 +100,11 @@ pub struct ModelSpec {
     
     /// JSON output configuration
     pub json_output: JsonOutputConfig,
+    
+    /// Model capabilities (optional, inferred if not specified)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub capabilities: Option<Capabilities>,
     
     /// Parameter mappings and constraints
     pub parameters: Value, // Flexible for provider-specific params
