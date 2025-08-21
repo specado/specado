@@ -23,7 +23,9 @@
 
 pub mod error;
 pub mod http;
+pub mod llm;
 pub mod provider_discovery;
+pub mod response;
 pub mod translation;
 pub mod types;
 
@@ -65,6 +67,12 @@ pub use types::{
 
 // Re-export error enums
 pub use error::LossinessCode;
+
+// Re-export high-level LLM interface
+pub use llm::{LLM, GenerationMode, Message as LLMMessage};
+
+// Re-export response extensions
+pub use response::{ResponseExt, TokenUsage, ToolCallInfo, extract_content};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
