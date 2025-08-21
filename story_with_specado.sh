@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Story generator using Specado properly
+# Story generator using Specado with gpt-5-mini
 
 # Colors for better output
 CYAN='\033[0;36m'
@@ -95,216 +95,86 @@ case $LENGTH_CHOICE in
     ;;
 esac
 
-# First, we need to create a proper provider spec that combines base provider + model
-# Let's create a combined provider spec for OpenAI with GPT-5 (or GPT-4 as fallback)
-cat > /tmp/openai_provider.yaml << 'ENDOFYAML'
-spec_version: "1.0.0"
-provider:
-  name: "openai"
-  base_url: "https://api.openai.com/v1"
-  headers:
-    Authorization: "Bearer ${OPENAI_API_KEY}"
+# Load the existing gpt-5-mini provider spec
+PROVIDER_SPEC_CONTENT=$(cat providers/openai/gpt-5-mini.json)
 
-models:
-  - id: "gpt-5"
-    aliases: ["gpt-5-turbo"]
-    family: "gpt5"
-    endpoints:
-      chat_completion:
-        method: "POST"
-        path: "/chat/completions"
-        protocol: "https"
-      streaming_chat_completion:
-        method: "POST"
-        path: "/chat/completions"
-        protocol: "https"
-    input_modes:
-      messages: true
-      single_text: false
-      images: true
-    tooling:
-      tools_supported: true
-      parallel_tool_calls_default: true
-      can_disable_parallel_tool_calls: true
-      disable_switch: "parallel_tool_calls"
-    json_output:
-      native_param: true
-      strategy: "response_format"
-    parameters:
-      type: "object"
-      properties:
-        temperature:
-          type: "number"
-          minimum: 0
-          maximum: 2
-        max_tokens:
-          type: "integer"
-        top_p:
-          type: "number"
-        frequency_penalty:
-          type: "number"
-        presence_penalty:
-          type: "number"
-    constraints:
-      system_prompt_location: "first"
-      forbid_unknown_top_level_fields: false
-      mutually_exclusive: []
-      resolution_preferences: []
-      limits:
-        max_tool_schema_bytes: 100000
-        max_system_prompt_bytes: 100000
-    mappings:
-      paths:
-        "sampling.temperature": "temperature"
-        "sampling.max_tokens": "max_tokens"
-        "sampling.top_p": "top_p"
-        "sampling.frequency_penalty": "frequency_penalty"
-        "sampling.presence_penalty": "presence_penalty"
-        "limits.max_output_tokens": "max_tokens"
-      flags: {}
-    response_normalization:
-      sync:
-        content_path: "$.choices[0].message.content"
-        finish_reason_path: "$.choices[0].finish_reason"
-        finish_reason_map:
-          "stop": "Stop"
-          "length": "Length"
-          "content_filter": "ContentFilter"
-      stream:
-        protocol: "sse"
-        event_selector:
-          type_path: "$.object"
-          routes: []
-  
-  - id: "gpt-4o"
-    aliases: ["gpt-4-turbo"]
-    family: "gpt4"
-    endpoints:
-      chat_completion:
-        method: "POST"
-        path: "/chat/completions"
-        protocol: "https"
-      streaming_chat_completion:
-        method: "POST"
-        path: "/chat/completions"
-        protocol: "https"
-    input_modes:
-      messages: true
-      single_text: false
-      images: true
-    tooling:
-      tools_supported: true
-      parallel_tool_calls_default: true
-      can_disable_parallel_tool_calls: true
-      disable_switch: "parallel_tool_calls"
-    json_output:
-      native_param: true
-      strategy: "response_format"
-    parameters:
-      type: "object"
-      properties:
-        temperature:
-          type: "number"
-        max_tokens:
-          type: "integer"
-    constraints:
-      system_prompt_location: "first"
-      forbid_unknown_top_level_fields: false
-      mutually_exclusive: []
-      resolution_preferences: []
-      limits:
-        max_tool_schema_bytes: 100000
-        max_system_prompt_bytes: 100000
-    mappings:
-      paths:
-        "sampling.temperature": "temperature"
-        "sampling.max_tokens": "max_tokens"
-        "limits.max_output_tokens": "max_tokens"
-      flags: {}
-    response_normalization:
-      sync:
-        content_path: "$.choices[0].message.content"
-        finish_reason_path: "$.choices[0].finish_reason"
-        finish_reason_map:
-          "stop": "Stop"
-          "length": "Length"
-      stream:
-        protocol: "sse"
-        event_selector:
-          type_path: "$.object"
-          routes: []
-ENDOFYAML
+# Create the request directly for gpt-5-mini Responses API
+# Combine system and user messages into a single input string with proper formatting
+INPUT_TEXT="System: You are an acclaimed creative writer known for vivid storytelling. Write engaging stories with memorable characters, rich descriptions, and satisfying narrative arcs.
 
-# Create the prompt for story generation with proper format
-cat > /tmp/story_prompt.json << ENDOFJSON
+User: Write an original ${STYLE} story about: ${TOPIC}
+
+The story should be ${LENGTH} long. Start with an engaging opening and end with a satisfying conclusion."
+
+# Escape the input text for JSON (this handles newlines, quotes, and all special characters)
+ESCAPED_INPUT=$(echo "$INPUT_TEXT" | jq -Rs .)
+
+# Create the provider-specific request for gpt-5-mini
+# Note: The Responses API for gpt-5-mini doesn't use temperature/top_p
+# It uses reasoning.effort and text.verbosity instead
+PROVIDER_REQUEST=$(cat << 'ENDOFJSON'
 {
-  "model_class": "Chat",
-  "messages": [
-    {
-      "role": "system",
-      "content": "You are an acclaimed creative writer known for vivid storytelling. Write engaging stories with memorable characters, rich descriptions, and satisfying narrative arcs."
-    },
-    {
-      "role": "user",
-      "content": "Write an original ${STYLE} story about: ${TOPIC}\n\nThe story should be ${LENGTH} long. Start with an engaging opening and end with a satisfying conclusion."
-    }
-  ],
-  "sampling": {
-    "temperature": 0.85,
-    "max_tokens": ${MAX_TOKENS},
-    "top_p": 0.95
+  "model": "gpt-5-mini",
+  "input": INPUT_PLACEHOLDER,
+  "max_output_tokens": MAX_TOKENS_PLACEHOLDER,
+  "reasoning": {
+    "effort": "low"
   },
-  "strict_mode": "Warn"
+  "text": {
+    "verbosity": "medium"
+  }
 }
 ENDOFJSON
+)
+
+# Replace placeholders with actual values
+PROVIDER_REQUEST="${PROVIDER_REQUEST//INPUT_PLACEHOLDER/$ESCAPED_INPUT}"
+PROVIDER_REQUEST="${PROVIDER_REQUEST//MAX_TOKENS_PLACEHOLDER/$MAX_TOKENS}"
+
+# Create the combined request file for the run command
+# We need to properly escape the provider spec JSON too
+ESCAPED_PROVIDER_SPEC=$(echo "$PROVIDER_SPEC_CONTENT" | jq -c .)
+
+# Create the final request JSON
+cat > /tmp/story_request.json << ENDOFJSON
+{
+  "provider_spec": ${ESCAPED_PROVIDER_SPEC},
+  "model_id": "gpt-5-mini",
+  "request_body": ${PROVIDER_REQUEST}
+}
+ENDOFJSON
+
+# Debug: Optionally show the request being sent (uncomment for debugging)
+# echo "Debug: Request being sent:"
+# jq . /tmp/story_request.json 2>/dev/null || cat /tmp/story_request.json
 
 echo ""
 echo -e "${CYAN}✨ Creating your ${STYLE} story about: ${TOPIC}${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Step 1: Translate the prompt using Specado preview
-echo "Step 1: Translating prompt with Specado..."
-FULL_TRANSLATION=$($SPECADO preview /tmp/story_prompt.json \
-  --provider /tmp/openai_provider.yaml \
-  --model gpt-4o \
+# Generate story using Specado run command
+echo "Generating story using Specado..."
+STORY_OUTPUT=$($SPECADO run /tmp/story_request.json \
   --output json 2>&1)
 
 if [[ $? -ne 0 ]]; then
-  echo -e "${RED}Translation failed. Error:${NC}"
-  echo "$FULL_TRANSLATION"
-  echo ""
-  echo "Trying with simpler provider spec..."
-  
-  # Try with a minimal provider spec
-  MODEL="gpt-4o"
+  echo -e "${RED}Story generation failed. Error:${NC}"
+  echo "$STORY_OUTPUT"
+  exit 1
 else
-  echo -e "${GREEN}✓ Translation successful${NC}"
+  echo -e "${GREEN}✓ Story generation successful${NC}"
   
-  # Extract just the provider_request_json part (which includes the model field)
-  TRANSLATED_REQUEST=$(echo "$FULL_TRANSLATION" | jq -r '.provider_request_json')
-  
-  # Save the translated request
-  echo "$TRANSLATED_REQUEST" > /tmp/translated_request.json
-  
-  echo ""
-  echo "Step 2: Executing request via OpenAI API..."
-  
-  # Now call the OpenAI API with the translated request
-  STORY_OUTPUT=$(curl -s https://api.openai.com/v1/chat/completions \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $OPENAI_API_KEY" \
-    -d "$TRANSLATED_REQUEST")
-  
-  # Extract and display the story
-  STORY=$(echo "$STORY_OUTPUT" | jq -r '.choices[0].message.content' 2>/dev/null)
+  # Extract the story content from the JSON response
+  # For gpt-5-mini, the content is in raw_metadata.output[1].content[0].text
+  STORY=$(echo "$STORY_OUTPUT" | jq -r '.raw_metadata.output[1].content[0].text // .output[1].content[0].text // .content' 2>/dev/null)
   
   if [ ! -z "$STORY" ] && [ "$STORY" != "null" ]; then
     echo ""
     echo "$STORY" | fold -s -w 80
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${GREEN}✓ Story generated successfully via Specado translation!${NC}"
+    echo -e "${GREEN}✓ Story generated successfully via Specado!${NC}"
   else
     echo -e "${RED}Failed to extract story from response${NC}"
     echo "Raw response:"
@@ -312,14 +182,8 @@ else
   fi
 fi
 
-# Show lossiness report if available
-echo ""
-echo -e "${YELLOW}Step 3: Checking for lossiness...${NC}"
-$SPECADO preview /tmp/story_prompt.json \
-  --provider /tmp/openai_provider.yaml \
-  --model gpt-4o \
-  --show-lossiness \
-  --output human 2>/dev/null | grep -A20 "Lossiness" || echo "No lossiness detected"
+# Note: lossiness check would require preview command which needs translate implementation
+# Skipping lossiness check for now since preview with --show-lossiness is part of L2 translate feature
 
 echo ""
 echo -e "${GREEN}Would you like to:${NC}"
@@ -352,4 +216,4 @@ case $CHOICE in
 esac
 
 # Clean up
-rm -f /tmp/story_prompt.json /tmp/openai_provider.yaml /tmp/translated_request.json
+rm -f /tmp/story_request.json
