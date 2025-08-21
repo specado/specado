@@ -541,6 +541,7 @@ mod tests {
                 native_param: false,
                 strategy: "system_prompt".to_string(),
             },
+            capabilities: None,
             parameters: serde_json::json!({}),
             constraints: Constraints {
                 system_prompt_location: "first".to_string(),
@@ -908,6 +909,7 @@ mod tests {
                     native_param: false,
                     strategy: "system_prompt".to_string(),
                 },
+                capabilities: None,
                 parameters: serde_json::json!({}),
                 constraints: Constraints {
                     system_prompt_location: "first".to_string(),

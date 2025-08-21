@@ -720,6 +720,7 @@ mod tests {
                         native_param: false,
                         strategy: "none".to_string(),
                     },
+                    capabilities: None,
                     parameters: serde_json::json!({}),
                     constraints: Constraints {
                         system_prompt_location: "message_role".to_string(),
