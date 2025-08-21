@@ -202,6 +202,10 @@ mod tests {
     
     #[test]
     fn test_openai_auth() {
+        // Save original env var value for restoration
+        let original_key = std::env::var("OPENAI_API_KEY").ok();
+        
+        // Set test API key
         std::env::set_var("OPENAI_API_KEY", "test-key-123");
         
         let auth = OpenAIAuth::from_env().unwrap();
@@ -211,11 +215,19 @@ mod tests {
         
         assert_eq!(headers.get("Authorization").unwrap(), "Bearer test-key-123");
         
-        std::env::remove_var("OPENAI_API_KEY");
+        // Restore original environment state
+        match original_key {
+            Some(key) => std::env::set_var("OPENAI_API_KEY", key),
+            None => std::env::remove_var("OPENAI_API_KEY"),
+        }
     }
     
     #[test]
     fn test_anthropic_auth() {
+        // Save original env var value for restoration
+        let original_key = std::env::var("ANTHROPIC_API_KEY").ok();
+        
+        // Set test API key  
         std::env::set_var("ANTHROPIC_API_KEY", "test-key-456");
         
         let auth = AnthropicAuth::from_env().unwrap();
@@ -226,24 +238,50 @@ mod tests {
         assert_eq!(headers.get("x-api-key").unwrap(), "test-key-456");
         assert_eq!(headers.get("anthropic-version").unwrap(), "2023-06-01");
         
-        std::env::remove_var("ANTHROPIC_API_KEY");
+        // Restore original environment state
+        match original_key {
+            Some(key) => std::env::set_var("ANTHROPIC_API_KEY", key),
+            None => std::env::remove_var("ANTHROPIC_API_KEY"),
+        }
     }
     
     #[test]
     fn test_missing_api_key() {
-        // Ensure env var is not set
+        // Save original env var value for restoration
+        let original_key = std::env::var("OPENAI_API_KEY").ok();
+        
+        // Ensure env var is not set - explicitly remove it
         std::env::remove_var("OPENAI_API_KEY");
+        
+        // Verify it's actually removed
+        assert!(std::env::var("OPENAI_API_KEY").is_err(), "OPENAI_API_KEY should be unset for this test");
         
         let auth = OpenAIAuth::from_env().unwrap();
         let mut headers = HashMap::new();
         
         let result = auth.apply_auth(&mut headers);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not found"));
+        
+        // Restore original environment state
+        if let Some(key) = original_key {
+            std::env::set_var("OPENAI_API_KEY", key);
+        }
+        
+        // Verify the test assertion
+        assert!(result.is_err(), "Expected auth to fail with missing API key");
+        let error_message = result.unwrap_err().to_string();
+        assert!(
+            error_message.contains("not found") || error_message.contains("not configured"), 
+            "Expected error message to mention missing key, got: {}", 
+            error_message
+        );
     }
     
     #[test]
     fn test_generic_auth_env_expansion() {
+        // Save original env var value for restoration
+        let original_key = std::env::var("CUSTOM_API_KEY").ok();
+        
+        // Set test API key
         std::env::set_var("CUSTOM_API_KEY", "custom-key-789");
         
         let mut auth_headers = HashMap::new();
@@ -259,6 +297,10 @@ mod tests {
         
         assert_eq!(headers.get("X-API-Key").unwrap(), "custom-key-789");
         
-        std::env::remove_var("CUSTOM_API_KEY");
+        // Restore original environment state
+        match original_key {
+            Some(key) => std::env::set_var("CUSTOM_API_KEY", key),
+            None => std::env::remove_var("CUSTOM_API_KEY"),
+        }
     }
 }

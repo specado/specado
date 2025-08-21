@@ -11,6 +11,7 @@ description = "Core translation engine for Specado - spec-driven LLM prompt comp
 [features]
 default = []
 blocking = []  # Enable synchronous API methods that create internal runtime
+flaky = []     # Enable flaky tests that may fail due to timing/randomness
 
 [dependencies]
 thiserror = { workspace = true }
