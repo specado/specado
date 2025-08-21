@@ -5,13 +5,14 @@
 
 use crate::{
     error::{Error, Result},
-    types::{PromptSpec, ProviderSpec, UniformResponse, TranslationResult},
+    types::{
+        Message, MessageRole, PromptSpec, ProviderSpec, UniformResponse,
+        SamplingParams, Limits,
+    },
     translation::translate,
     StrictMode,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::HashMap;
 
 /// High-level LLM interface for simplified interactions
 pub struct LLM {
@@ -21,17 +22,6 @@ pub struct LLM {
     normalized_model: String,
     /// The provider specification
     provider_spec: ProviderSpec,
-    /// The API format type (responses or messages)
-    api_format: ApiFormat,
-}
-
-/// API format types for different providers
-#[derive(Debug, Clone, PartialEq)]
-enum ApiFormat {
-    /// GPT-5 family Responses API
-    Responses,
-    /// Claude Messages API
-    Messages,
 }
 
 /// Preset modes for common parameter configurations
@@ -46,8 +36,6 @@ pub enum GenerationMode {
     Precise,
     /// Fast generation with lower quality
     Fast,
-    /// Custom parameters
-    Custom(HashMap<String, Value>),
 }
 
 impl LLM {
@@ -55,13 +43,34 @@ impl LLM {
     pub fn new(model: &str) -> Result<Self> {
         let normalized_model = Self::normalize_model_name(model)?;
         let provider_spec = Self::load_builtin_spec(&normalized_model)?;
-        let api_format = Self::detect_api_format(&normalized_model);
         
         Ok(Self {
             model: model.to_string(),
             normalized_model,
             provider_spec,
-            api_format,
+        })
+    }
+    
+    /// Create a new LLM instance with a custom provider spec
+    pub fn with_provider_spec(model: &str, provider_spec: ProviderSpec) -> Result<Self> {
+        let normalized_model = Self::normalize_model_name(model)?;
+        
+        // Validate that the model exists in the provider spec
+        let model_exists = provider_spec.models.iter()
+            .any(|m| m.id == normalized_model || 
+                     m.aliases.as_ref().map_or(false, |a| a.contains(&normalized_model)));
+        
+        if !model_exists {
+            return Err(Error::Unsupported {
+                message: format!("Model '{}' not found in provider spec", model),
+                feature: None,
+            });
+        }
+        
+        Ok(Self {
+            model: model.to_string(),
+            normalized_model,
+            provider_spec,
         })
     }
     
@@ -73,41 +82,29 @@ impl LLM {
         max_tokens: Option<u32>,
     ) -> Result<UniformResponse> {
         let prompt_spec = self.build_prompt_spec(prompt, mode, max_tokens)?;
-        let translation_result = translate(
-            &prompt_spec,
-            &self.provider_spec,
-            &self.normalized_model,
-            StrictMode::Warn,
-        )?;
-        
-        // Execute the request
-        let response = crate::run(&translation_result.provider_request_json).await?;
-        Ok(response)
+        self.execute_request(prompt_spec).await
     }
     
     /// Generate text with a simple prompt (synchronous version)
+    #[cfg(feature = "blocking")]
     pub fn generate_sync(
         &self,
         prompt: &str,
         mode: GenerationMode,
         max_tokens: Option<u32>,
     ) -> Result<UniformResponse> {
+        // Note: This creates a runtime internally, which is not ideal for library code.
+        // Consider using the async version when possible.
         let prompt_spec = self.build_prompt_spec(prompt, mode, max_tokens)?;
-        let translation_result = translate(
-            &prompt_spec,
-            &self.provider_spec,
-            &self.normalized_model,
-            StrictMode::Warn,
-        )?;
         
         // Use tokio runtime for sync execution
         let runtime = tokio::runtime::Runtime::new()
             .map_err(|e| Error::Unsupported {
-            message: format!("Failed to create runtime: {}", e),
-            feature: Some("sync_runtime".to_string()),
-        })?;
+                message: format!("Failed to create runtime: {}", e),
+                feature: Some("blocking".to_string()),
+            })?;
         
-        runtime.block_on(crate::run(&translation_result.provider_request_json))
+        runtime.block_on(self.execute_request(prompt_spec))
     }
     
     /// Chat with message history
@@ -118,6 +115,12 @@ impl LLM {
         max_tokens: Option<u32>,
     ) -> Result<UniformResponse> {
         let prompt_spec = self.build_chat_spec(messages, mode, max_tokens)?;
+        self.execute_request(prompt_spec).await
+    }
+    
+    /// Execute a request with the configured provider
+    async fn execute_request(&self, prompt_spec: PromptSpec) -> Result<UniformResponse> {
+        // Translate the prompt spec to provider format
         let translation_result = translate(
             &prompt_spec,
             &self.provider_spec,
@@ -125,27 +128,17 @@ impl LLM {
             StrictMode::Warn,
         )?;
         
-        let response = crate::run(&translation_result.provider_request_json).await?;
+        // Wrap the translated request for the run function
+        let request = serde_json::json!({
+            "provider_spec": self.provider_spec,
+            "model_id": self.normalized_model,
+            "request_body": translation_result.provider_request_json,
+        });
+        
+        // Execute the request
+        let response = crate::run(&request).await?;
         Ok(response)
     }
-    
-    // Stream responses will be implemented in a future version
-    // For now, this is commented out to avoid type inference issues
-    /*
-    /// Stream responses (returns an iterator of response chunks)
-    pub async fn stream(
-        &self,
-        prompt: &str,
-        mode: GenerationMode,
-        max_tokens: Option<u32>,
-    ) -> Result<impl futures::Stream<Item = Result<String>>> {
-        // TODO: Implement streaming support
-        Err(Error::Unsupported {
-            message: "Streaming not yet implemented".to_string(),
-            feature: Some("streaming".to_string()),
-        })
-    }
-    */
     
     /// Build a prompt specification from parameters
     fn build_prompt_spec(
@@ -154,68 +147,29 @@ impl LLM {
         mode: GenerationMode,
         max_tokens: Option<u32>,
     ) -> Result<PromptSpec> {
-        let params = self.map_mode_to_params(&mode);
+        // Always use Chat model class - let translation handle provider differences
+        let messages = vec![
+            Message {
+                role: MessageRole::User,
+                content: prompt.to_string(),
+                name: None,
+                metadata: None,
+            }
+        ];
         
-        match self.api_format {
-            ApiFormat::Responses => {
-                // GPT-5 uses single input field
-                let mut spec = serde_json::json!({
-                    "model_class": "Responses",
-                    "input": prompt,
-                    "strict_mode": "Warn"
-                });
-                
-                // Add mapped parameters
-                if let Some(obj) = spec.as_object_mut() {
-                    for (key, value) in params {
-                        obj.insert(key, value);
-                    }
-                    if let Some(tokens) = max_tokens {
-                        obj.insert("max_output_tokens".to_string(), tokens.into());
-                    }
-                }
-                
-                serde_json::from_value(spec)
-                    .map_err(|e| Error::Unsupported {
-            message: format!("Failed to build prompt spec: {}", e),
-            feature: None,
+        let (sampling, limits) = self.build_params(mode, max_tokens);
+        
+        Ok(PromptSpec {
+            model_class: "Chat".to_string(),
+            messages,
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+            sampling: Some(sampling),
+            limits: Some(limits),
+            media: None,
+            strict_mode: StrictMode::Warn,
         })
-            }
-            ApiFormat::Messages => {
-                // Claude uses messages array
-                let mut spec = serde_json::json!({
-                    "model_class": "Chat",
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ],
-                    "strict_mode": "Warn"
-                });
-                
-                // Add sampling parameters
-                let mut sampling = serde_json::Map::new();
-                for (key, value) in params {
-                    if key.starts_with("sampling.") {
-                        let param_name = key.strip_prefix("sampling.").unwrap_or(&key);
-                        sampling.insert(param_name.to_string(), value);
-                    }
-                }
-                if let Some(tokens) = max_tokens {
-                    sampling.insert("max_tokens".to_string(), tokens.into());
-                }
-                
-                if let Some(obj) = spec.as_object_mut() {
-                    if !sampling.is_empty() {
-                        obj.insert("sampling".to_string(), sampling.into());
-                    }
-                }
-                
-                serde_json::from_value(spec)
-                    .map_err(|e| Error::Unsupported {
-            message: format!("Failed to build prompt spec: {}", e),
-            feature: None,
-        })
-            }
-        }
     }
     
     /// Build a chat specification from messages
@@ -225,128 +179,63 @@ impl LLM {
         mode: GenerationMode,
         max_tokens: Option<u32>,
     ) -> Result<PromptSpec> {
-        let params = self.map_mode_to_params(&mode);
+        let (sampling, limits) = self.build_params(mode, max_tokens);
         
-        // Convert messages to JSON format
-        let json_messages: Vec<Value> = messages
-            .into_iter()
-            .map(|m| serde_json::json!({
-                "role": m.role,
-                "content": m.content
-            }))
-            .collect();
-        
-        match self.api_format {
-            ApiFormat::Responses => {
-                // For GPT-5, concatenate messages into single input
-                let input = json_messages
-                    .iter()
-                    .map(|m| {
-                        format!(
-                            "{}: {}",
-                            m.get("role").and_then(|r| r.as_str()).unwrap_or("user"),
-                            m.get("content").and_then(|c| c.as_str()).unwrap_or("")
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n\n");
-                
-                self.build_prompt_spec(&input, mode, max_tokens)
-            }
-            ApiFormat::Messages => {
-                // Claude uses messages directly
-                let mut spec = serde_json::json!({
-                    "model_class": "Chat",
-                    "messages": json_messages,
-                    "strict_mode": "Warn"
-                });
-                
-                // Add sampling parameters
-                let mut sampling = serde_json::Map::new();
-                for (key, value) in params {
-                    if key.starts_with("sampling.") {
-                        let param_name = key.strip_prefix("sampling.").unwrap_or(&key);
-                        sampling.insert(param_name.to_string(), value);
-                    }
-                }
-                if let Some(tokens) = max_tokens {
-                    sampling.insert("max_tokens".to_string(), tokens.into());
-                }
-                
-                if let Some(obj) = spec.as_object_mut() {
-                    if !sampling.is_empty() {
-                        obj.insert("sampling".to_string(), sampling.into());
-                    }
-                }
-                
-                serde_json::from_value(spec)
-                    .map_err(|e| Error::Unsupported {
-            message: format!("Failed to build chat spec: {}", e),
-            feature: None,
+        Ok(PromptSpec {
+            model_class: "Chat".to_string(),
+            messages,
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+            sampling: Some(sampling),
+            limits: Some(limits),
+            media: None,
+            strict_mode: StrictMode::Warn,
         })
-            }
-        }
     }
     
-    /// Map generation mode to provider-specific parameters
-    fn map_mode_to_params(&self, mode: &GenerationMode) -> HashMap<String, Value> {
-        let mut params = HashMap::new();
+    /// Build sampling parameters and limits from mode
+    fn build_params(&self, mode: GenerationMode, max_tokens: Option<u32>) -> (SamplingParams, Limits) {
+        // Standard parameters that work across providers
+        // The translation layer will handle provider-specific mapping
+        let sampling = match mode {
+            GenerationMode::Creative => SamplingParams {
+                temperature: Some(0.9),
+                top_p: Some(0.95),
+                top_k: None,
+                frequency_penalty: None,
+                presence_penalty: None,
+            },
+            GenerationMode::Precise => SamplingParams {
+                temperature: Some(0.2),
+                top_p: Some(0.5),
+                top_k: None,
+                frequency_penalty: None,
+                presence_penalty: None,
+            },
+            GenerationMode::Fast => SamplingParams {
+                temperature: Some(0.7),
+                top_p: Some(0.8),
+                top_k: None,
+                frequency_penalty: None,
+                presence_penalty: None,
+            },
+            GenerationMode::Balanced => SamplingParams {
+                temperature: Some(0.5),
+                top_p: Some(0.9),
+                top_k: None,
+                frequency_penalty: None,
+                presence_penalty: None,
+            },
+        };
         
-        match (&self.api_format, mode) {
-            (ApiFormat::Responses, GenerationMode::Creative) => {
-                params.insert("reasoning".to_string(), serde_json::json!({
-                    "effort": "high"
-                }));
-                params.insert("text".to_string(), serde_json::json!({
-                    "verbosity": "high"
-                }));
-            }
-            (ApiFormat::Responses, GenerationMode::Precise) => {
-                params.insert("reasoning".to_string(), serde_json::json!({
-                    "effort": "max"
-                }));
-                params.insert("text".to_string(), serde_json::json!({
-                    "verbosity": "low"
-                }));
-            }
-            (ApiFormat::Responses, GenerationMode::Fast) => {
-                params.insert("reasoning".to_string(), serde_json::json!({
-                    "effort": "low"
-                }));
-                params.insert("text".to_string(), serde_json::json!({
-                    "verbosity": "low"
-                }));
-            }
-            (ApiFormat::Responses, GenerationMode::Balanced) => {
-                params.insert("reasoning".to_string(), serde_json::json!({
-                    "effort": "medium"
-                }));
-                params.insert("text".to_string(), serde_json::json!({
-                    "verbosity": "medium"
-                }));
-            }
-            (ApiFormat::Messages, GenerationMode::Creative) => {
-                params.insert("sampling.temperature".to_string(), 0.9.into());
-                params.insert("sampling.top_p".to_string(), 0.95.into());
-            }
-            (ApiFormat::Messages, GenerationMode::Precise) => {
-                params.insert("sampling.temperature".to_string(), 0.2.into());
-                params.insert("sampling.top_p".to_string(), 0.5.into());
-            }
-            (ApiFormat::Messages, GenerationMode::Fast) => {
-                params.insert("sampling.temperature".to_string(), 0.7.into());
-                params.insert("sampling.top_p".to_string(), 0.8.into());
-            }
-            (ApiFormat::Messages, GenerationMode::Balanced) => {
-                params.insert("sampling.temperature".to_string(), 0.5.into());
-                params.insert("sampling.top_p".to_string(), 0.9.into());
-            }
-            (_, GenerationMode::Custom(custom_params)) => {
-                params = custom_params.clone();
-            }
-        }
+        let limits = Limits {
+            max_output_tokens: max_tokens,
+            reasoning_tokens: None,
+            max_prompt_tokens: None,
+        };
         
-        params
+        (sampling, limits)
     }
     
     /// Normalize model name to standard form
@@ -358,98 +247,85 @@ impl LLM {
             "claude-opus-4.1" | "opus-4.1" | "opus4.1" => "claude-opus-4.1",
             "claude-sonnet-4" | "sonnet-4" | "sonnet4" => "claude-sonnet-4",
             _ => return Err(Error::Unsupported {
-            message: format!("Model '{}' is not supported", model),
-            feature: None,
-        }),
+                message: format!("Model '{}' is not supported", model),
+                feature: None,
+            }),
         };
         
         Ok(normalized.to_string())
     }
     
-    /// Detect API format for model
-    fn detect_api_format(model: &str) -> ApiFormat {
-        match model {
-            "gpt-5" | "gpt-5-mini" => ApiFormat::Responses,
-            "claude-opus-4.1" | "claude-sonnet-4" => ApiFormat::Messages,
-            _ => ApiFormat::Messages, // Default to messages
-        }
-    }
-    
     /// Load built-in provider specification
     fn load_builtin_spec(model: &str) -> Result<ProviderSpec> {
-        // For now, load from files. Later we'll embed these.
+        // For now, load from files. Later we can embed these with include_str!
         let spec_path = match model {
             "gpt-5" => "providers/openai/gpt-5.json",
             "gpt-5-mini" => "providers/openai/gpt-5-mini.json",
             "claude-opus-4.1" => "providers/anthropic/claude-opus-4.1.json",
             "claude-sonnet-4" => "providers/anthropic/claude-sonnet-4.json",
             _ => return Err(Error::Unsupported {
-            message: format!("No built-in spec for model '{}'", model),
-            feature: None,
-        }),
+                message: format!("No built-in spec for model '{}'", model),
+                feature: None,
+            }),
         };
         
         let spec_content = std::fs::read_to_string(spec_path)
             .map_err(|e| Error::Unsupported {
-            message: format!("Failed to load provider spec: {}", e),
-            feature: None,
-        })?;
+                message: format!("Failed to load provider spec: {}", e),
+                feature: None,
+            })?;
         
         // Parse and validate the spec
         let spec: ProviderSpec = serde_json::from_str(&spec_content)
             .map_err(|e| Error::Unsupported {
-            message: format!("Failed to parse provider spec: {}", e),
-            feature: None,
-        })?;
+                message: format!("Failed to parse provider spec: {}", e),
+                feature: None,
+            })?;
         
-        // Update model ID to use the actual model ID from the spec
-        // This ensures we use the correct model ID when calling the API
+        // Validate that the model exists in the spec
         if !spec.models.is_empty() {
-            // The normalized model name should match an alias or the main ID
-            let model_spec = spec.models.iter()
+            let _model_spec = spec.models.iter()
                 .find(|m| m.id == model || m.aliases.as_ref().map_or(false, |a| a.contains(&model.to_string())))
                 .ok_or_else(|| Error::Unsupported {
-            message: format!("Model '{}' not found in provider spec", model),
-            feature: None,
-        })?;
-            
-            // For now, we'll just validate the model exists
-            // The actual model ID will be passed through the translate function
+                    message: format!("Model '{}' not found in provider spec", model),
+                    feature: None,
+                })?;
         }
         
         Ok(spec)
     }
 }
 
-/// Simple message structure for chat interactions
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Message {
-    pub role: String,
-    pub content: String,
-}
-
+/// Helper functions for creating messages
 impl Message {
-    /// Create a new message
-    pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            role: role.into(),
-            content: content.into(),
-        }
-    }
-    
     /// Create a user message
     pub fn user(content: impl Into<String>) -> Self {
-        Self::new("user", content)
+        Self {
+            role: MessageRole::User,
+            content: content.into(),
+            name: None,
+            metadata: None,
+        }
     }
     
     /// Create an assistant message
     pub fn assistant(content: impl Into<String>) -> Self {
-        Self::new("assistant", content)
+        Self {
+            role: MessageRole::Assistant,
+            content: content.into(),
+            name: None,
+            metadata: None,
+        }
     }
     
     /// Create a system message
     pub fn system(content: impl Into<String>) -> Self {
-        Self::new("system", content)
+        Self {
+            role: MessageRole::System,
+            content: content.into(),
+            name: None,
+            metadata: None,
+        }
     }
 }
 
@@ -467,10 +343,15 @@ mod tests {
     }
     
     #[test]
-    fn test_api_format_detection() {
-        assert_eq!(LLM::detect_api_format("gpt-5"), ApiFormat::Responses);
-        assert_eq!(LLM::detect_api_format("gpt-5-mini"), ApiFormat::Responses);
-        assert_eq!(LLM::detect_api_format("claude-opus-4.1"), ApiFormat::Messages);
-        assert_eq!(LLM::detect_api_format("claude-sonnet-4"), ApiFormat::Messages);
+    fn test_message_helpers() {
+        let user_msg = Message::user("Hello");
+        assert_eq!(user_msg.role, MessageRole::User);
+        assert_eq!(user_msg.content, "Hello");
+        
+        let system_msg = Message::system("You are helpful");
+        assert_eq!(system_msg.role, MessageRole::System);
+        
+        let assistant_msg = Message::assistant("I can help");
+        assert_eq!(assistant_msg.role, MessageRole::Assistant);
     }
 }

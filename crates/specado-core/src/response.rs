@@ -94,80 +94,15 @@ pub struct ToolCallInfo {
     pub arguments: Value,
 }
 
-/// Helper to extract content from different provider response formats
-pub fn extract_content(response: &Value, provider_type: &str) -> Option<String> {
-    match provider_type {
-        "gpt-5" | "gpt-5-mini" => {
-            // GPT-5 Responses API format
-            response
-                .get("output")
-                .and_then(|o| o.as_array())
-                .and_then(|arr| arr.get(1))
-                .and_then(|msg| msg.get("content"))
-                .and_then(|c| c.as_array())
-                .and_then(|arr| arr.get(0))
-                .and_then(|item| item.get("text"))
-                .and_then(|t| t.as_str())
-                .map(|s| s.to_string())
-        }
-        "claude" | "anthropic" => {
-            // Claude Messages API format
-            response
-                .get("content")
-                .and_then(|c| c.as_array())
-                .and_then(|arr| arr.get(0))
-                .and_then(|item| item.get("text"))
-                .and_then(|t| t.as_str())
-                .map(|s| s.to_string())
-        }
-        "openai" => {
-            // OpenAI Chat Completions format
-            response
-                .get("choices")
-                .and_then(|c| c.as_array())
-                .and_then(|arr| arr.get(0))
-                .and_then(|choice| choice.get("message"))
-                .and_then(|msg| msg.get("content"))
-                .and_then(|c| c.as_str())
-                .map(|s| s.to_string())
-        }
-        _ => None
-    }
-}
+// Note: extract_content is a low-level helper that's typically not needed
+// since UniformResponse already contains the normalized content.
+// This is only useful if you're working with raw provider responses
+// before they've been normalized.
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
-    
-    #[test]
-    fn test_extract_gpt5_content() {
-        let response = json!({
-            "output": [
-                {"type": "reasoning"},
-                {
-                    "content": [
-                        {"text": "Hello, world!"}
-                    ]
-                }
-            ]
-        });
-        
-        let content = extract_content(&response, "gpt-5");
-        assert_eq!(content, Some("Hello, world!".to_string()));
-    }
-    
-    #[test]
-    fn test_extract_claude_content() {
-        let response = json!({
-            "content": [
-                {"text": "Hello from Claude!"}
-            ]
-        });
-        
-        let content = extract_content(&response, "claude");
-        assert_eq!(content, Some("Hello from Claude!".to_string()));
-    }
     
     #[test]
     fn test_token_usage() {

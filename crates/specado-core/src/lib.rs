@@ -69,10 +69,10 @@ pub use types::{
 pub use error::LossinessCode;
 
 // Re-export high-level LLM interface
-pub use llm::{LLM, GenerationMode, Message as LLMMessage};
+pub use llm::{LLM, GenerationMode};
 
 // Re-export response extensions
-pub use response::{ResponseExt, TokenUsage, ToolCallInfo, extract_content};
+pub use response::{ResponseExt, TokenUsage, ToolCallInfo};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
