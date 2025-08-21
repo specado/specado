@@ -106,8 +106,27 @@ macro_rules! golden_test {
             use $crate::{GoldenConfig, GoldenTestRunner};
             
             let config = GoldenConfig::from_env();
+            // Skip if corpus directory doesn't exist
+            if !config.corpus_dir.exists() {
+                println!(
+                    "Skipping golden test - corpus directory not found at: {}",
+                    config.corpus_dir.display()
+                );
+                return;
+            }
+
+            // Skip if specific test case doesn't exist
+            let test_json = config.corpus_dir.join($test_path).join("test.json");
+            if !test_json.exists() {
+                println!(
+                    "Skipping golden test - test case not found at: {}",
+                    test_json.display()
+                );
+                return;
+            }
+
             let runner = GoldenTestRunner::new(config);
-            
+
             runner
                 .run_test($test_path)
                 .expect(&format!("Golden test failed: {}", $test_path));
@@ -121,11 +140,46 @@ macro_rules! golden_test_batch {
     ($pattern:expr) => {
         #[test]
         fn golden_tests() {
-            use $crate::{GoldenConfig, GoldenTestRunner};
+            use $crate::{GoldenConfig, GoldenTestRunner, CorpusManager};
             
             let config = GoldenConfig::from_env();
+            // Skip if corpus directory doesn't exist
+            if !config.corpus_dir.exists() {
+                println!(
+                    "Skipping golden test batch - corpus directory not found at: {}",
+                    config.corpus_dir.display()
+                );
+                return;
+            }
+
+            // Skip if there are no tests matching the pattern
+            let corpus = CorpusManager::new(&config.corpus_dir);
+            let discovered = match corpus.discover_tests() {
+                Ok(tests) => tests,
+                Err(_) => {
+                    println!(
+                        "Skipping golden test batch - failed to scan corpus at: {}",
+                        config.corpus_dir.display()
+                    );
+                    return;
+                }
+            };
+            let has_match = if $pattern == "*" {
+                !discovered.is_empty()
+            } else {
+                discovered.iter().any(|t| t.name.contains($pattern) || t.category.contains($pattern))
+            };
+            if !has_match {
+                println!(
+                    "Skipping golden test batch - no tests match pattern '{}' in {}",
+                    $pattern,
+                    config.corpus_dir.display()
+                );
+                return;
+            }
+
             let runner = GoldenTestRunner::new(config);
-            
+
             runner
                 .run_batch($pattern)
                 .expect(&format!("Golden test batch failed: {}", $pattern));

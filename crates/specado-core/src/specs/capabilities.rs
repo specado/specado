@@ -163,62 +163,72 @@ impl CapabilityDetector {
     /// Detect streaming support from endpoints configuration
     /// 
     /// Analyzes endpoint configuration to determine if streaming is supported through:
-    /// 1. **Protocol Analysis**: Checks for SSE ('sse') or streaming protocols
-    /// 2. **Header Analysis**: Looks for streaming indicators in headers (resilient to missing headers)
-    /// 3. **Endpoint Differentiation**: Compares regular vs streaming endpoints for differences
+    /// 1. **Header Analysis**: Looks for SSE headers (Accept: text/event-stream) - primary method
+    /// 2. **Endpoint Differentiation**: Compares regular vs streaming endpoints for differences
+    /// 3. **Query Parameter Analysis**: Checks for streaming-specific parameters
+    /// 
+    /// # Note on Protocol Field
+    /// The `protocol` field in EndpointConfig refers to transport protocol (http/https/ws/wss),
+    /// not streaming technology. SSE runs over HTTP/HTTPS, so we rely on headers and other
+    /// indicators to detect streaming capability.
     /// 
     /// # Resilience
     /// - Handles missing headers gracefully (None case)
-    /// - Performs case-insensitive protocol checks
-    /// - Falls back to endpoint comparison if other methods fail
+    /// - Performs case-insensitive header/parameter checks
+    /// - Falls back to endpoint/query comparison if headers missing
     /// 
     /// # Returns
     /// `true` if streaming support is detected, `false` otherwise
     fn detect_streaming_support(endpoints: &crate::types::Endpoints) -> bool {
-        // 1. Check for SSE/streaming protocol indicators (case-insensitive)
-        let streaming_protocol = &endpoints.streaming_chat_completion.protocol.to_lowercase();
-        if streaming_protocol == "sse" || streaming_protocol.contains("stream") {
-            return true;
-        }
-        
-        // 2. Check headers for SSE indicators (resilient to missing headers)
+        // 1. Check headers for SSE indicators (primary method - case-insensitive)
         if let Some(headers) = &endpoints.streaming_chat_completion.headers {
             for (key, value) in headers {
                 let key_lower = key.to_lowercase();
                 let value_lower = value.to_lowercase();
                 
-                // Look for streaming-related headers
-                if (key_lower.contains("accept") && value_lower.contains("text/event-stream"))
-                    || value_lower.contains("stream")
-                    || key_lower.contains("stream") {
+                // Look for SSE-specific headers (most reliable indicator)
+                if key_lower.contains("accept") && value_lower.contains("text/event-stream") {
+                    return true;
+                }
+                
+                // Look for other streaming-related headers
+                if value_lower.contains("stream") || key_lower.contains("stream") {
                     return true;
                 }
             }
         }
         
-        // 3. Check if streaming endpoint differs from regular endpoint
-        // Different protocols indicate streaming capability
-        if endpoints.chat_completion.protocol != endpoints.streaming_chat_completion.protocol {
-            return true;
-        }
-        
+        // 2. Check if streaming endpoint differs from regular endpoint
         // Different paths indicate separate streaming endpoint
-        if endpoints.chat_completion.path != endpoints.streaming_chat_completion.path {
+        if endpoints.chat_completion.path.to_lowercase() != endpoints.streaming_chat_completion.path.to_lowercase() {
             return true;
         }
         
-        // 4. Check for streaming-specific query parameters
+        // Different transport protocols (e.g., WebSocket for streaming)
+        if endpoints.chat_completion.protocol.to_lowercase() != endpoints.streaming_chat_completion.protocol.to_lowercase() {
+            return true;
+        }
+        
+        // 3. Check for streaming-specific query parameters (case-insensitive)
         let regular_query = endpoints.chat_completion.query.as_ref();
         let streaming_query = endpoints.streaming_chat_completion.query.as_ref();
         
         if let (Some(reg_q), Some(stream_q)) = (regular_query, streaming_query) {
+            // Compare query parameters (case-insensitive)
+            let reg_params: std::collections::HashMap<String, String> = reg_q.iter()
+                .map(|(k, v)| (k.to_lowercase(), v.to_lowercase()))
+                .collect();
+            let stream_params: std::collections::HashMap<String, String> = stream_q.iter()
+                .map(|(k, v)| (k.to_lowercase(), v.to_lowercase()))
+                .collect();
+                
             // If streaming endpoint has stream=true or similar parameters
-            if stream_q.values().any(|v| v.to_lowercase().contains("true") || v.to_lowercase().contains("stream")) {
+            if stream_params.values().any(|v| v.contains("true") && (v.contains("stream") || v == "true")) {
                 return true;
             }
             
             // If queries differ, likely indicates streaming support
-            if reg_q != stream_q {
+            if reg_params != stream_params {
                 return true;
             }
         } else if streaming_query.is_some() && regular_query.is_none() {

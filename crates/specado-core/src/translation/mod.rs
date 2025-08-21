@@ -21,7 +21,7 @@ pub mod validator;
 pub mod provider_spec_tests;
 
 use crate::{
-    Error, PromptSpec, ProviderSpec, Result, StrictMode, TranslationMetadata,
+    Error, MessageRole, PromptSpec, ProviderSpec, Result, StrictMode, TranslationMetadata,
     TranslationResult,
 };
 use std::time::Instant;
@@ -141,12 +141,57 @@ pub fn translate(
     // Step 6: Create JSONPath mapper with lossiness tracking (issue #18)
     let mut mapper = JSONPathMapper::new(&context);
 
+    // Step 6.5: Apply constraint-based message reordering
+    let mut reordered_messages = prompt_spec.messages.clone();
+    if context.system_prompt_location() == "first_message" {
+        // Check if we need to relocate system messages to the beginning
+        let has_system = reordered_messages.iter().any(|m| m.role == MessageRole::System);
+        let system_not_first = reordered_messages.first()
+            .map(|m| m.role != MessageRole::System)
+            .unwrap_or(false);
+        
+        if has_system && system_not_first {
+            // Separate system and non-system messages
+            let mut system_messages = Vec::new();
+            let mut other_messages = Vec::new();
+            
+            for msg in reordered_messages {
+                if msg.role == MessageRole::System {
+                    system_messages.push(msg);
+                } else {
+                    other_messages.push(msg);
+                }
+            }
+            
+            // Track the count before moving
+            let system_count = system_messages.len();
+            
+            // Recombine with system messages first
+            reordered_messages = system_messages;
+            reordered_messages.extend(other_messages);
+            
+            // Track relocation with lossiness
+            let policy_result = strictness_policy.evaluate_field_relocation(
+                "messages",
+                "messages[0]",
+                serde_json::json!(system_count),
+            );
+            
+            // Add lossiness item if provided
+            if let Some(lossiness_item) = policy_result.lossiness_item {
+                if let Ok(mut tracker) = lossiness_tracker.lock() {
+                    tracker.add_item(lossiness_item);
+                }
+            }
+        }
+    }
+
     // Step 7: Build base provider request structure
     // This is a placeholder implementation - the actual mapping logic
     // will be implemented in subsequent issues
     let mut provider_request = serde_json::json!({
         "model": model_id,
-        "messages": prompt_spec.messages.iter().map(|msg| {
+        "messages": reordered_messages.iter().map(|msg| {
             serde_json::json!({
                 "role": msg.role,
                 "content": msg.content,
@@ -272,23 +317,131 @@ pub fn translate(
             }
         }
         if let Some(top_p) = sampling.top_p {
-            provider_request["top_p"] = serde_json::json!(top_p);
+            // Use strictness policy to validate top_p range
+            let policy_result = strictness_policy.evaluate_value_clamping(
+                "top_p",
+                serde_json::json!(top_p),
+                0.0,
+                1.0,
+                context.provider_name(),
+            );
+            
+            match policy_result.action {
+                StrictnessAction::Coerce { adjusted_value, .. } => {
+                    provider_request["top_p"] = adjusted_value;
+                }
+                StrictnessAction::Proceed => {
+                    provider_request["top_p"] = serde_json::json!(top_p);
+                }
+                StrictnessAction::Warn { message } => {
+                    log::warn!("{}", message);
+                    provider_request["top_p"] = serde_json::json!(top_p);
+                }
+                StrictnessAction::Fail { error } => return Err(error),
+            }
+            
+            if let Some(lossiness_item) = policy_result.lossiness_item {
+                if let Ok(mut tracker) = lossiness_tracker.lock() {
+                    tracker.add_item(lossiness_item);
+                }
+            }
         }
         if let Some(top_k) = sampling.top_k {
             provider_request["top_k"] = serde_json::json!(top_k);
         }
         if let Some(freq_penalty) = sampling.frequency_penalty {
-            provider_request["frequency_penalty"] = serde_json::json!(freq_penalty);
+            // Use strictness policy to validate frequency_penalty range
+            let policy_result = strictness_policy.evaluate_value_clamping(
+                "frequency_penalty",
+                serde_json::json!(freq_penalty),
+                -2.0,
+                2.0,
+                context.provider_name(),
+            );
+            
+            match policy_result.action {
+                StrictnessAction::Coerce { adjusted_value, .. } => {
+                    provider_request["frequency_penalty"] = adjusted_value;
+                }
+                StrictnessAction::Proceed => {
+                    provider_request["frequency_penalty"] = serde_json::json!(freq_penalty);
+                }
+                StrictnessAction::Warn { message } => {
+                    log::warn!("{}", message);
+                    provider_request["frequency_penalty"] = serde_json::json!(freq_penalty);
+                }
+                StrictnessAction::Fail { error } => return Err(error),
+            }
+            
+            if let Some(lossiness_item) = policy_result.lossiness_item {
+                if let Ok(mut tracker) = lossiness_tracker.lock() {
+                    tracker.add_item(lossiness_item);
+                }
+            }
         }
         if let Some(pres_penalty) = sampling.presence_penalty {
-            provider_request["presence_penalty"] = serde_json::json!(pres_penalty);
+            // Use strictness policy to validate presence_penalty range
+            let policy_result = strictness_policy.evaluate_value_clamping(
+                "presence_penalty",
+                serde_json::json!(pres_penalty),
+                -2.0,
+                2.0,
+                context.provider_name(),
+            );
+            
+            match policy_result.action {
+                StrictnessAction::Coerce { adjusted_value, .. } => {
+                    provider_request["presence_penalty"] = adjusted_value;
+                }
+                StrictnessAction::Proceed => {
+                    provider_request["presence_penalty"] = serde_json::json!(pres_penalty);
+                }
+                StrictnessAction::Warn { message } => {
+                    log::warn!("{}", message);
+                    provider_request["presence_penalty"] = serde_json::json!(pres_penalty);
+                }
+                StrictnessAction::Fail { error } => return Err(error),
+            }
+            
+            if let Some(lossiness_item) = policy_result.lossiness_item {
+                if let Ok(mut tracker) = lossiness_tracker.lock() {
+                    tracker.add_item(lossiness_item);
+                }
+            }
         }
     }
 
     // Step 11: Apply limits
     if let Some(ref limits) = prompt_spec.limits {
         if let Some(max_tokens) = limits.max_output_tokens {
-            provider_request["max_tokens"] = serde_json::json!(max_tokens);
+            // Use strictness policy to validate max_output_tokens range
+            let policy_result = strictness_policy.evaluate_value_clamping(
+                "max_output_tokens",
+                serde_json::json!(max_tokens),
+                1.0,
+                1000000.0,
+                context.provider_name(),
+            );
+            
+            match policy_result.action {
+                StrictnessAction::Coerce { adjusted_value, .. } => {
+                    provider_request["max_tokens"] = adjusted_value;
+                }
+                StrictnessAction::Proceed => {
+                    provider_request["max_tokens"] = serde_json::json!(max_tokens);
+                }
+                StrictnessAction::Warn { message } => {
+                    log::warn!("{}", message);
+                    provider_request["max_tokens"] = serde_json::json!(max_tokens);
+                }
+                StrictnessAction::Fail { error } => return Err(error),
+            }
+            
+            if let Some(lossiness_item) = policy_result.lossiness_item {
+                if let Ok(mut tracker) = lossiness_tracker.lock() {
+                    tracker.add_item(lossiness_item);
+                }
+            }
         }
     }
 

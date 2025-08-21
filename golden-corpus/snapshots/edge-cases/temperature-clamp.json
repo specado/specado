@@ -3,7 +3,7 @@
   "metadata": {
     "version": "1.0.0",
     "created_at": "2025-08-18T14:03:17.180339+00:00",
-    "updated_at": "2025-08-18T14:03:17.180339+00:00",
+    "updated_at": "2025-08-21T23:05:26.060153+00:00",
     "description": "Test temperature and top_p clamping to valid ranges",
     "tags": []
   },
@@ -17,17 +17,25 @@
           "message": "Value 2.5 clamped to openai's supported range [0, 2]",
           "path": "temperature",
           "severity": "Info"
+        },
+        {
+          "after": 1.0,
+          "before": 1.5,
+          "code": "Clamp",
+          "message": "Value 1.5 clamped to openai's supported range [0, 1]",
+          "path": "top_p",
+          "severity": "Info"
         }
       ],
       "max_severity": "Info",
       "summary": {
         "by_code": {
-          "Clamp": 1
+          "Clamp": 2
         },
         "by_severity": {
-          "info": 1
+          "info": 2
         },
-        "total_items": 1
+        "total_items": 2
       }
     },
     "metadata": {
@@ -35,7 +43,7 @@
       "model": "gpt-5",
       "provider": "openai",
       "strict_mode": "Warn",
-      "timestamp": "2025-08-18T14:03:17.180284+00:00"
+      "timestamp": "2025-08-21T23:05:26.058082+00:00"
     },
     "provider_request_json": {
       "messages": [

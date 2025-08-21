@@ -10,6 +10,13 @@ use specado_golden::{GoldenConfig, GoldenTestRunner};
 #[ignore] // Ignore by default as these require the corpus to be set up
 fn golden_test_suite() {
     let config = GoldenConfig::from_env();
+    
+    // Skip if corpus directory doesn't exist
+    if !config.corpus_dir.exists() {
+        println!("Skipping golden tests - corpus directory not found at: {}", config.corpus_dir.display());
+        return;
+    }
+    
     let runner = GoldenTestRunner::new(config);
     
     // Initialize corpus if it doesn't exist
@@ -31,8 +38,14 @@ fn golden_test_suite() {
 #[ignore]
 fn golden_test_basic() {
     let config = GoldenConfig::from_env();
-    let runner = GoldenTestRunner::new(config);
     
+    // Skip if corpus directory doesn't exist
+    if !config.corpus_dir.exists() {
+        println!("Skipping basic golden tests - corpus directory not found at: {}", config.corpus_dir.display());
+        return;
+    }
+    
+    let runner = GoldenTestRunner::new(config);
     runner.run_batch("basic").expect("Basic golden tests failed");
 }
 
@@ -41,8 +54,14 @@ fn golden_test_basic() {
 #[ignore]
 fn golden_test_edge_cases() {
     let config = GoldenConfig::from_env();
-    let runner = GoldenTestRunner::new(config);
     
+    // Skip if corpus directory doesn't exist
+    if !config.corpus_dir.exists() {
+        println!("Skipping edge case golden tests - corpus directory not found at: {}", config.corpus_dir.display());
+        return;
+    }
+    
+    let runner = GoldenTestRunner::new(config);
     runner.run_batch("edge-cases").expect("Edge case golden tests failed");
 }
 
@@ -51,8 +70,14 @@ fn golden_test_edge_cases() {
 #[ignore]
 fn golden_corpus_stats() {
     let config = GoldenConfig::from_env();
-    let runner = GoldenTestRunner::new(config);
     
+    // Skip if corpus directory doesn't exist
+    if !config.corpus_dir.exists() {
+        println!("Skipping corpus stats - corpus directory not found at: {}", config.corpus_dir.display());
+        return;
+    }
+    
+    let runner = GoldenTestRunner::new(config);
     runner.get_statistics().expect("Failed to get corpus statistics");
 }
 

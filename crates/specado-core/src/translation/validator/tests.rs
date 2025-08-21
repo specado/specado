@@ -8,9 +8,9 @@
 
 #[cfg(test)]
 mod tests {
-    use super::super::{ValidationError, ValidationSeverity, ValidationMode, PreValidator};
+    use super::super::{ValidationSeverity, ValidationMode, PreValidator};
     use crate::{
-        Error, Result, StrictMode, Constraints, ConstraintLimits, EndpointConfig, Endpoints, 
+        Error, StrictMode, Constraints, ConstraintLimits, EndpointConfig, Endpoints, 
         InputModes, JsonOutputConfig, Mappings, Message, MessageRole, ProviderInfo, 
         ResponseNormalization, StreamNormalization, SyncNormalization, ToolingConfig, 
         EventSelector, ProviderSpec, ModelSpec, PromptSpec, Tool, Limits, MediaConfig, 
