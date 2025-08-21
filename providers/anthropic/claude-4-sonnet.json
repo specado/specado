@@ -1,0 +1,305 @@
+{
+  "spec_version": "1.1.0",
+  "provider": {
+    "name": "anthropic",
+    "base_url": "https://api.anthropic.com",
+    "headers": {
+      "Content-Type": "application/json",
+      "anthropic-version": "2025-01-15"
+    },
+    "auth": {
+      "type": "api_key",
+      "header_name": "x-api-key",
+      "value_template": "${ENV:ANTHROPIC_API_KEY}"
+    }
+  },
+  "models": [{
+    "id": "claude-4-sonnet",
+    "aliases": ["claude-4-s", "claude-sonnet-4"],
+    "family": "claude-4",
+    "description": "Balanced model optimized for both speed and capability with advanced reasoning",
+    "endpoints": {
+      "chat_completion": {
+        "method": "POST",
+        "path": "/v1/messages",
+        "protocol": "https"
+      },
+      "streaming_chat_completion": {
+        "method": "POST",
+        "path": "/v1/messages",
+        "protocol": "https",
+        "headers": {
+          "Accept": "text/event-stream"
+        }
+      }
+    },
+    "input_modes": {
+      "messages": true,
+      "single_text": true,
+      "images": true,
+      "audio": false,
+      "video": false,
+      "documents": true
+    },
+    "reasoning": {
+      "supported": true,
+      "effort_levels": ["fast", "balanced", "thorough"],
+      "default_effort": "balanced",
+      "internal_chain_of_thought": true,
+      "optimized_for": "balanced_performance",
+      "summary_modes": ["auto", "detailed", "none"],
+      "default_summary": "auto",
+      "thinking_tokens": true
+    },
+    "verbosity": {
+      "supported": true,
+      "levels": ["concise", "standard", "detailed", "comprehensive"],
+      "default_level": "standard"
+    },
+    "tooling": {
+      "tools_supported": true,
+      "parallel_tool_calls_default": false,
+      "can_disable_parallel_tool_calls": true,
+      "custom_tools": true,
+      "preambles_supported": true,
+      "tool_types": ["function", "computer_use"],
+      "context_free_grammars": false,
+      "tool_choice_modes": ["auto", "any", "tool"]
+    },
+    "json_output": {
+      "native_param": false,
+      "strategy": "system_prompt",
+      "notes": "JSON output achieved via system instructions and validation"
+    },
+    "parameters": {
+      "model": {
+        "type": "string",
+        "required": true,
+        "default": "claude-4-sonnet"
+      },
+      "max_tokens": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200000,
+        "required": true
+      },
+      "messages": {
+        "type": "array",
+        "required": true,
+        "items": {
+          "type": "object",
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": ["user", "assistant"]
+            },
+            "content": {
+              "oneOf": [
+                {"type": "string"},
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["text", "image", "document"]
+                      },
+                      "text": {"type": "string"},
+                      "source": {"type": "object"}
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "system": {
+        "type": "string",
+        "description": "System prompt to guide model behavior"
+      },
+      "temperature": {
+        "type": "number",
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "default": 0.7
+      },
+      "top_p": {
+        "type": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "top_k": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 200
+      },
+      "stop_sequences": {
+        "type": "array",
+        "items": {"type": "string"},
+        "maxItems": 4
+      },
+      "stream": {
+        "type": "boolean",
+        "default": false
+      },
+      "tools": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "description": {"type": "string"},
+            "input_schema": {"type": "object"}
+          }
+        }
+      },
+      "tool_choice": {
+        "oneOf": [
+          {"type": "string", "enum": ["auto", "any"]},
+          {
+            "type": "object",
+            "properties": {
+              "type": {"type": "string", "enum": ["tool"]},
+              "name": {"type": "string"}
+            }
+          }
+        ]
+      },
+      "reasoning_mode": {
+        "type": "string",
+        "enum": ["fast", "balanced", "thorough"],
+        "default": "balanced",
+        "description": "Controls depth of reasoning process"
+      },
+      "thinking_budget": {
+        "type": "integer",
+        "minimum": 1000,
+        "maximum": 65536,
+        "default": 32768,
+        "description": "Maximum tokens for internal reasoning"
+      }
+    },
+    "constraints": {
+      "system_prompt_location": "system_parameter",
+      "forbid_unknown_top_level_fields": true,
+      "required_fields": ["model", "max_tokens", "messages"],
+      "mutually_exclusive": [],
+      "resolution_preferences": [
+        "max_tokens"
+      ],
+      "limits": {
+        "max_tool_schema_bytes": 500000,
+        "max_system_prompt_bytes": 100000,
+        "max_thinking_tokens": 65536
+      }
+    },
+    "mappings": {
+      "paths": {
+        "$.prompt_spec.messages": "$.messages",
+        "$.prompt_spec.system_prompt": "$.system",
+        "$.prompt_spec.sampling.temperature": "$.temperature",
+        "$.prompt_spec.sampling.top_p": "$.top_p",
+        "$.prompt_spec.sampling.top_k": "$.top_k",
+        "$.prompt_spec.limits.max_output_tokens": "$.max_tokens",
+        "$.prompt_spec.tools": "$.tools",
+        "$.prompt_spec.tool_choice": "$.tool_choice",
+        "$.prompt_spec.stop_sequences": "$.stop_sequences"
+      },
+      "transformations": {
+        "system_to_system_param": {
+          "description": "Move system message to system parameter",
+          "type": "extract",
+          "source_path": "$.messages[?(@.role == 'system')].content",
+          "target_path": "$.system"
+        }
+      },
+      "flags": {
+        "supports_reasoning": true,
+        "supports_thinking_tokens": true,
+        "supports_multimodal": true
+      }
+    },
+    "response_normalization": {
+      "sync": {
+        "content_path": "content[0].text",
+        "reasoning_path": "thinking",
+        "tool_calls_path": "content[?(@.type == 'tool_use')]",
+        "finish_reason_path": "stop_reason",
+        "finish_reason_map": {
+          "end_turn": "stop",
+          "max_tokens": "length",
+          "stop_sequence": "stop",
+          "tool_use": "tool_call"
+        },
+        "token_usage_path": "usage",
+        "response_id_path": "id",
+        "model_path": "model"
+      },
+      "stream": {
+        "protocol": "sse",
+        "event_selector": {
+          "type_path": "type",
+          "routes": [
+            {
+              "when": "content_block_delta",
+              "emit": "delta",
+              "text_path": "delta.text"
+            },
+            {
+              "when": "thinking_block_delta", 
+              "emit": "reasoning_delta",
+              "text_path": "delta.text"
+            },
+            {
+              "when": "content_block_start",
+              "emit": "content_start",
+              "content_type_path": "content_block.type"
+            },
+            {
+              "when": "message_delta",
+              "emit": "usage_delta",
+              "usage_path": "delta.usage"
+            },
+            {
+              "when": "message_stop",
+              "emit": "stop",
+              "finish_reason_path": "delta.stop_reason"
+            }
+          ]
+        }
+      }
+    },
+    "capabilities": {
+      "text_generation": true,
+      "vision": true,
+      "function_calling": true,
+      "streaming": true,
+      "reasoning": true,
+      "extended_context": true,
+      "multimodal": ["text", "image", "document"],
+      "computer_use": true,
+      "code_execution": false,
+      "experimental": {
+        "thinking_mode": true,
+        "advanced_reasoning": true,
+        "document_analysis": true,
+        "computer_interaction": true
+      }
+    },
+    "limits": {
+      "context_window": 200000,
+      "max_output_tokens": 200000,
+      "thinking_token_limit": 65536,
+      "max_images_per_request": 20,
+      "max_tools_per_request": 256
+    },
+    "performance": {
+      "latency_p50_ms": 1200,
+      "latency_p95_ms": 3000,
+      "throughput_tokens_per_second": 75,
+      "reasoning_overhead_factor": 1.5
+    }
+  }]
+}
