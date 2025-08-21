@@ -10,6 +10,7 @@
 use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use tracing::{field, Span};
@@ -137,7 +138,7 @@ pub fn init_logging(config: LoggingConfig) -> Result<()> {
             let subscriber = tracing_subscriber::fmt()
                 .with_env_filter(env_filter)
                 .with_target(true)
-                .with_ansi(config.console && atty::is(atty::Stream::Stderr))
+                .with_ansi(config.console && std::io::stderr().is_terminal())
                 .with_thread_ids(config.thread_ids)
                 .with_file(config.source_location)
                 .with_line_number(config.source_location)
@@ -165,7 +166,7 @@ pub fn init_logging(config: LoggingConfig) -> Result<()> {
             let subscriber = tracing_subscriber::fmt()
                 .with_env_filter(env_filter)
                 .with_target(true)
-                .with_ansi(config.console && atty::is(atty::Stream::Stderr))
+                .with_ansi(config.console && std::io::stderr().is_terminal())
                 .with_thread_ids(config.thread_ids)
                 .with_file(config.source_location)
                 .with_line_number(config.source_location)

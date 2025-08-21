@@ -27,25 +27,6 @@ build/
 *.wasm
 pkg/
 
-# Node.js (for FFI)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
-yarn.lock
-
-# Python (for FFI)
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-ENV/
-*.egg-info/
-dist/
-build/
 
 # Documentation
 docs/_build/

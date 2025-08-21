@@ -15,7 +15,7 @@ use serde_json::Value;
 use specado_core::types::{TranslationResult, LossinessReport, LossinessItem, TranslationMetadata};
 use specado_schemas::validation::{ValidationError, ValidationErrors};
 use std::collections::HashMap;
-use std::io::{self, Write};
+use std::io::{self, Write, IsTerminal};
 use std::time::Duration;
 
 /// Trait for formatting output with specialized support for common types
@@ -104,7 +104,7 @@ impl OutputWriter {
         Self {
             format,
             use_color,
-            show_progress: !quiet && atty::is(atty::Stream::Stdout),
+            show_progress: !quiet && std::io::stdout().is_terminal(),
             quiet,
             verbose,
             writer: Box::new(io::stdout()),

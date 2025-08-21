@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 /// High-level LLM interface for simplified interactions
 pub struct LLM {
     /// The model identifier (e.g., "gpt-5", "claude-opus-4.1")
+    #[allow(dead_code)] // May be used for debugging or future features
     model: String,
     /// The normalized model name for internal use
     normalized_model: String,

@@ -4,6 +4,7 @@
 //! providing a type-safe and well-documented command interface.
 
 use clap::{Parser, Subcommand, ValueEnum};
+use std::io::IsTerminal;
 use std::path::PathBuf;
 
 /// Specado CLI - Spec-driven LLM prompt translation and validation
@@ -375,7 +376,7 @@ impl Cli {
 
     /// Check if colored output should be used
     pub fn use_color(&self) -> bool {
-        !self.no_color && atty::is(atty::Stream::Stdout)
+        !self.no_color && std::io::stdout().is_terminal()
     }
 }
 

@@ -1,4 +1,4 @@
-//! Example demonstrating the high-level LLM API
+//! Example demonstrating the high-level LLM API in Rust
 //! 
 //! Run with: cargo run --example high_level_api
 

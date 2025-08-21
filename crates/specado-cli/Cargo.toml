@@ -44,7 +44,7 @@ thiserror = "1.0"
 # Terminal output
 colored = "2.1"
 indicatif = "0.17"
-atty = "0.2"
+is-terminal = "0.4"
 
 # File handling
 dirs = "5.0"

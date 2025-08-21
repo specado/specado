@@ -9,10 +9,8 @@ specado/
 ├── crates/
 │   ├── specado-core/        # Core translation engine
 │   ├── specado-schemas/     # JSON Schema definitions
-│   ├── specado-providers/   # Provider specifications
 │   ├── specado-cli/         # Command-line interface
-│   ├── specado-ffi/         # FFI bindings (Node.js/Python)
-│   └── specado-wasm/        # WebAssembly bindings
+│   └── specado-golden/      # Golden test infrastructure
 ├── schemas/                  # JSON Schema files
 ├── providers/                # Provider spec files
 └── tests/                    # Test suites
