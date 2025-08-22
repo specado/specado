@@ -112,17 +112,17 @@ impl ProviderSpecValidator {
     fn validate_custom_rules(&self, spec: &Value, ctx: &ValidationContext) -> Vec<ValidationError> {
         let mut errors = Vec::new();
 
-        // Rule: JSONPath expressions in mappings.paths must be valid syntax
+        // Rule: JSONPath expressions in mappings.paths should be non-empty strings
         if let Some(models) = spec.get("models").and_then(|m| m.as_array()) {
             for (model_idx, model) in models.iter().enumerate() {
                 if let Some(mappings) = model.get("mappings") {
                     if let Some(paths) = mappings.get("paths").and_then(|p| p.as_object()) {
                         for (field, path_value) in paths {
                             if let Some(path) = path_value.as_str() {
-                                if ValidationHelpers::validate_jsonpath(path, ctx).is_err() {
+                                if path.is_empty() {
                                     errors.push(ValidationError::new(
                                         format!("$.models[{}].mappings.paths.{}", model_idx, field),
-                                        format!("Invalid JSONPath expression: {}", path),
+                                        "JSONPath cannot be empty".to_string(),
                                     ));
                                 }
                             }
@@ -133,13 +133,15 @@ impl ProviderSpecValidator {
         }
 
         // Rule: Environment variable references ${ENV:VAR} must be properly formatted
-        if let Some(auth) = spec.get("authentication") {
-            if let Some(env_var) = auth.get("env_var").and_then(|v| v.as_str()) {
-                if ValidationHelpers::validate_env_var_reference(env_var, ctx).is_err() {
-                    errors.push(ValidationError::new(
-                        ctx.child("authentication").child("env_var").path.clone(),
-                        format!("Invalid environment variable reference: {}", env_var),
-                    ));
+        if let Some(provider) = spec.get("provider") {
+            if let Some(auth) = provider.get("auth") {
+                if let Some(value_template) = auth.get("value_template").and_then(|v| v.as_str()) {
+                    if !value_template.is_empty() && !value_template.contains("${ENV:") {
+                        errors.push(ValidationError::new(
+                            "$.provider.auth.value_template".to_string(),
+                            "Environment variable references should use ${ENV:VARIABLE_NAME} format".to_string(),
+                        ));
+                    }
                 }
             }
         }
@@ -165,18 +167,54 @@ impl ProviderSpecValidator {
             }
         }
 
-        // Rule: response_normalization paths must be valid JSONPath expressions
+        // Rule: response_normalization paths should be non-empty strings
         if let Some(models) = spec.get("models").and_then(|m| m.as_array()) {
             for (idx, model) in models.iter().enumerate() {
                 if let Some(norm) = model.get("response_normalization") {
-                    if let Some(paths) = norm.as_object() {
-                        for (field, path_value) in paths {
-                            if let Some(path) = path_value.as_str() {
-                                if ValidationHelpers::validate_jsonpath(path, ctx).is_err() {
+                    // Check sync paths
+                    if let Some(sync) = norm.get("sync").and_then(|s| s.as_object()) {
+                        for (field, path_value) in sync {
+                            if field.ends_with("_path") {
+                                if let Some(path) = path_value.as_str() {
+                                    if path.is_empty() {
+                                        errors.push(ValidationError::new(
+                                            format!("$.models[{}].response_normalization.sync.{}", idx, field),
+                                            "JSONPath cannot be empty".to_string(),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Check stream event selector paths
+                    if let Some(stream) = norm.get("stream") {
+                        if let Some(event_selector) = stream.get("event_selector") {
+                            // Check type_path
+                            if let Some(type_path) = event_selector.get("type_path").and_then(|p| p.as_str()) {
+                                if type_path.is_empty() {
                                     errors.push(ValidationError::new(
-                                        format!("$.models[{}].response_normalization.{}", idx, field),
-                                        format!("Invalid JSONPath in response_normalization: {}", path),
+                                        format!("$.models[{}].response_normalization.stream.event_selector.type_path", idx),
+                                        "JSONPath cannot be empty".to_string(),
                                     ));
+                                }
+                            }
+                            // Check route paths
+                            if let Some(routes) = event_selector.get("routes").and_then(|r| r.as_array()) {
+                                for (route_idx, route) in routes.iter().enumerate() {
+                                    if let Some(route_obj) = route.as_object() {
+                                        for (field, path_value) in route_obj {
+                                            if field.ends_with("_path") {
+                                                if let Some(path) = path_value.as_str() {
+                                                    if path.is_empty() {
+                                                        errors.push(ValidationError::new(
+                                                            format!("$.models[{}].response_normalization.stream.event_selector.routes[{}].{}", idx, route_idx, field),
+                                                            "JSONPath cannot be empty".to_string(),
+                                                        ));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

@@ -70,8 +70,8 @@ The `extensions` object serves as an "escape hatch" for:
 
 ### Important Notes about Extensions
 
-- **No validation**: Content in `extensions` is not validated against the schema
-- **Flexibility**: Supports arbitrary nested structures
+- **Lightly validated**: Known anchors (e.g., reasoning, transformations, rate_limits) are validated via $defs; unknown keys are accepted
+- **Flexibility**: Supports arbitrary nested structures via additionalProperties: true
 - **Forward compatibility**: New features can be added without schema changes
 - **Backwards compatibility**: Existing functionality preserved during migration
 
@@ -154,14 +154,13 @@ The following strategy values are officially supported and validated:
 
 ### Authentication Types
 - `"bearer"` - Bearer token authentication
-- `"api_key"` - API key header authentication  
-- `"oauth2"` - OAuth 2.0 flow
+- `"api-key"` - API key header authentication  
 - `"basic"` - Basic HTTP authentication
+- `"custom"` - Custom authentication method
 
 ### Stream Protocols
 - `"sse"` - Server-Sent Events
 - `"websocket"` - WebSocket connection
-- `"polling"` - HTTP polling fallback
 
 ## JSONPath Expression Guidelines
 

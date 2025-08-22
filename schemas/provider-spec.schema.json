@@ -51,7 +51,6 @@
             "type": "object",
             "additionalProperties": true,
             "properties": {
-              "auth": { "$ref": "#/$defs/AuthConfiguration" },
               "rate_limits": { "$ref": "#/$defs/RateLimits" },
               "validation_schemas": {
                 "description": "References to additional validation schema files",
