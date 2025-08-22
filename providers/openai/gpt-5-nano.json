@@ -240,7 +240,7 @@
       "stream": {
         "protocol": "sse",
         "event_selector": {
-          "type_path": "object",
+          "type_path": "$.object",
           "routes": [
             {
               "when": "response.output_text.delta",

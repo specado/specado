@@ -1,11 +1,15 @@
 {
-  "spec_version": "1.0.0",
+  "spec_version": "1.1.0",
   "provider": {
     "name": "anthropic",
     "base_url": "https://api.anthropic.com",
     "headers": {
-      "x-api-key": "${ANTHROPIC_API_KEY}",
       "anthropic-version": "2023-06-01"
+    },
+    "auth": {
+      "type": "api-key",
+      "header_name": "x-api-key",
+      "value_template": "${ENV:ANTHROPIC_API_KEY}"
     }
   },
   "models": [
@@ -103,12 +107,12 @@
             "routes": [
               {
                 "when": "content_block_delta",
-                "emit": "text",
+                "emit": "delta",
                 "text_path": "$.delta.text"
               },
               {
                 "when": "tool_use",
-                "emit": "tool_call",
+                "emit": "tool",
                 "name_path": "$.name",
                 "args_path": "$.input"
               }

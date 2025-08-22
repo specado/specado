@@ -1,10 +1,15 @@
 {
-  "spec_version": "1.0.0",
+  "spec_version": "1.1.0",
   "provider": {
     "name": "openai",
     "base_url": "https://api.openai.com/v1",
     "headers": {
-      "Authorization": "Bearer ${OPENAI_API_KEY}"
+      "Content-Type": "application/json"
+    },
+    "auth": {
+      "type": "bearer",
+      "header_name": "Authorization",
+      "value_template": "Bearer ${ENV:OPENAI_API_KEY}"
     }
   },
   "models": [
@@ -16,12 +21,12 @@
         "chat_completion": {
           "method": "POST",
           "path": "/chat/completions",
-          "protocol": "http"
+          "protocol": "https"
         },
         "streaming_chat_completion": {
           "method": "POST",
           "path": "/chat/completions",
-          "protocol": "sse"
+          "protocol": "https"
         }
       },
       "input_modes": {
@@ -106,12 +111,12 @@
             "routes": [
               {
                 "when": "content",
-                "emit": "text",
+                "emit": "delta",
                 "text_path": "$.choices[0].delta.content"
               },
               {
                 "when": "tool_calls",
-                "emit": "tool_call",
+                "emit": "tool",
                 "name_path": "$.choices[0].delta.tool_calls[0].function.name",
                 "args_path": "$.choices[0].delta.tool_calls[0].function.arguments"
               }

@@ -15,7 +15,7 @@
       "provider": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "base_url", "headers", "auth"],
+        "required": ["name", "base_url", "headers"],
         "properties": {
           "name": { "type": "string", "minLength": 1 },
           "base_url": { "type": "string", "format": "uri" },
@@ -25,7 +25,7 @@
             "additionalProperties": { "type": "string" }
           },
           "auth": {
-            "description": "Authentication configuration",
+            "description": "Optional. If omitted, authentication must be supplied via a templated header (e.g., Authorization: \"Bearer ${ENV:API_KEY}\").",
             "type": "object",
             "additionalProperties": false,
             "required": ["type", "header_name"],
@@ -43,6 +43,23 @@
               "value_template": { 
                 "description": "Template for auth value (e.g., 'Bearer ${ENV:API_KEY}')",
                 "type": "string" 
+              }
+            }
+          },
+          "extensions": {
+            "description": "Provider-specific extensions and experimental features",
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "auth": { "$ref": "#/$defs/AuthConfiguration" },
+              "rate_limits": { "$ref": "#/$defs/RateLimits" },
+              "validation_schemas": {
+                "description": "References to additional validation schema files",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
               }
             }
           },
@@ -113,48 +130,6 @@
             "description": "Model family (e.g., gpt-4, claude-3)",
             "type": "string", 
             "minLength": 1 
-          },
-          "reasoning": {
-            "description": "Reasoning capabilities (for models that support chain-of-thought)",
-            "type": "object",
-            "properties": {
-              "supported": { "type": "boolean" },
-              "effort_levels": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "default_effort": { "type": "string" },
-              "internal_chain_of_thought": { "type": "boolean" },
-              "optimized_for": { "type": "string" },
-              "summary_modes": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "default_summary": { "type": "string" }
-            }
-          },
-          "verbosity": {
-            "description": "Verbosity control capabilities",
-            "type": "object",
-            "properties": {
-              "supported": { "type": "boolean" },
-              "levels": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "default_level": { "type": "string" }
-            }
-          },
-          "thinking": {
-            "description": "Extended thinking/reasoning capabilities (Anthropic-style)",
-            "type": "object",
-            "properties": {
-              "supported": { "type": "boolean" },
-              "type": { "type": "string" },
-              "budget_tokens_min": { "type": "integer" },
-              "budget_tokens_max": { "type": "integer" },
-              "default_budget": { "type": "integer" }
-            }
           },
 
           "capabilities": {
@@ -251,33 +226,53 @@
               "tools_supported": { "type": "boolean" },
               "parallel_tool_calls_default": { "type": "boolean" },
               "can_disable_parallel_tool_calls": { "type": "boolean" },
-              "custom_tools": { "type": "boolean" },
-              "preambles_supported": { "type": "boolean" },
-              "tool_types": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "context_free_grammars": { "type": "boolean" },
-              "tool_choice_modes": {
-                "description": "Supported tool choice modes",
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "enum": ["auto", "none", "required", "any", "specific"]
-                }
-              },
-              "strict_tools_support": {
-                "description": "Supports strict tool schema validation",
-                "type": "boolean",
-                "default": false
-              },
               "disable_switch": {
                 "type": "object",
                 "additionalProperties": false,
                 "required": ["path", "value"],
                 "properties": {
-                  "path": { "type": "string", "minLength": 1 },
+                  "path": { 
+                    "description": "Path to the boolean flag, specified as a JSONPath (provider-spec flavor)",
+                    "type": "string", 
+                    "minLength": 1 
+                  },
                   "value": {}
+                }
+              },
+              "extensions": {
+                "description": "Additional tooling capabilities and experimental features",
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "tool_types": {
+                    "description": "Supported tool types",
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
+                  "tool_choice_modes": {
+                    "description": "Supported tool choice modes",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["auto", "none", "required", "any", "specific"]
+                    }
+                  },
+                  "strict_tools_support": {
+                    "description": "Supports strict tool schema validation",
+                    "type": "boolean"
+                  },
+                  "context_free_grammars": {
+                    "description": "Supports context-free grammar tools",
+                    "type": "boolean"
+                  },
+                  "preambles_supported": {
+                    "description": "Supports tool preambles",
+                    "type": "boolean"
+                  },
+                  "custom_tools": {
+                    "description": "Supports custom tool definitions",
+                    "type": "boolean"
+                  }
                 }
               }
             }
@@ -289,7 +284,10 @@
             "required": ["native_param", "strategy"],
             "properties": {
               "native_param": { "type": "boolean" },
-              "strategy": { "type": "string", "enum": ["json_schema", "prompt_only"] },
+              "strategy": { 
+                "description": "Free-form; canonical values: json_schema, response_format, prompt_only (loader warns on others)",
+                "type": "string" 
+              },
               "notes": { "type": "string" }
             }
           },
@@ -325,7 +323,7 @@
               "system_prompt_location": { 
                 "description": "Where system prompts are placed",
                 "type": "string", 
-                "enum": ["top_level", "message_role", "preamble"] 
+                "enum": ["top_level", "message_role", "preamble", "first_message", "system_parameter"] 
               },
               "forbid_unknown_top_level_fields": { 
                 "description": "Whether unknown fields cause errors",
@@ -345,25 +343,10 @@
                 "type": "array",
                 "items": { "type": "string" }
               },
-              "prompt_truncation": {
-                "description": "Prompt truncation strategy",
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "default_mode": {
-                    "description": "Default truncation mode",
-                    "type": "string",
-                    "enum": ["OFF", "AUTO", "AUTO_PRESERVE_ORDER"]
-                  },
-                  "supported_modes": {
-                    "description": "List of supported truncation modes",
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "enum": ["OFF", "AUTO", "AUTO_PRESERVE_ORDER", "START", "END"]
-                    }
-                  }
-                }
+              "required_fields": {
+                "description": "Provider-required top-level parameter names (for loader linting)",
+                "type": "array",
+                "items": { "type": "string" }
               },
               "limits": {
                 "description": "Size limits for various fields",
@@ -373,6 +356,14 @@
                 "properties": {
                   "max_tool_schema_bytes": { "type": "integer", "minimum": 0 },
                   "max_system_prompt_bytes": { "type": "integer", "minimum": 0 }
+                }
+              },
+              "extensions": {
+                "description": "Additional constraint configurations and experimental features",
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "prompt_truncation": { "$ref": "#/$defs/PromptTruncation" }
                 }
               }
             }
@@ -394,65 +385,17 @@
                 "type": "object",
                 "additionalProperties": true
               },
-              "transformations": {
-                "description": "Data transformation rules",
+              "extensions": {
+                "description": "Additional mapping configurations and transformations",
                 "type": "object",
-                "additionalProperties": {
-                  "type": "object",
-                  "properties": {
-                    "description": { "type": "string" },
-                    "type": { "type": "string" },
-                    "separator": { "type": "string" }
-                  }
+                "additionalProperties": true,
+                "properties": {
+                  "transformations": { "$ref": "#/$defs/TransformationRules" }
                 }
               }
             }
           },
 
-          "rag_config": {
-            "description": "Retrieval-augmented generation configuration",
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "connector_param": {
-                "description": "Parameter name for RAG connectors",
-                "type": "string"
-              },
-              "document_param": {
-                "description": "Parameter name for documents",
-                "type": "string"
-              },
-              "search_queries_param": {
-                "description": "Parameter name for search queries only mode",
-                "type": "string"
-              },
-              "web_search_connector": {
-                "description": "Identifier for web search connector",
-                "type": "string"
-              }
-            }
-          },
-
-          "conversation_management": {
-            "description": "Conversation persistence configuration",
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "conversation_id_param": {
-                "description": "Parameter name for conversation ID",
-                "type": "string"
-              },
-              "history_param": {
-                "description": "Parameter name for chat history",
-                "type": "string"
-              },
-              "supports_branching": {
-                "description": "Whether conversations can branch",
-                "type": "boolean",
-                "default": false
-              }
-            }
-          },
 
           "response_normalization": {
             "description": "Rules for normalizing provider responses",
@@ -467,14 +410,12 @@
                 "required": ["content_path", "finish_reason_path", "finish_reason_map"],
                 "properties": {
                   "content_path": { 
-                    "description": "JSONPath to response content",
-                    "type": "string",
-                    "pattern": "^[\\w\\[\\]\\.]+$"
+                    "description": "Must be valid JSONPath; loader pre-parses and errors on syntax",
+                    "type": "string"
                   },
                   "finish_reason_path": { 
-                    "description": "JSONPath to finish reason",
-                    "type": "string",
-                    "pattern": "^[\\w\\[\\]\\.]+$"
+                    "description": "Must be valid JSONPath; loader pre-parses and errors on syntax",
+                    "type": "string"
                   },
                   "finish_reason_map": {
                     "description": "Map provider finish reasons to uniform ones",
@@ -482,11 +423,11 @@
                     "additionalProperties": { "type": "string" }
                   },
                   "reasoning_path": { 
-                    "description": "JSONPath to reasoning content",
+                    "description": "Must be valid JSONPath; loader pre-parses and errors on syntax",
                     "type": "string"
                   },
                   "tool_calls_path": { 
-                    "description": "JSONPath to tool calls",
+                    "description": "Must be valid JSONPath; loader pre-parses and errors on syntax",
                     "type": "string"
                   },
                   "response_id_path": { 
@@ -506,7 +447,7 @@
                     "type": "string"
                   },
                   "usage_path": {
-                    "description": "JSONPath to usage statistics in response",
+                    "description": "Must be valid JSONPath; loader pre-parses and errors on syntax",
                     "type": "string"
                   }
                 }
@@ -529,9 +470,8 @@
                     "required": ["type_path", "routes"],
                     "properties": {
                       "type_path": { 
-                        "description": "JSONPath to event type",
-                        "type": "string",
-                        "pattern": "^[\\w\\[\\]\\.]+$"
+                        "description": "Must be valid JSONPath; loader pre-parses and errors on syntax",
+                        "type": "string"
                       },
                       "routes": {
                         "description": "Event routing configuration",
@@ -548,19 +488,24 @@
                             "emit": { 
                               "description": "Event to emit",
                               "type": "string",
-                              "enum": ["start", "delta", "tool", "stop", "error"]
+                              "enum": ["start", "delta", "tool", "stop", "error", "custom"]
                             },
                             "text_path": { 
-                              "type": "string",
-                              "pattern": "^[\\w\\[\\]\\.]+$"
+                              "description": "Must be valid JSONPath; loader pre-parses and errors on syntax",
+                              "type": "string"
                             },
                             "name_path": { 
-                              "type": "string",
-                              "pattern": "^[\\w\\[\\]\\.]+$"
+                              "description": "Must be valid JSONPath; loader pre-parses and errors on syntax",
+                              "type": "string"
                             },
                             "args_path": { 
-                              "type": "string",
-                              "pattern": "^[\\w\\[\\]\\.]+$"
+                              "description": "Must be valid JSONPath; loader pre-parses and errors on syntax",
+                              "type": "string"
+                            },
+                            "extensions": {
+                              "description": "Route-specific extensions (required if emit is 'custom')",
+                              "type": "object",
+                              "additionalProperties": true
                             }
                           }
                         }
@@ -569,6 +514,19 @@
                   }
                 }
               }
+            }
+          },
+
+          "extensions": {
+            "description": "Model-specific extensions and experimental features",
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "reasoning": { "$ref": "#/$defs/ReasoningCapabilities" },
+              "verbosity": { "$ref": "#/$defs/VerbosityControl" },
+              "thinking": { "$ref": "#/$defs/ThinkingCapabilities" },
+              "conversation_management": { "$ref": "#/$defs/ConversationManagement" },
+              "rag_config": { "$ref": "#/$defs/RagConfiguration" }
             }
           }
         }
@@ -604,6 +562,214 @@
             "description": "Additional headers for this endpoint",
             "type": "object",
             "additionalProperties": { "type": "string" }
+          }
+        }
+      },
+
+      "PromptTruncation": {
+        "description": "Prompt truncation strategy configuration",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "default_mode": {
+            "description": "Default truncation mode",
+            "type": "string",
+            "enum": ["OFF", "AUTO", "AUTO_PRESERVE_ORDER", "START", "END"]
+          },
+          "supported_modes": {
+            "description": "List of supported truncation modes",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["OFF", "AUTO", "AUTO_PRESERVE_ORDER", "START", "END"]
+            }
+          }
+        }
+      },
+
+      "AuthConfiguration": {
+        "description": "Authentication configuration",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { 
+            "description": "Authentication type",
+            "type": "string", 
+            "enum": ["bearer", "api-key", "basic", "custom"] 
+          },
+          "header_name": { 
+            "description": "Header name for authentication",
+            "type": "string", 
+            "default": "Authorization" 
+          },
+          "value_template": { 
+            "description": "Template for auth value (e.g., 'Bearer ${ENV:API_KEY}')",
+            "type": "string" 
+          }
+        }
+      },
+
+      "RateLimits": {
+        "description": "Rate limiting configuration",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requests_per_minute": {
+            "description": "Maximum requests per minute",
+            "type": "integer",
+            "minimum": 0
+          },
+          "tokens_per_minute": {
+            "description": "Maximum tokens per minute",
+            "type": "integer",
+            "minimum": 0
+          },
+          "concurrent_requests": {
+            "description": "Maximum concurrent requests",
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+
+      "ToolingCapabilities": {
+        "description": "Extended tooling capabilities",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tool_types": {
+            "description": "Supported tool types",
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "tool_choice_modes": {
+            "description": "Supported tool choice modes",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["auto", "none", "required", "any", "specific"]
+            }
+          },
+          "strict_tools_support": {
+            "description": "Supports strict tool schema validation",
+            "type": "boolean"
+          },
+          "context_free_grammars": {
+            "description": "Supports context-free grammar tools",
+            "type": "boolean"
+          },
+          "preambles_supported": {
+            "description": "Supports tool preambles",
+            "type": "boolean"
+          },
+          "custom_tools": {
+            "description": "Supports custom tool definitions",
+            "type": "boolean"
+          }
+        }
+      },
+
+      "TransformationRules": {
+        "description": "Data transformation rules",
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "type": { "type": "string" },
+            "separator": { "type": "string" }
+          }
+        }
+      },
+
+      "ReasoningCapabilities": {
+        "description": "Reasoning capabilities configuration",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "supported": { "type": "boolean" },
+          "effort_levels": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "default_effort": { "type": "string" },
+          "internal_chain_of_thought": { "type": "boolean" },
+          "optimized_for": { "type": "string" },
+          "summary_modes": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "default_summary": { "type": "string" }
+        }
+      },
+
+      "VerbosityControl": {
+        "description": "Verbosity control capabilities",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "supported": { "type": "boolean" },
+          "levels": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "default_level": { "type": "string" }
+        }
+      },
+
+      "ThinkingCapabilities": {
+        "description": "Extended thinking/reasoning capabilities",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "supported": { "type": "boolean" },
+          "type": { "type": "string" },
+          "budget_tokens_min": { "type": "integer" },
+          "budget_tokens_max": { "type": "integer" },
+          "default_budget": { "type": "integer" }
+        }
+      },
+
+      "ConversationManagement": {
+        "description": "Conversation persistence configuration",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "conversation_id_param": {
+            "description": "Parameter name for conversation ID",
+            "type": "string"
+          },
+          "history_param": {
+            "description": "Parameter name for chat history",
+            "type": "string"
+          },
+          "supports_branching": {
+            "description": "Whether conversations can branch",
+            "type": "boolean"
+          }
+        }
+      },
+
+      "RagConfiguration": {
+        "description": "Retrieval-augmented generation configuration",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connector_param": {
+            "description": "Parameter name for RAG connectors",
+            "type": "string"
+          },
+          "document_param": {
+            "description": "Parameter name for documents",
+            "type": "string"
+          },
+          "search_queries_param": {
+            "description": "Parameter name for search queries only mode",
+            "type": "string"
+          },
+          "web_search_connector": {
+            "description": "Identifier for web search connector",
+            "type": "string"
           }
         }
       }

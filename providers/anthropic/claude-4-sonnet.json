@@ -233,7 +233,7 @@
           "stop_sequence": "stop",
           "tool_use": "tool_call"
         },
-        "token_usage_path": "usage",
+        "usage_path": "usage",
         "response_id_path": "id",
         "model_path": "model"
       },
@@ -249,18 +249,22 @@
             },
             {
               "when": "thinking_block_delta", 
-              "emit": "reasoning_delta",
-              "text_path": "delta.text"
+              "emit": "delta",
+              "text_path": "delta.text",
+              "extensions": {
+                "channel": "reasoning"
+              }
             },
             {
               "when": "content_block_start",
-              "emit": "content_start",
-              "content_type_path": "content_block.type"
+              "emit": "start"
             },
             {
               "when": "message_delta",
-              "emit": "usage_delta",
-              "usage_path": "delta.usage"
+              "emit": "delta",
+              "extensions": {
+                "channel": "usage"
+              }
             },
             {
               "when": "message_stop",
@@ -277,29 +281,25 @@
       "function_calling": true,
       "streaming": true,
       "reasoning": true,
+      "thinking_mode": true,
+      "advanced_reasoning": true,
       "extended_context": true,
       "multimodal": ["text", "image", "document"],
-      "computer_use": true,
-      "code_execution": false,
       "experimental": {
-        "thinking_mode": true,
-        "advanced_reasoning": true,
         "document_analysis": true,
-        "computer_interaction": true
+        "computer_interaction": true,
+        "computer_use": true,
+        "code_execution": false
       }
     },
-    "limits": {
-      "context_window": 200000,
-      "max_output_tokens": 200000,
-      "thinking_token_limit": 65536,
-      "max_images_per_request": 20,
-      "max_tools_per_request": 256
-    },
-    "performance": {
-      "latency_p50_ms": 1200,
-      "latency_p95_ms": 3000,
-      "throughput_tokens_per_second": 75,
-      "reasoning_overhead_factor": 1.5
+    "extensions": {
+      "limits": {
+        "context_window": 200000,
+        "max_output_tokens": 200000,
+        "thinking_token_limit": 65536,
+        "max_images_per_request": 20,
+        "max_tools_per_request": 256
+      }
     }
   }]
 }
