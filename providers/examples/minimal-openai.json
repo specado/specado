@@ -1,0 +1,181 @@
+{
+  "spec_version": "1.0.0",
+  "provider": {
+    "name": "openai",
+    "base_url": "https://api.openai.com",
+    "headers": {
+      "Authorization": "Bearer ${ENV:OPENAI_API_KEY}"
+    },
+    "extensions": {
+      "auth": {
+        "type": "bearer",
+        "header_name": "Authorization",
+        "value_template": "Bearer ${ENV:OPENAI_API_KEY}"
+      },
+      "rate_limits": {
+        "requests_per_minute": 3000,
+        "tokens_per_minute": 150000
+      }
+    }
+  },
+  "models": [
+    {
+      "id": "gpt-4",
+      "family": "gpt-4",
+      "endpoints": {
+        "chat_completion": {
+          "method": "POST",
+          "path": "/v1/chat/completions",
+          "protocol": "https"
+        },
+        "streaming_chat_completion": {
+          "method": "POST",
+          "path": "/v1/chat/completions",
+          "protocol": "https",
+          "headers": {
+            "Accept": "text/event-stream"
+          }
+        }
+      },
+      "input_modes": {
+        "messages": true,
+        "single_text": false,
+        "images": true
+      },
+      "tooling": {
+        "tools_supported": true,
+        "parallel_tool_calls_default": true,
+        "can_disable_parallel_tool_calls": true,
+        "extensions": {
+          "tool_types": ["function"],
+          "tool_choice_modes": ["auto", "none", "required", "specific"],
+          "strict_tools_support": true
+        }
+      },
+      "json_output": {
+        "native_param": true,
+        "strategy": "json_schema",
+        "notes": "Supports structured outputs via response_format parameter"
+      },
+      "capabilities": {
+        "text_generation": true,
+        "vision": true,
+        "function_calling": true,
+        "streaming": true,
+        "experimental": {
+          "structured_outputs": true,
+          "system_fingerprint": true
+        }
+      },
+      "parameters": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32000
+        },
+        "top_p": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1
+        }
+      },
+      "constraints": {
+        "system_prompt_location": "message_role",
+        "forbid_unknown_top_level_fields": true,
+        "mutually_exclusive": [
+          ["temperature", "top_p"]
+        ],
+        "resolution_preferences": ["temperature"],
+        "limits": {
+          "max_tool_schema_bytes": 131072,
+          "max_system_prompt_bytes": 32768
+        },
+        "extensions": {
+          "prompt_truncation": {
+            "default_mode": "AUTO",
+            "supported_modes": ["OFF", "AUTO", "AUTO_PRESERVE_ORDER"]
+          }
+        }
+      },
+      "mappings": {
+        "paths": {
+          "$.limits.max_output_tokens": "$.max_tokens",
+          "$.sampling.temperature": "$.temperature",
+          "$.sampling.top_p": "$.top_p"
+        },
+        "flags": {
+          "supports_system_messages": true,
+          "supports_streaming": true
+        },
+        "extensions": {
+          "transformations": {
+            "messages_to_single_text": {
+              "description": "Convert messages array to single text input",
+              "type": "join",
+              "separator": "\\n\\n"
+            }
+          }
+        }
+      },
+      "response_normalization": {
+        "sync": {
+          "content_path": "$.choices[0].message.content",
+          "finish_reason_path": "$.choices[0].finish_reason",
+          "finish_reason_map": {
+            "stop": "stop",
+            "length": "length",
+            "function_call": "tool_call",
+            "tool_calls": "tool_call"
+          },
+          "tool_calls_path": "$.choices[0].message.tool_calls",
+          "usage_path": "$.usage"
+        },
+        "stream": {
+          "protocol": "sse",
+          "event_selector": {
+            "type_path": "$.choices[0].delta",
+            "routes": [
+              {
+                "when": "content",
+                "emit": "delta",
+                "text_path": "$.choices[0].delta.content"
+              },
+              {
+                "when": "tool_calls",
+                "emit": "tool",
+                "name_path": "$.choices[0].delta.tool_calls[0].function.name",
+                "args_path": "$.choices[0].delta.tool_calls[0].function.arguments"
+              },
+              {
+                "when": "finish_reason",
+                "emit": "stop"
+              }
+            ]
+          }
+        }
+      },
+      "extensions": {
+        "reasoning": {
+          "supported": false,
+          "notes": "GPT-4 does not expose internal reasoning steps"
+        },
+        "conversation_management": {
+          "conversation_id_param": "conversation_id",
+          "supports_branching": false
+        },
+        "custom_features": {
+          "logprobs": true,
+          "seed_parameter": true,
+          "response_format_json_schema": true
+        }
+      }
+    }
+  ]
+}

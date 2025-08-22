@@ -17,49 +17,55 @@ specado/
 ├── tests/               # Integration tests
 └── docs/                # Documentation
 
-## Crates Structure
+## Crates Structure (Actual)
 crates/
+├── specado-cli/         # Command-line interface
+│   └── src/
+│       ├── main.rs     # CLI entry point
+│       ├── handlers/   # Command handlers
+│       └── output/     # Output formatting
+
 ├── specado-core/        # Core translation engine
 │   ├── src/
 │   │   ├── lib.rs      # Main library entry
 │   │   ├── error.rs    # Error types
 │   │   ├── types.rs    # Core type definitions
-│   │   ├── translation/ # Translation modules
-│   │   │   ├── mod.rs
-│   │   │   ├── builder.rs      # Result builder
-│   │   │   ├── conflict.rs     # Conflict resolution
-│   │   │   ├── context.rs      # Translation context
-│   │   │   ├── jsonpath/       # JSONPath mapping
-│   │   │   ├── lossiness.rs    # Lossiness tracking
-│   │   │   ├── mapper.rs       # Field mapping
-│   │   │   ├── strictness.rs   # Strictness policies
-│   │   │   ├── transformer.rs  # Value transformations
-│   │   │   └── validator.rs    # Validation logic
-│   │   └── provider_discovery/ # Provider discovery
-│   ├── tests/          # Integration tests
-│   └── benches/        # Benchmarks
+│   │   ├── http/       # HTTP client module
+│   │   ├── provider_discovery/ # Provider discovery
+│   │   └── translation/ # Translation modules
+│   │       ├── mod.rs
+│   │       ├── builder.rs      # Result builder
+│   │       ├── conflict.rs     # Conflict resolution
+│   │       ├── context.rs      # Translation context
+│   │       ├── jsonpath.rs     # JSONPath mapping
+│   │       ├── lossiness.rs    # Lossiness tracking
+│   │       ├── mapper.rs       # Field mapping
+│   │       ├── strictness.rs   # Strictness policies
+│   │       ├── transformer.rs  # Value transformations
+│   │       └── validator.rs    # Validation logic
+│   ├── providers/       # Provider implementations
+│   │   ├── anthropic/  # Anthropic provider
+│   │   └── openai/     # OpenAI provider
+│   ├── examples/       # Example usage
+│   ├── benches/        # Benchmarks
+│   ├── fuzz/          # Fuzzing tests
+│   └── tests/         # Integration tests
 
 ├── specado-schemas/     # JSON Schema handling
 │   ├── src/
-│   └── tests/
-
-├── specado-providers/   # Provider specifications
-│   └── src/
-
-├── specado-cli/        # Command-line interface
-│   └── src/
-
-├── specado-ffi/        # Foreign function interface
-│   └── src/
-
-├── specado-wasm/       # WebAssembly bindings
-│   └── src/
+│   │   ├── documentation/  # Schema documentation
+│   │   ├── loader/        # Schema loading
+│   │   ├── validation/    # Schema validation
+│   │   └── versioning/    # Version management
+│   ├── docs/          # Schema documentation
+│   ├── examples/      # Schema examples
+│   └── tests/         # Schema tests
 
 └── specado-golden/     # Golden test infrastructure
-    ├── src/
-    │   ├── runner.rs   # Test runner
-    │   └── snapshot.rs # Snapshot management
-    └── tests/
+    └── src/
+        ├── lib.rs      # Library exports
+        ├── runner.rs   # Test runner
+        └── snapshot.rs # Snapshot management
 ```
 
 ## Key Files

@@ -1,0 +1,41 @@
+{
+  "name": "hello-world",
+  "category": "basic",
+  "input": {
+    "prompt_spec": {
+      "messages": [
+        {
+          "content": "Hello, world!",
+          "role": "user"
+        }
+      ],
+      "model_class": "Chat",
+      "strict_mode": "Warn"
+    },
+    "provider_spec": null
+  },
+  "provider": "openai",
+  "expectations": {
+    "should_succeed": true,
+    "error_pattern": null,
+    "ignore_fields": [
+      "metadata.timestamp"
+    ],
+    "volatile_fields": [
+      {
+        "path": "metadata.duration_ms",
+        "pattern": "^\\d+$"
+      }
+    ],
+    "expected_lossiness": []
+  },
+  "metadata": {
+    "description": "Basic hello world translation test",
+    "tags": [
+      "basic",
+      "smoke"
+    ],
+    "enabled": true,
+    "priority": 1
+  }
+}

@@ -16,6 +16,18 @@ specado/
 └── tests/                    # Test suites
 ```
 
+## Guiding Principles for a Minimal & Robust Schema
+
+### 1. If the Runtime Needs It, It's Core
+If your core translation engine must read a field to function, it belongs in the core schema.
+
+### 2. If It's Descriptive, It's an Extension
+If a field provides metadata about capabilities that a human or a higher-level client might use, it belongs in extensions.
+
+### 3. Validation Lives in the Loader
+The schema validates the shape of the data. The loader validates the semantics (e.g., "is this JSONPath valid?").
+
+
 ## Development
 
 ```bash
@@ -25,6 +37,7 @@ cargo build --all
 # Run tests
 cargo test --all
 ```
+
 
 ## License
 

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use reqwest::{Client as ReqwestClient, Response};
 use serde_json::Value;
 use crate::types::{ProviderSpec, ModelSpec, EndpointConfig};
+use crate::provider_discovery::ProviderRegistry;
 use crate::http::{
     RequestBuilder,
     AuthHandler,
@@ -228,6 +229,78 @@ impl HttpClient {
     /// Create with default configuration
     pub fn with_default_config(provider_spec: ProviderSpec) -> Result<Self> {
         Self::new(provider_spec, HttpClientConfig::default())
+    }
+    
+    /// Create HTTP client from provider registry using optimized configuration
+    /// This integrates the auto-discovery system with HttpClient infrastructure
+    pub fn from_registry(
+        registry: &mut ProviderRegistry,
+        provider_name: &str,
+        model_id: &str,
+    ) -> Result<Self> {
+        // Discover the provider
+        let provider_info = registry.get_provider_by_name(provider_name)
+            .ok_or_else(|| crate::Error::Configuration {
+                message: format!("Provider '{}' not found in registry", provider_name),
+                source: None,
+            })?.clone();
+        
+        // Load and parse provider specification
+        let spec_json = registry.load_provider_spec(&provider_info)
+            .map_err(|e| crate::Error::Configuration {
+                message: format!("Failed to load provider spec: {}", e),
+                source: Some(anyhow::anyhow!("{}", e)),
+            })?;
+        
+        let provider_spec: ProviderSpec = serde_json::from_value(spec_json)
+            .map_err(|e| crate::Error::Configuration {
+                message: format!("Failed to parse provider spec: {}", e),
+                source: Some(anyhow::anyhow!("{}", e)),
+            })?;
+        
+        // Get optimized HTTP configuration from registry
+        let config = registry.create_http_config_for_provider(provider_name)
+            .unwrap_or_default();
+        
+        // Validate that the requested model exists in the provider spec
+        let model_exists = provider_spec.models.iter().any(|m| {
+            m.id == model_id || 
+            m.aliases.as_ref()
+                .map(|aliases| aliases.iter().any(|a| a == model_id))
+                .unwrap_or(false)
+        });
+        
+        if !model_exists {
+            return Err(crate::Error::Configuration {
+                message: format!("Model '{}' not found in provider '{}'", model_id, provider_name),
+                source: None,
+            });
+        }
+        
+        // Validate provider endpoints
+        registry.validate_provider_endpoints(provider_name)
+            .map_err(|e| crate::Error::Configuration {
+                message: format!("Provider endpoint validation failed: {}", e),
+                source: Some(anyhow::anyhow!("{}", e)),
+            })?;
+        
+        Self::new(provider_spec, config)
+    }
+    
+    /// Create HTTP client with automatic provider discovery
+    /// Discovers provider for the given model and creates optimized client
+    pub fn with_auto_discovery(
+        registry: &mut ProviderRegistry,
+        model_id: &str,
+    ) -> Result<Self> {
+        // Auto-discover provider for the model
+        let provider_info = registry.discover_provider(model_id)
+            .map_err(|e| crate::Error::Configuration {
+                message: format!("Failed to discover provider for model '{}': {}", model_id, e),
+                source: Some(anyhow::anyhow!("{}", e)),
+            })?.clone();
+        
+        Self::from_registry(registry, &provider_info.name, model_id)
     }
     
     /// Execute a synchronous request to the chat completion endpoint
@@ -801,5 +874,56 @@ mod tests {
         assert!(config.tls_config.validate_certificates);
         assert!(config.rate_limit_config.is_none());
         assert_eq!(config.circuit_breaker_config.failure_threshold, 5);
+    }
+    
+    #[test]
+    fn test_registry_integration() {
+        use crate::provider_discovery::{ProviderRegistry, ProviderRegistryBuilder};
+        
+        // Create registry with HTTP configuration
+        let (mut registry, _) = ProviderRegistryBuilder::new()
+            .with_builtin_providers()
+            .with_http_timeouts(15, 45)
+            .with_tls_validation(true)
+            .build_with_http_config();
+        
+        // Test that we can create optimized HTTP configs for each provider
+        if let Some(openai_config) = registry.create_http_config_for_provider("openai") {
+            assert_eq!(openai_config.retry_policy.max_attempts, 3);
+            assert_eq!(openai_config.circuit_breaker_config.failure_threshold, 5);
+        }
+        
+        if let Some(anthropic_config) = registry.create_http_config_for_provider("anthropic") {
+            assert_eq!(anthropic_config.retry_policy.max_attempts, 2);
+            assert_eq!(anthropic_config.circuit_breaker_config.failure_threshold, 3);
+        }
+        
+        // Test endpoint validation works
+        let mut registry_for_validation = ProviderRegistry::new();
+        let validation_result = registry_for_validation.validate_provider_endpoints("openai");
+        assert!(validation_result.is_ok());
+    }
+    
+    #[test]
+    fn test_auto_discovery_integration() {
+        use crate::provider_discovery::ProviderRegistry;
+        
+        let mut registry = ProviderRegistry::new();
+        
+        // Test that auto-discovery can find providers for models
+        if let Ok(provider) = registry.discover_provider("gpt-5") {
+            assert_eq!(provider.name, "openai");
+            
+            // Test endpoint validation for discovered provider
+            let provider_name = provider.name.clone();
+            let validation = registry.validate_provider_endpoints(&provider_name);
+            assert!(validation.is_ok());
+        }
+        
+        // Test optimized config creation for discovered providers
+        if let Some(config) = registry.create_http_config_for_provider("openai") {
+            assert!(config.retry_policy.max_attempts > 0);
+            assert!(config.circuit_breaker_config.failure_threshold > 0);
+        }
     }
 }

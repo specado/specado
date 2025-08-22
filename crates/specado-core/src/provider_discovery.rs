@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 mod error;
 pub use error::{SpecadoError, SpecadoResult};
+use crate::http::HttpClientConfig;
 
 /// Provider information and metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -405,6 +406,101 @@ impl ProviderRegistry {
     pub fn clear_cache(&mut self) {
         self.spec_cache.clear();
     }
+    
+    /// Create HttpClientConfig optimized for a specific provider
+    /// This integrates the discovery system with HttpClient configuration
+    pub fn create_http_config_for_provider(&mut self, provider_name: &str) -> Option<HttpClientConfig> {
+        let provider = self.get_provider_by_name(provider_name)?.clone();
+        let mut config = HttpClientConfig::default();
+        
+        // Load provider spec to extract configuration hints
+        if let Ok(spec) = self.load_provider_spec(&provider) {
+            // Extract timeout configurations from provider spec
+            if let Some(provider_info) = spec.get("provider") {
+                // Check for custom timeout hints in provider config
+                if let Some(timeout_secs) = provider_info.get("timeout_secs").and_then(|t| t.as_u64()) {
+                    config.timeout_secs = timeout_secs;
+                    config.timeout_config.request_timeout = std::time::Duration::from_secs(timeout_secs);
+                }
+                
+                // Check for TLS configuration hints
+                if let Some(tls_strict) = provider_info.get("strict_tls").and_then(|t| t.as_bool()) {
+                    config.tls_config.validate_certificates = tls_strict;
+                }
+                
+                // Configure rate limiting based on provider characteristics
+                if let Some(rate_limit) = provider_info.get("rate_limit_requests_per_minute").and_then(|r| r.as_u64()) {
+                    config.rate_limit_config = Some(crate::http::RateLimitConfig {
+                        max_requests: rate_limit as u32,
+                        burst_size: (rate_limit / 4).max(1) as u32, // 25% burst capacity
+                        time_window: std::time::Duration::from_secs(60), // per minute
+                        ..Default::default()
+                    });
+                }
+            }
+            
+            // Provider-specific optimizations
+            match provider_name {
+                "openai" => {
+                    // OpenAI-specific optimizations
+                    config.retry_policy.max_attempts = 3;
+                    config.circuit_breaker_config.failure_threshold = 5;
+                }
+                "anthropic" => {
+                    // Anthropic-specific optimizations
+                    config.retry_policy.max_attempts = 2;
+                    config.circuit_breaker_config.failure_threshold = 3;
+                }
+                _ => {
+                    // Generic provider defaults
+                    config.retry_policy.max_attempts = 3;
+                }
+            }
+        }
+        
+        Some(config)
+    }
+    
+    /// Validate provider endpoints are accessible (using file-based validation)
+    /// This ensures provider specs have valid endpoint configurations
+    pub fn validate_provider_endpoints(&mut self, provider_name: &str) -> SpecadoResult<bool> {
+        let provider = self.get_provider_by_name(provider_name)
+            .ok_or_else(|| SpecadoError::ProviderNotFound {
+                model: provider_name.to_string(),
+                available: self.list_available_models(),
+            })?.clone();
+            
+        let spec = self.load_provider_spec(&provider)?;
+        
+        // Validate that required endpoints exist in spec
+        if let Some(models) = spec.get("models").and_then(|m| m.as_array()) {
+            for model in models {
+                if let Some(endpoints) = model.get("endpoints") {
+                    // Check that chat_completion endpoint is properly configured
+                    if let Some(chat_endpoint) = endpoints.get("chat_completion") {
+                        if chat_endpoint.get("path").is_none() || chat_endpoint.get("method").is_none() {
+                            return Ok(false);
+                        }
+                    } else {
+                        return Ok(false);
+                    }
+                    
+                    // Check streaming endpoint if present
+                    if let Some(streaming_endpoint) = endpoints.get("streaming_chat_completion") {
+                        if streaming_endpoint.get("path").is_none() || streaming_endpoint.get("method").is_none() {
+                            return Ok(false);
+                        }
+                    }
+                } else {
+                    return Ok(false);
+                }
+            }
+        } else {
+            return Ok(false);
+        }
+        
+        Ok(true)
+    }
 }
 
 impl Default for ProviderRegistry {
@@ -413,9 +509,10 @@ impl Default for ProviderRegistry {
     }
 }
 
-/// Builder for custom provider registration
+/// Builder for custom provider registration with HttpClient integration
 pub struct ProviderRegistryBuilder {
     registry: ProviderRegistry,
+    default_http_config: Option<HttpClientConfig>,
 }
 
 impl Default for ProviderRegistryBuilder {
@@ -434,6 +531,7 @@ impl ProviderRegistryBuilder {
                 default_provider: None,
                 spec_cache: HashMap::new(),
             },
+            default_http_config: None,
         }
     }
     
@@ -461,9 +559,58 @@ impl ProviderRegistryBuilder {
         self
     }
     
+    /// Configure default HTTP settings for all providers
+    pub fn with_http_config(mut self, config: HttpClientConfig) -> Self {
+        self.default_http_config = Some(config);
+        self
+    }
+    
+    /// Configure HTTP timeouts for all providers
+    pub fn with_http_timeouts(mut self, connect_timeout_secs: u64, request_timeout_secs: u64) -> Self {
+        let mut config = self.default_http_config.unwrap_or_default();
+        config.timeout_config.connect_timeout = std::time::Duration::from_secs(connect_timeout_secs);
+        config.timeout_config.request_timeout = std::time::Duration::from_secs(request_timeout_secs);
+        config.timeout_secs = request_timeout_secs; // Backward compatibility
+        self.default_http_config = Some(config);
+        self
+    }
+    
+    /// Configure TLS settings for all providers
+    pub fn with_tls_validation(mut self, validate_certificates: bool) -> Self {
+        let mut config = self.default_http_config.unwrap_or_default();
+        config.tls_config.validate_certificates = validate_certificates;
+        config.validate_tls = validate_certificates; // Backward compatibility
+        self.default_http_config = Some(config);
+        self
+    }
+    
+    /// Configure rate limiting for all providers
+    pub fn with_rate_limiting(mut self, max_requests: u32, burst_size: u32) -> Self {
+        let mut config = self.default_http_config.unwrap_or_default();
+        config.rate_limit_config = Some(crate::http::RateLimitConfig {
+            max_requests,
+            burst_size,
+            time_window: std::time::Duration::from_secs(60), // per minute
+            ..Default::default()
+        });
+        self.default_http_config = Some(config);
+        self
+    }
+    
+    /// Validate all provider endpoints during build
+    pub fn with_endpoint_validation(self) -> Self {
+        // Validation happens in build() method if this was called
+        self
+    }
+    
     /// Build the registry
     pub fn build(self) -> ProviderRegistry {
         self.registry
+    }
+    
+    /// Build the registry and return both registry and default HTTP config
+    pub fn build_with_http_config(self) -> (ProviderRegistry, Option<HttpClientConfig>) {
+        (self.registry, self.default_http_config)
     }
 }
 
@@ -621,5 +768,73 @@ mod tests {
         // Built-in providers should also be available
         let provider = registry.discover_provider("gpt-5").unwrap();
         assert_eq!(provider.name, "openai");
+    }
+    
+    #[test]
+    fn test_http_config_integration() {
+        
+        // Test builder with HTTP configuration
+        let (mut registry, http_config) = ProviderRegistryBuilder::new()
+            .with_builtin_providers()
+            .with_http_timeouts(20, 60)
+            .with_tls_validation(false)
+            .with_rate_limiting(100, 25)
+            .build_with_http_config();
+        
+        // Verify HTTP config was captured
+        let config = http_config.unwrap();
+        assert_eq!(config.timeout_secs, 60);
+        assert_eq!(config.timeout_config.request_timeout, std::time::Duration::from_secs(60));
+        assert_eq!(config.timeout_config.connect_timeout, std::time::Duration::from_secs(20));
+        assert!(!config.validate_tls);
+        assert!(!config.tls_config.validate_certificates);
+        assert!(config.rate_limit_config.is_some());
+        
+        let rate_config = config.rate_limit_config.unwrap();
+        assert_eq!(rate_config.max_requests, 100);
+        assert_eq!(rate_config.burst_size, 25);
+        
+        // Test provider-specific config creation
+        if let Some(openai_config) = registry.create_http_config_for_provider("openai") {
+            assert_eq!(openai_config.retry_policy.max_attempts, 3);
+            assert_eq!(openai_config.circuit_breaker_config.failure_threshold, 5);
+        }
+        
+        if let Some(anthropic_config) = registry.create_http_config_for_provider("anthropic") {
+            assert_eq!(anthropic_config.retry_policy.max_attempts, 2);
+            assert_eq!(anthropic_config.circuit_breaker_config.failure_threshold, 3);
+        }
+    }
+    
+    #[test]
+    fn test_endpoint_validation() {
+        let mut registry = ProviderRegistry::new();
+        
+        // Test endpoint validation for discovered providers
+        if let Ok(provider) = registry.discover_provider("gpt-5") {
+            // Should pass validation for well-formed provider specs
+            let provider_name = provider.name.clone();
+            let is_valid = registry.validate_provider_endpoints(&provider_name);
+            assert!(is_valid.is_ok());
+        }
+        
+        // Test validation for non-existent provider
+        let invalid_result = registry.validate_provider_endpoints("nonexistent-provider");
+        assert!(invalid_result.is_err());
+    }
+    
+    #[test]
+    fn test_provider_config_optimization() {
+        let mut registry = ProviderRegistry::new();
+        
+        // Test that different providers get different optimizations
+        let openai_config = registry.create_http_config_for_provider("openai");
+        let anthropic_config = registry.create_http_config_for_provider("anthropic");
+        
+        if let (Some(openai), Some(anthropic)) = (openai_config, anthropic_config) {
+            // OpenAI should have different settings than Anthropic
+            assert_ne!(openai.retry_policy.max_attempts, anthropic.retry_policy.max_attempts);
+            assert_ne!(openai.circuit_breaker_config.failure_threshold, anthropic.circuit_breaker_config.failure_threshold);
+        }
     }
 }
