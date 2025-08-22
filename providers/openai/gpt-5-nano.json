@@ -214,6 +214,13 @@
         "supports_response_api": true
       }
     },
+    "capabilities": {
+      "text_generation": true,
+      "vision": false,
+      "function_calling": true,
+      "streaming": true,
+      "reasoning": true
+    },
     "response_normalization": {
       "sync": {
         "content_path": "output_text",

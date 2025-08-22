@@ -78,6 +78,14 @@
         },
         "flags": {}
       },
+      "capabilities": {
+        "text_generation": true,
+        "vision": true,
+        "function_calling": true,
+        "streaming": true,
+        "extended_context": true,
+        "multimodal": ["text", "image"]
+      },
       "response_normalization": {
         "sync": {
           "content_path": "$.content[0].text",

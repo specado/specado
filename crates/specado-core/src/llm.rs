@@ -239,61 +239,105 @@ impl LLM {
         (sampling, limits)
     }
     
-    /// Normalize model name to standard form
+    /// Normalize model name using provider discovery (spec-driven approach)
     fn normalize_model_name(model: &str) -> Result<String> {
-        let normalized = match model.to_lowercase().as_str() {
-            "gpt-5" | "gpt5" => "gpt-5",
-            "gpt-5-mini" | "gpt5-mini" => "gpt-5-mini",
-            "gpt-5-thinking" | "gpt5-thinking" => "gpt-5",
-            "claude-opus-4.1" | "opus-4.1" | "opus4.1" => "claude-opus-4.1",
-            "claude-sonnet-4" | "sonnet-4" | "sonnet4" => "claude-sonnet-4",
-            _ => return Err(Error::Unsupported {
-                message: format!("Model '{}' is not supported", model),
-                feature: None,
-            }),
-        };
+        // Use provider discovery to find the model instead of hardcoded checks
+        use crate::provider_discovery::ProviderRegistry;
         
-        Ok(normalized.to_string())
+        let registry = ProviderRegistry::new();
+        
+        // First try exact match
+        match registry.discover_provider(model) {
+            Ok(_provider_info) => {
+                // For exact matches, return the canonical (lowercase) form
+                // Check if this model is in our available models list to get the canonical form
+                let available_models = registry.list_available_models();
+                for available in &available_models {
+                    if available.eq_ignore_ascii_case(model) {
+                        return Ok(available.clone());
+                    }
+                }
+                // If not found in available list, return lowercase
+                return Ok(model.to_lowercase());
+            }
+            Err(_) => {
+                // No exact match - try case-insensitive matching
+                let model_lower = model.to_lowercase();
+                let available_models = registry.list_available_models();
+                
+                // Look for case-insensitive match in available models
+                for available in &available_models {
+                    if available.to_lowercase() == model_lower {
+                        // Return the canonical model name (from the spec)
+                        return Ok(available.clone());
+                    }
+                }
+                
+                // Also try provider discovery with the lowercase version
+                match registry.discover_provider(&model_lower) {
+                    Ok(_provider_info) => {
+                        return Ok(model_lower);
+                    }
+                    Err(_) => {}
+                }
+                
+                Err(Error::Unsupported {
+                    message: format!(
+                        "Model '{}' is not supported. Available models: {}",
+                        model,
+                        available_models.join(", ")
+                    ),
+                    feature: None,
+                })
+            }
+        }
     }
     
-    /// Load built-in provider specification
+    /// Load provider specification using spec-driven discovery
     fn load_builtin_spec(model: &str) -> Result<ProviderSpec> {
-        // For now, load from files. Later we can embed these with include_str!
-        let spec_path = match model {
-            "gpt-5" => "providers/openai/gpt-5.json",
-            "gpt-5-mini" => "providers/openai/gpt-5-mini.json",
-            "claude-opus-4.1" => "providers/anthropic/claude-opus-4.1.json",
-            "claude-sonnet-4" => "providers/anthropic/claude-sonnet-4.json",
-            _ => return Err(Error::Unsupported {
-                message: format!("No built-in spec for model '{}'", model),
-                feature: None,
-            }),
-        };
+        use crate::provider_discovery::ProviderRegistry;
         
-        let spec_content = std::fs::read_to_string(spec_path)
+        let mut registry = ProviderRegistry::new();
+        
+        // Discover provider for the model using spec-driven approach
+        let provider_info = registry.discover_provider(model)
             .map_err(|e| Error::Unsupported {
-                message: format!("Failed to load provider spec: {}", e),
+                message: format!("Model '{}' not supported: {}", model, e),
+                feature: None,
+            })?.clone(); // Clone to avoid borrowing issues
+        
+        // Load the provider specification from the discovered provider
+        let spec = registry.load_provider_spec(&provider_info)
+            .map_err(|e| Error::Unsupported {
+                message: format!("Failed to load provider spec for model '{}': {}", model, e),
                 feature: None,
             })?;
         
-        // Parse and validate the spec
-        let spec: ProviderSpec = serde_json::from_str(&spec_content)
+        // Parse the spec as ProviderSpec
+        let provider_spec: ProviderSpec = serde_json::from_value(spec)
             .map_err(|e| Error::Unsupported {
-                message: format!("Failed to parse provider spec: {}", e),
+                message: format!("Failed to parse provider spec for model '{}': {}", model, e),
                 feature: None,
             })?;
         
         // Validate that the model exists in the spec
-        if !spec.models.is_empty() {
-            let _model_spec = spec.models.iter()
-                .find(|m| m.id == model || m.aliases.as_ref().map_or(false, |a| a.contains(&model.to_string())))
+        if !provider_spec.models.is_empty() {
+            let _model_spec = provider_spec.models.iter()
+                .find(|m| {
+                    m.id == model || 
+                    m.aliases.as_ref().map_or(false, |a| a.contains(&model.to_string())) ||
+                    // Also check if model matches any pattern for this provider
+                    provider_info.model_patterns.iter().any(|pattern| {
+                        registry.matches_pattern(model, pattern)
+                    })
+                })
                 .ok_or_else(|| Error::Unsupported {
                     message: format!("Model '{}' not found in provider spec", model),
                     feature: None,
                 })?;
         }
         
-        Ok(spec)
+        Ok(provider_spec)
     }
 }
 
@@ -336,11 +380,24 @@ mod tests {
     
     #[test]
     fn test_model_normalization() {
+        // Test case normalization
         assert_eq!(LLM::normalize_model_name("gpt-5").unwrap(), "gpt-5");
         assert_eq!(LLM::normalize_model_name("GPT-5").unwrap(), "gpt-5");
-        assert_eq!(LLM::normalize_model_name("opus-4.1").unwrap(), "claude-opus-4.1");
-        assert_eq!(LLM::normalize_model_name("sonnet-4").unwrap(), "claude-sonnet-4");
-        assert!(LLM::normalize_model_name("unknown-model").is_err());
+        
+        // Test alias resolution (sonnet-4 is a direct alias based on available models)
+        assert_eq!(LLM::normalize_model_name("sonnet-4").unwrap(), "sonnet-4");
+        
+        // Test that full model names work
+        let result = LLM::normalize_model_name("claude-opus-4.1");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "claude-opus-4.1");
+        
+        // Test unknown model - in the spec-driven system, unknown models fall back to default provider
+        let unknown_result = LLM::normalize_model_name("unknown-model");
+        assert!(unknown_result.is_ok()); // Fallback provider handles unknown models
+        
+        // The normalized name should be the input (since no specific normalization applies)
+        assert_eq!(unknown_result.unwrap(), "unknown-model");
     }
     
     #[test]

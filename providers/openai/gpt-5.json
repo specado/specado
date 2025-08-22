@@ -82,6 +82,12 @@
         },
         "flags": {}
       },
+      "capabilities": {
+        "text_generation": true,
+        "vision": false,
+        "function_calling": true,
+        "streaming": true
+      },
       "response_normalization": {
         "sync": {
           "content_path": "$.choices[0].message.content",

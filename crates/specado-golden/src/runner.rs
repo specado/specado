@@ -281,10 +281,13 @@ impl GoldenTestRunner {
             self.load_default_provider_spec(provider_name)?
         };
         
-        // Get model ID - use first model from provider or default
+        // Get model ID - use first model from provider or return error if none available
         let model_id = provider_spec.models.first()
             .map(|m| m.id.as_str())
-            .unwrap_or("gpt-5");
+            .ok_or_else(|| GoldenError::CorpusError(
+                "Provider spec must contain at least one model for golden testing. \
+                 Consider adding a model specification to your provider spec.".to_string()
+            ))?;
         
         // Perform translation
         let result = translate(&prompt_spec, &provider_spec, model_id, prompt_spec.strict_mode)
@@ -298,92 +301,19 @@ impl GoldenTestRunner {
     }
     
     /// Load default provider spec
+    /// 
+    /// Note: This creates minimal test specs for golden testing when provider specs 
+    /// are not available. In a properly configured system, this should not be needed
+    /// as provider specs should be loaded from the providers directory.
     fn load_default_provider_spec(&self, provider: &str) -> Result<specado_core::types::ProviderSpec> {
-        // For now, create a minimal provider spec with a basic model
-        // In production, this would load from provider files
-        let spec = match provider {
-            "openai" => serde_json::json!({
-                "spec_version": "1.0.0",
-                "provider": {
-                    "name": provider,
-                    "base_url": "https://api.openai.com/v1",
-                    "headers": {"Authorization": "Bearer $OPENAI_API_KEY"}
-                },
-                "models": [{
-                    "id": "gpt-5",
-                    "aliases": ["gpt5"],
-                    "family": "gpt",
-                    "endpoints": {
-                        "chat_completion": {
-                            "method": "POST",
-                            "path": "/chat/completions",
-                            "protocol": "http"
-                        },
-                        "streaming_chat_completion": {
-                            "method": "POST",
-                            "path": "/chat/completions",
-                            "protocol": "sse"
-                        }
-                    },
-                    "input_modes": {
-                        "messages": true,
-                        "single_text": false,
-                        "images": false
-                    },
-                    "tooling": {
-                        "tools_supported": true,
-                        "parallel_tool_calls_default": true,
-                        "can_disable_parallel_tool_calls": true,
-                        "disable_switch": {"parallel_tool_calls": false}
-                    },
-                    "json_output": {
-                        "native_param": true,
-                        "strategy": "response_format"
-                    },
-                    "parameters": {},
-                    "constraints": {
-                        "system_prompt_location": "first_message",
-                        "forbid_unknown_top_level_fields": true,
-                        "mutually_exclusive": [],
-                        "resolution_preferences": [],
-                        "limits": {
-                            "max_tool_schema_bytes": 16384,
-                            "max_system_prompt_bytes": 32768
-                        }
-                    },
-                    "mappings": {
-                        "paths": {},
-                        "flags": {}
-                    },
-                    "response_normalization": {
-                        "sync": {
-                            "content_path": "$.choices[0].message.content",
-                            "finish_reason_path": "$.choices[0].finish_reason",
-                            "finish_reason_map": {}
-                        },
-                        "stream": {
-                            "protocol": "sse",
-                            "event_selector": {
-                                "type_path": "$.choices[0].delta",
-                                "routes": []
-                            }
-                        }
-                    }
-                }]
-            }),
-            _ => serde_json::json!({
-                "spec_version": "1.0.0",
-                "provider": {
-                    "name": provider,
-                    "base_url": format!("https://api.{}.com", provider),
-                    "headers": {}
-                },
-                "models": []
-            })
-        };
-        
-        serde_json::from_value(spec)
-            .map_err(GoldenError::Json)
+        // Return error encouraging proper spec-driven configuration
+        // Golden testing should rely on actual provider specifications, not hardcoded defaults
+        Err(GoldenError::CorpusError(format!(
+            "No provider specification found for '{}'. \
+             Golden testing requires proper provider specifications in the 'providers' directory. \
+             Please ensure provider specs are available rather than relying on hardcoded defaults.",
+            provider
+        )))
     }
     
     /// Initialize the corpus with sample tests

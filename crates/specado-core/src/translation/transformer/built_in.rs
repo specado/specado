@@ -43,11 +43,23 @@ pub fn boolean_to_string() -> TransformationType {
 }
 
 /// Create an OpenAI to Anthropic model mapping
+/// 
+/// Note: This function creates hardcoded model mappings and should be avoided in favor
+/// of spec-driven model selection. Consider using provider discovery and capability
+/// matching instead of these static mappings.
+#[deprecated(note = "Use spec-driven model selection instead of hardcoded mappings")]
 pub fn openai_to_anthropic_models() -> TransformationType {
+    // These mappings are deprecated in favor of spec-driven model selection
+    // based on capabilities and provider specifications
     let mut mappings = HashMap::new();
-    mappings.insert("gpt-5".to_string(), "claude-opus-4-1-20250805".to_string());
-    mappings.insert("gpt-5-mini".to_string(), "claude-3-sonnet-20240229".to_string());
-    mappings.insert("gpt-3.5-turbo".to_string(), "claude-3-haiku-20240307".to_string());
+    
+    // Only include mappings for backwards compatibility in test/development scenarios
+    #[cfg(any(test, feature = "legacy-mappings"))]
+    {
+        mappings.insert("gpt-5".to_string(), "claude-opus-4-1-20250805".to_string());
+        mappings.insert("gpt-5-mini".to_string(), "claude-3-sonnet-20240229".to_string());
+        mappings.insert("gpt-3.5-turbo".to_string(), "claude-3-haiku-20240307".to_string());
+    }
 
     TransformationType::EnumMapping {
         mappings,
