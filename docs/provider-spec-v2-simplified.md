@@ -70,7 +70,7 @@ The `extensions` object serves as an "escape hatch" for:
 
 ### Important Notes about Extensions
 
-- **Lightly validated**: Known anchors (e.g., reasoning, transformations, rate_limits) are validated via $defs; unknown keys are accepted
+- **Known anchors validated**: Common extension patterns like reasoning, transformations, rate_limits are validated via $defs; unknown keys are accepted
 - **Flexibility**: Supports arbitrary nested structures via additionalProperties: true
 - **Forward compatibility**: New features can be added without schema changes
 - **Backwards compatibility**: Existing functionality preserved during migration
@@ -128,7 +128,7 @@ See `providers/examples/minimal-openai.json` for a complete example demonstratin
 ## Validation Strategy
 
 - **Core fields**: Strictly validated against the schema
-- **Extensions**: Lightly validated - known anchors (e.g., reasoning, transformations, prompt_truncation) are validated via $defs; unknown keys pass through via additionalProperties: true
+- **Extensions**: Known anchors (e.g., reasoning, transformations, rate_limits) are validated via $defs; unknown keys are accepted
 - **Optional fields**: Only validated if present
 - **Runtime alignment**: Required fields match actual code usage
 

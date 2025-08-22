@@ -4,7 +4,7 @@
 //! Licensed under the Apache-2.0 license
 
 use crate::loader::{SchemaLoader, LoaderConfig};
-use crate::validation::base::{SchemaValidator, ValidationContext, ValidationHelpers, ValidationMode};
+use crate::validation::base::{SchemaValidator, ValidationContext, ValidationMode};
 use crate::validation::error::{ValidationError, ValidationResult};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
