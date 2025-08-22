@@ -34,19 +34,18 @@ All provider specifications must conform to the base JSON Schema defined in `sch
 The following custom validation rules are enforced beyond basic JSON Schema validation:
 
 ### 1. JSONPath Validation
-**Rule**: All JSONPath expressions must be syntactically valid
+**Rule**: All JSONPath expressions are evaluated at runtime and should be syntactically valid
 **Applies to**:
 - `mappings.paths.*` - Parameter mapping paths
 - `response_normalization.*_path` - Response extraction paths
 - Stream event selector `type_path` values
 
-**Examples of Invalid JSONPath**:
+**Flexible Syntax**:
 ```json
-// Invalid - missing $ prefix
-"type_path": "object"
-
-// Valid - proper JSONPath syntax  
-"type_path": "$.object"
+// Both forms are supported - automatic root resolution
+"type_path": "object"          // Simple path
+"type_path": "$.object"        // Explicit root
+"content_path": "choices[0].message.content"  // Array indexing
 ```
 
 ### 2. Environment Variable Reference Format

@@ -27,6 +27,10 @@ If a field provides metadata about capabilities that a human or a higher-level c
 ### 3. Validation Lives in the Loader
 The schema validates the shape of the data. The loader validates the semantics (e.g., "is this JSONPath valid?").
 
+## Documentation
+
+- **[Provider Specification Schema](docs/provider-spec-v2-simplified.md)** - Complete guide to the provider specification format
+- **[Validation Rules](docs/validation-rules.md)** - Comprehensive validation rules and error handling
 
 ## Development
 

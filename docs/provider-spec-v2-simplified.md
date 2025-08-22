@@ -128,11 +128,19 @@ See `providers/examples/minimal-openai.json` for a complete example demonstratin
 ## Validation Strategy
 
 - **Core fields**: Strictly validated against the schema
-- **Extensions**: Accepted without validation (buyer beware)
+- **Extensions**: Lightly validated - known anchors (e.g., reasoning, transformations, prompt_truncation) are validated via $defs; unknown keys pass through via additionalProperties: true
 - **Optional fields**: Only validated if present
 - **Runtime alignment**: Required fields match actual code usage
 
 This approach ensures the schema serves as both a contract (for core functionality) and a flexible container (for extensions and experimentation).
+
+### Extensions Philosophy
+
+Extensions provide structured flexibility through a "light contract" approach:
+
+- **Known anchors**: Common extension patterns like `reasoning`, `conversation_management`, `transformations` are typed and validated
+- **Escape hatch preserved**: Unknown keys are accepted via `additionalProperties: true`
+- **Provider-specific features**: Custom capabilities can be added without schema changes
 
 ## Canonical Strategy Values
 
@@ -160,28 +168,28 @@ The following strategy values are officially supported and validated:
 All `*_path` properties accept JSONPath expressions with the following requirements:
 
 ### Syntax Requirements
-- Must start with `$` root identifier: `$.path.to.field`
-- Array indexing supported: `$.choices[0].message.content`
-- Wildcard selectors allowed: `$.content[*].text`
-- Filter expressions supported: `$.content[?(@.type == 'text')]`
+- JSONPath expressions with automatic root resolution: `path.to.field` or `$.path.to.field`
+- Array indexing supported: `choices[0].message.content`
+- Wildcard selectors allowed: `content[*].text`
+- Filter expressions supported: `content[?(@.type == 'text')]`
 
 ### Common Patterns
 ```json
 {
   "response_normalization": {
-    "content_path": "$.choices[0].message.content",
-    "tool_calls_path": "$.choices[0].message.tool_calls",
-    "finish_reason_path": "$.choices[0].finish_reason",
-    "usage_path": "$.usage"
+    "content_path": "choices[0].message.content",
+    "tool_calls_path": "choices[0].message.tool_calls",
+    "finish_reason_path": "choices[0].finish_reason",
+    "usage_path": "usage"
   },
   "stream": {
     "event_selector": {
-      "type_path": "$.choices[0].delta.type",
+      "type_path": "choices[0].delta.type",
       "routes": [
         {
           "when": "content",
           "emit": "delta",
-          "text_path": "$.choices[0].delta.content"
+          "text_path": "choices[0].delta.content"
         }
       ]
     }
@@ -190,13 +198,44 @@ All `*_path` properties accept JSONPath expressions with the following requireme
 ```
 
 ### Validation Notes
-- JSONPath expressions are pre-validated during schema loading
-- Invalid expressions will cause validation failures with specific error messages
+- JSONPath expressions are flexible and support both simple paths and complex expressions
+- Validation occurs during runtime when the paths are actually evaluated
 - Complex expressions are cached for performance during evaluation
 - Provider-specific path structures are supported through extensions
 
 ### Best Practices
-1. **Use specific paths**: Prefer `$.choices[0].content` over `$.choices[*].content`
+1. **Use specific paths**: Prefer `choices[0].content` over `choices[*].content`
 2. **Validate with sample data**: Test JSONPath expressions against real API responses
 3. **Document custom paths**: Include comments or documentation for complex expressions
 4. **Handle missing fields**: Consider optional paths for fields that may not always be present
+
+## Stream Event Customization
+
+The schema supports a `"custom"` emit type for specialized stream events that require additional metadata:
+
+### Custom Emit Type Usage
+```json
+{
+  "routes": [
+    {
+      "when": "thinking_block_delta",
+      "emit": "custom",
+      "text_path": "delta.text",
+      "extensions": {
+        "channel": "reasoning",
+        "event_type": "thinking",
+        "metadata": {
+          "confidence": "high",
+          "step_type": "analysis"
+        }
+      }
+    }
+  ]
+}
+```
+
+### Extension Requirements
+- **Required for custom emit**: When `emit: "custom"`, the `extensions` object must be present
+- **Channel specification**: Use `extensions.channel` to categorize the event (e.g., "reasoning", "usage", "debug")
+- **Event metadata**: Additional properties in `extensions` provide context for downstream processing
+- **Downstream handling**: Applications can route custom events based on channel and metadata

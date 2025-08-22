@@ -39,29 +39,17 @@
       "audio": false,
       "video": false
     },
-    "reasoning": {
-      "supported": true,
-      "effort_levels": ["low", "medium", "high"],
-      "default_effort": "medium",
-      "internal_chain_of_thought": true,
-      "optimized_for": "cost_efficiency",
-      "summary_modes": ["auto", "none"],
-      "default_summary": "none"
-    },
-    "verbosity": {
-      "supported": true,
-      "levels": ["low", "medium", "high"],
-      "default_level": "low"
-    },
     "tooling": {
       "tools_supported": true,
       "parallel_tool_calls_default": true,
       "can_disable_parallel_tool_calls": true,
-      "custom_tools": true,
-      "preambles_supported": true,
-      "tool_types": ["function", "custom"],
-      "context_free_grammars": true,
-      "tool_choice_modes": ["auto", "none", "required", "specific"]
+      "extensions": {
+        "custom_tools": true,
+        "preambles_supported": true,
+        "tool_types": ["function", "custom"],
+        "context_free_grammars": true,
+        "tool_choice_modes": ["auto", "none", "required", "specific"]
+      }
     },
     "json_output": {
       "native_param": true,
@@ -206,16 +194,18 @@
         "$.prompt_spec.tools": "$.tools",
         "$.prompt_spec.tool_choice": "$.tool_choice"
       },
-      "transformations": {
-        "messages_to_input": {
-          "description": "Convert messages array to single input string",
-          "type": "join",
-          "separator": "\n"
-        }
-      },
       "flags": {
         "supports_reasoning": true,
         "supports_response_api": true
+      },
+      "extensions": {
+        "transformations": {
+          "messages_to_input": {
+            "description": "Convert messages array to single input string",
+            "type": "join",
+            "separator": "\n"
+          }
+        }
       }
     },
     "capabilities": {
@@ -245,7 +235,7 @@
       "stream": {
         "protocol": "sse",
         "event_selector": {
-          "type_path": "$.object",
+          "type_path": "object",
           "routes": [
             {
               "when": "response.output_text.delta",
@@ -275,6 +265,22 @@
             }
           ]
         }
+      }
+    },
+    "extensions": {
+      "reasoning": {
+        "supported": true,
+        "effort_levels": ["low", "medium", "high"],
+        "default_effort": "medium",
+        "internal_chain_of_thought": true,
+        "optimized_for": "cost_efficiency",
+        "summary_modes": ["auto", "none"],
+        "default_summary": "none"
+      },
+      "verbosity": {
+        "supported": true,
+        "levels": ["low", "medium", "high"],
+        "default_level": "low"
       }
     }
   }]

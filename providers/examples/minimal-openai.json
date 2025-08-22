@@ -1,17 +1,14 @@
 {
-  "spec_version": "1.0.0",
+  "spec_version": "1.1.0",
   "provider": {
     "name": "openai",
     "base_url": "https://api.openai.com",
-    "headers": {
-      "Authorization": "Bearer ${ENV:OPENAI_API_KEY}"
+    "auth": {
+      "type": "bearer",
+      "header_name": "Authorization",
+      "value_template": "Bearer ${ENV:OPENAI_API_KEY}"
     },
     "extensions": {
-      "auth": {
-        "type": "bearer",
-        "header_name": "Authorization",
-        "value_template": "Bearer ${ENV:OPENAI_API_KEY}"
-      },
       "rate_limits": {
         "requests_per_minute": 3000,
         "tokens_per_minute": 150000
