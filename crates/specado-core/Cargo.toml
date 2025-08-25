@@ -12,6 +12,8 @@ description = "Core translation engine for Specado - spec-driven LLM prompt comp
 default = []
 blocking = []  # Enable synchronous API methods that create internal runtime
 flaky = []     # Enable flaky tests that may fail due to timing/randomness
+dev-fallback = []  # Enable development fallback providers
+legacy-mappings = []  # Enable legacy model mappings
 
 [dependencies]
 thiserror = { workspace = true }

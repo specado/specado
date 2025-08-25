@@ -249,6 +249,7 @@ impl ProviderRegistry {
     }
     
     /// Minimal fallback providers for backwards compatibility (when directory discovery fails)
+    #[allow(dead_code)]
     fn register_fallback_providers(&mut self) {
         // Only register the most essential providers that we know exist
         // This serves as a minimal safety net

@@ -7,6 +7,7 @@
 //! Licensed under the Apache-2.0 license
 
 #[cfg(test)]
+#[allow(deprecated)]  // Testing deprecated functions is intentional
 mod tests {
     use super::super::super::super::{PromptSpec, ProviderSpec, ModelSpec, StrictMode};
     use super::super::super::TranslationContext;
