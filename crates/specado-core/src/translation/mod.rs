@@ -83,6 +83,7 @@ pub use validator::{PreValidator, ValidationError, ValidationSeverity, Validatio
 /// #   sampling: None,
 /// #   limits: None,
 /// #   media: None,
+/// #   advanced: None,
 /// #   strict_mode: StrictMode::Warn,
 /// };
 ///
@@ -505,6 +506,45 @@ pub fn translate(
         }
     }
 
+    // Step 12.5: Handle advanced parameters for latest models
+    if let Some(ref advanced) = prompt_spec.advanced {
+        // Thinking mode (Claude Opus 4.1)
+        if let Some(thinking) = advanced.thinking {
+            provider_request["thinking"] = serde_json::json!(thinking);
+            
+            if thinking {
+                if let Some(min_thinking_tokens) = advanced.min_thinking_tokens {
+                    provider_request["min_thinking_tokens"] = serde_json::json!(min_thinking_tokens);
+                }
+            }
+        }
+        
+        // Reasoning effort (GPT-5)
+        if let Some(ref reasoning_effort) = advanced.reasoning_effort {
+            provider_request["reasoning_effort"] = serde_json::json!(reasoning_effort);
+        }
+        
+        // Deterministic seed
+        if let Some(seed) = advanced.seed {
+            provider_request["seed"] = serde_json::json!(seed);
+        }
+        
+        // Reasoning mode (Claude 4 Sonnet)
+        if let Some(ref reasoning_mode) = advanced.reasoning_mode {
+            provider_request["reasoning_mode"] = serde_json::json!(reasoning_mode);
+        }
+        
+        // Thinking budget
+        if let Some(thinking_budget) = advanced.thinking_budget {
+            provider_request["thinking_budget"] = serde_json::json!(thinking_budget);
+        }
+        
+        // Verbosity level
+        if let Some(ref verbosity) = advanced.verbosity {
+            provider_request["verbosity"] = serde_json::json!(verbosity);
+        }
+    }
+
     // Step 13: Apply strictness policy evaluation
     // Check if we should proceed based on accumulated lossiness
     if let Ok(tracker) = lossiness_tracker.lock() {
@@ -597,6 +637,7 @@ mod tests {
             sampling: None,
             limits: None,
             media: None,
+            advanced: None,
             strict_mode: StrictMode::Warn,
         }
     }

@@ -24,6 +24,25 @@ pub struct Capabilities {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extended_context: Option<bool>,
     
+    /// Advanced capabilities for latest models
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking_mode: Option<bool>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adaptive_reasoning: Option<bool>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deterministic_sampling: Option<bool>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub advanced_coding: Option<bool>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balanced_performance: Option<bool>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agentic_tasks: Option<bool>,
+    
     /// Multimodal capabilities (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub multimodal: Option<Vec<String>>,
@@ -42,6 +61,12 @@ impl Default for Capabilities {
             streaming: false,
             reasoning: None,
             extended_context: None,
+            thinking_mode: None,
+            adaptive_reasoning: None,
+            deterministic_sampling: None,
+            advanced_coding: None,
+            balanced_performance: None,
+            agentic_tasks: None,
             multimodal: None,
             experimental: HashMap::new(),
         }
@@ -139,6 +164,50 @@ impl CapabilityDetector {
             };
                 
             capabilities.extended_context = Self::detect_extended_context(params_obj);
+            
+            // Detect advanced capabilities from new parameters
+            capabilities.thinking_mode = if params_obj.contains_key("thinking") 
+                || params_obj.contains_key("min_thinking_tokens") {
+                Some(true)
+            } else {
+                None
+            };
+            
+            capabilities.adaptive_reasoning = if params_obj.contains_key("reasoning_effort") {
+                Some(true)
+            } else {
+                None
+            };
+            
+            capabilities.deterministic_sampling = if params_obj.contains_key("seed") {
+                Some(true)
+            } else {
+                None
+            };
+            
+            // Check for advanced capabilities from model ID patterns (no hardcoded names)
+            let model_id_lower = model_spec.id.to_lowercase();
+            
+            capabilities.advanced_coding = if model_id_lower.contains("gpt-5") 
+                || params_obj.contains_key("reasoning_effort") {
+                Some(true)
+            } else {
+                None
+            };
+            
+            capabilities.balanced_performance = if params_obj.contains_key("reasoning_mode") 
+                && params_obj.contains_key("thinking_budget") {
+                Some(true)
+            } else {
+                None
+            };
+            
+            capabilities.agentic_tasks = if params_obj.contains_key("thinking") 
+                && params_obj.contains_key("min_thinking_tokens") {
+                Some(true)
+            } else {
+                None
+            };
             
             // Extract experimental features from parameters
             for (key, value) in params_obj {
@@ -508,6 +577,12 @@ mod tests {
             streaming: true,
             reasoning: Some(true),
             extended_context: None,
+            thinking_mode: None,
+            adaptive_reasoning: None,
+            deterministic_sampling: None,
+            advanced_coding: None,
+            balanced_performance: None,
+            agentic_tasks: None,
             multimodal: None,
             experimental: HashMap::new(),
         });

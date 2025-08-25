@@ -25,6 +25,7 @@ pub fn minimal_prompt() -> PromptSpec {
         sampling: None,
         limits: None,
         media: None,
+        advanced: None,
         strict_mode: StrictMode::Warn,
     }
 }
@@ -53,6 +54,7 @@ pub fn chat_prompt(system: &str, user: &str) -> PromptSpec {
         sampling: None,
         limits: None,
         media: None,
+        advanced: None,
         strict_mode: StrictMode::Warn,
     }
 }
@@ -468,6 +470,7 @@ pub fn multi_turn_prompt() -> PromptSpec {
         sampling: None,
         limits: None,
         media: None,
+        advanced: None,
         strict_mode: StrictMode::Warn,
     }
 }

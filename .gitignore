@@ -49,3 +49,6 @@ secrets.yaml
 # LLM context files (internal documentation)
 llmcontext/
 CLAUDE.md
+
+# Research data
+research/

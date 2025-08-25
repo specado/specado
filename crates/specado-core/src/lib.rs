@@ -46,7 +46,8 @@ pub use types::{
     Tool, ToolChoice, ToolCall,
     
     // Configuration types
-    ResponseFormat, SamplingParams, Limits, MediaConfig,
+    ResponseFormat, SamplingParams, Limits, MediaConfig, AdvancedParams,
+    ReasoningEffort, ReasoningMode, VerbosityLevel,
     
     // Provider types
     ProviderInfo, ModelSpec, Endpoints, EndpointConfig,

@@ -17,6 +17,7 @@ use crate::specs::Capabilities;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptSpec {
     /// Model class (e.g., "Chat", "ReasoningChat")
+    #[serde(default = "default_model_class")]
     pub model_class: String,
     
     /// Conversation messages
@@ -46,8 +47,82 @@ pub struct PromptSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub media: Option<MediaConfig>,
     
+    /// Advanced model parameters for latest features
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub advanced: Option<AdvancedParams>,
+    
     /// Strictness mode for translation
+    #[serde(default = "default_strict_mode")]
     pub strict_mode: StrictMode,
+}
+
+fn default_model_class() -> String {
+    "Chat".to_string()
+}
+
+fn default_strict_mode() -> StrictMode {
+    StrictMode::Warn
+}
+
+impl Default for PromptSpec {
+    fn default() -> Self {
+        Self {
+            model_class: default_model_class(),
+            messages: Vec::new(),  // User must provide messages
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+            sampling: None,
+            limits: None,
+            media: None,
+            advanced: None,
+            strict_mode: default_strict_mode(),
+        }
+    }
+}
+
+impl PromptSpec {
+    /// Create a prompt with just a message - everything else uses defaults
+    pub fn new(prompt: impl Into<String>) -> Self {
+        Self {
+            messages: vec![Message::user(prompt)],
+            ..Default::default()
+        }
+    }
+    
+    /// Builder method to add messages
+    pub fn with_messages(mut self, messages: Vec<Message>) -> Self {
+        self.messages = messages;
+        self
+    }
+    
+    /// Builder method to add a single message
+    pub fn with_message(mut self, message: Message) -> Self {
+        self.messages.push(message);
+        self
+    }
+    
+    /// Builder method for advanced parameters
+    pub fn with_advanced(mut self, advanced: AdvancedParams) -> Self {
+        self.advanced = Some(advanced);
+        self
+    }
+    
+    /// Create a simple prompt with a single user message (kept for compatibility)
+    pub fn simple(prompt: &str) -> Self {
+        Self::new(prompt)
+    }
+    
+    /// Create with system and user messages  
+    pub fn with_system(system: &str, user: &str) -> Self {
+        Self {
+            messages: vec![
+                Message::system(system),
+                Message::user(user),
+            ],
+            ..Default::default()
+        }
+    }
 }
 
 /// Represents a provider specification
@@ -137,6 +212,38 @@ pub struct Message {
     pub metadata: Option<Value>,
 }
 
+impl Message {
+    /// Create a user message
+    pub fn user(content: impl Into<String>) -> Self {
+        Self {
+            role: MessageRole::User,
+            content: content.into(),
+            name: None,
+            metadata: None,
+        }
+    }
+    
+    /// Create an assistant message
+    pub fn assistant(content: impl Into<String>) -> Self {
+        Self {
+            role: MessageRole::Assistant,
+            content: content.into(),
+            name: None,
+            metadata: None,
+        }
+    }
+    
+    /// Create a system message
+    pub fn system(content: impl Into<String>) -> Self {
+        Self {
+            role: MessageRole::System,
+            content: content.into(),
+            name: None,
+            metadata: None,
+        }
+    }
+}
+
 /// Message role enumeration
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -205,6 +312,66 @@ pub struct SamplingParams {
     
     #[serde(skip_serializing_if = "Option::is_none")]
     pub presence_penalty: Option<f32>,
+}
+
+/// Advanced parameters for latest model features
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AdvancedParams {
+    /// Enable thinking mode (Claude Opus 4.1)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<bool>,
+    
+    /// Minimum tokens for thinking mode
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_thinking_tokens: Option<u32>,
+    
+    /// Reasoning effort level (GPT-5)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<ReasoningEffort>,
+    
+    /// Deterministic sampling seed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u32>,
+    
+    /// Reasoning mode for Claude 4 Sonnet
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_mode: Option<ReasoningMode>,
+    
+    /// Thinking token budget
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking_budget: Option<u32>,
+    
+    /// Verbosity level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verbosity: Option<VerbosityLevel>,
+}
+
+/// Reasoning effort levels for adaptive models
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReasoningEffort {
+    Low,
+    Medium,
+    High,
+}
+
+/// Reasoning modes for balanced models
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReasoningMode {
+    Fast,
+    Balanced,
+    Thorough,
+}
+
+/// Verbosity levels for output control
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VerbosityLevel {
+    Concise,
+    Standard,
+    Detailed,
+    Comprehensive,
 }
 
 /// Token and output limits
@@ -488,6 +655,7 @@ mod tests {
             sampling: None,
             limits: None,
             media: None,
+            advanced: None,
             strict_mode: StrictMode::Warn,
         };
         

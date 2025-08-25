@@ -118,6 +118,7 @@ pub fn prompt_spec_strategy() -> impl Strategy<Value = PromptSpec> {
             sampling,
             limits,
             media: None,
+            advanced: None,
             strict_mode,
         }
     })

@@ -466,6 +466,7 @@ mod tests {
             sampling: None,
             limits: None,
             media: None,
+            advanced: None,
             strict_mode: StrictMode::Warn,
         };
 

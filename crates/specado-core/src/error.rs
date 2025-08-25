@@ -165,6 +165,12 @@ pub enum StrictMode {
     Coerce,
 }
 
+impl Default for StrictMode {
+    fn default() -> Self {
+        StrictMode::Warn
+    }
+}
+
 /// Severity levels for errors and warnings
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Severity {

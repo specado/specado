@@ -28,6 +28,7 @@ url = "2.5"
 rand = "0.8"
 tracing = "0.1"
 colored = "2.1"
+dotenv = "0.15"
 
 [dev-dependencies]
 criterion = "0.5"

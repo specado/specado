@@ -363,6 +363,7 @@ fn create_test_context() -> crate::translation::TranslationContext {
         sampling: None,
         limits: None,
         media: None,
+        advanced: None,
         strict_mode: StrictMode::Warn,
     };
 

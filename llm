@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Universal LLM CLI - works with any model
+# Usage: ./llm [model] 
+# Examples:
+#   ./llm gpt-5          # Use GPT-5
+#   ./llm claude-opus-4.1 # Use Claude Opus 4.1
+#   ./llm                # Defaults to GPT-5
+
+cd "$(dirname "$0")"
+
+# Build if needed
+if [ ! -f "target/release/examples/cli" ]; then
+    echo "Building CLI..."
+    cargo build --release --example cli 2>/dev/null
+fi
+
+# Run with model argument (defaults to gpt-5)
+exec ./target/release/examples/cli "$@"

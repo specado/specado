@@ -7,7 +7,7 @@ use crate::{
     error::{Error, Result},
     types::{
         Message, MessageRole, PromptSpec, ProviderSpec, UniformResponse,
-        SamplingParams, Limits,
+        SamplingParams, Limits, AdvancedParams, ReasoningEffort, ReasoningMode, VerbosityLevel,
     },
     translation::translate,
     StrictMode,
@@ -40,6 +40,12 @@ pub enum GenerationMode {
 }
 
 impl LLM {
+    /// Quick one-shot API call with minimal setup
+    pub async fn quick_ask(model: &str, prompt: &str) -> Result<String> {
+        let llm = Self::new(model)?;
+        llm.ask(prompt).await
+    }
+    
     /// Create a new LLM instance for the specified model
     pub fn new(model: &str) -> Result<Self> {
         let normalized_model = Self::normalize_model_name(model)?;
@@ -73,6 +79,12 @@ impl LLM {
             normalized_model,
             provider_spec,
         })
+    }
+    
+    /// Generate text with minimal configuration (uses defaults)
+    pub async fn ask(&self, prompt: &str) -> Result<String> {
+        let response = self.generate(prompt, GenerationMode::Balanced, None).await?;
+        Ok(response.content)
     }
     
     /// Generate text with a simple prompt
@@ -116,6 +128,92 @@ impl LLM {
         max_tokens: Option<u32>,
     ) -> Result<UniformResponse> {
         let prompt_spec = self.build_chat_spec(messages, mode, max_tokens)?;
+        self.execute_request(prompt_spec).await
+    }
+    
+    /// Generate with advanced parameters for thinking mode (Claude Opus 4.1)
+    pub async fn generate_with_thinking(
+        &self,
+        prompt: &str,
+        thinking_enabled: bool,
+        min_thinking_tokens: Option<u32>,
+        max_tokens: Option<u32>,
+    ) -> Result<UniformResponse> {
+        let mut prompt_spec = self.build_prompt_spec(prompt, GenerationMode::Balanced, max_tokens)?;
+        
+        // Add advanced thinking parameters
+        prompt_spec.advanced = Some(AdvancedParams {
+            thinking: Some(thinking_enabled),
+            min_thinking_tokens,
+            reasoning_effort: None,
+            seed: None,
+            reasoning_mode: None,
+            thinking_budget: None,
+            verbosity: None,
+        });
+        
+        self.execute_request(prompt_spec).await
+    }
+    
+    /// Generate with reasoning effort control (GPT-5)
+    pub async fn generate_with_reasoning(
+        &self,
+        prompt: &str,
+        reasoning_effort: ReasoningEffort,
+        seed: Option<u32>,
+        max_tokens: Option<u32>,
+    ) -> Result<UniformResponse> {
+        let mut prompt_spec = self.build_prompt_spec(prompt, GenerationMode::Balanced, max_tokens)?;
+        
+        // Add advanced reasoning parameters
+        prompt_spec.advanced = Some(AdvancedParams {
+            thinking: None,
+            min_thinking_tokens: None,
+            reasoning_effort: Some(reasoning_effort),
+            seed,
+            reasoning_mode: None,
+            thinking_budget: None,
+            verbosity: None,
+        });
+        
+        self.execute_request(prompt_spec).await
+    }
+    
+    /// Generate with balanced reasoning mode (Claude 4 Sonnet)
+    pub async fn generate_with_balanced_reasoning(
+        &self,
+        prompt: &str,
+        reasoning_mode: ReasoningMode,
+        thinking_budget: Option<u32>,
+        verbosity: Option<VerbosityLevel>,
+        max_tokens: Option<u32>,
+    ) -> Result<UniformResponse> {
+        let mut prompt_spec = self.build_prompt_spec(prompt, GenerationMode::Balanced, max_tokens)?;
+        
+        // Add advanced balanced reasoning parameters
+        prompt_spec.advanced = Some(AdvancedParams {
+            thinking: None,
+            min_thinking_tokens: None,
+            reasoning_effort: None,
+            seed: None,
+            reasoning_mode: Some(reasoning_mode),
+            thinking_budget,
+            verbosity,
+        });
+        
+        self.execute_request(prompt_spec).await
+    }
+    
+    /// Generate with full advanced parameters control
+    pub async fn generate_advanced(
+        &self,
+        prompt: &str,
+        advanced: AdvancedParams,
+        mode: GenerationMode,
+        max_tokens: Option<u32>,
+    ) -> Result<UniformResponse> {
+        let mut prompt_spec = self.build_prompt_spec(prompt, mode, max_tokens)?;
+        prompt_spec.advanced = Some(advanced);
         self.execute_request(prompt_spec).await
     }
     
@@ -169,6 +267,7 @@ impl LLM {
             sampling: Some(sampling),
             limits: Some(limits),
             media: None,
+            advanced: None,
             strict_mode: StrictMode::Warn,
         })
     }
@@ -191,6 +290,7 @@ impl LLM {
             sampling: Some(sampling),
             limits: Some(limits),
             media: None,
+            advanced: None,
             strict_mode: StrictMode::Warn,
         })
     }
@@ -342,37 +442,6 @@ impl LLM {
 }
 
 /// Helper functions for creating messages
-impl Message {
-    /// Create a user message
-    pub fn user(content: impl Into<String>) -> Self {
-        Self {
-            role: MessageRole::User,
-            content: content.into(),
-            name: None,
-            metadata: None,
-        }
-    }
-    
-    /// Create an assistant message
-    pub fn assistant(content: impl Into<String>) -> Self {
-        Self {
-            role: MessageRole::Assistant,
-            content: content.into(),
-            name: None,
-            metadata: None,
-        }
-    }
-    
-    /// Create a system message
-    pub fn system(content: impl Into<String>) -> Self {
-        Self {
-            role: MessageRole::System,
-            content: content.into(),
-            name: None,
-            metadata: None,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

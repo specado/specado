@@ -63,6 +63,18 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 128000
+        },
+        "reasoning_effort": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "default": "medium",
+          "description": "Configurable reasoning effort level for adaptive processing"
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647,
+          "description": "Deterministic sampling seed for reproducible outputs"
         }
       },
       "constraints": {
@@ -83,7 +95,9 @@
           "$.sampling.temperature": "$.temperature",
           "$.sampling.top_p": "$.top_p",
           "$.sampling.frequency_penalty": "$.frequency_penalty",
-          "$.sampling.presence_penalty": "$.presence_penalty"
+          "$.sampling.presence_penalty": "$.presence_penalty",
+          "$.advanced.reasoning_effort": "$.reasoning_effort",
+          "$.advanced.seed": "$.seed"
         },
         "flags": {}
       },
@@ -91,7 +105,11 @@
         "text_generation": true,
         "vision": false,
         "function_calling": true,
-        "streaming": true
+        "streaming": true,
+        "adaptive_reasoning": true,
+        "context_routing": true,
+        "deterministic_sampling": true,
+        "advanced_coding": true
       },
       "response_normalization": {
         "sync": {

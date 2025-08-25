@@ -117,6 +117,12 @@ mod tests {
             streaming: false,
             reasoning: None,
             extended_context: None,
+            thinking_mode: None,
+            adaptive_reasoning: None,
+            deterministic_sampling: None,
+            advanced_coding: None,
+            balanced_performance: None,
+            agentic_tasks: None,
             multimodal: None,
             experimental: HashMap::new(),
         });
