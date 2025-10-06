@@ -1,6 +1,6 @@
 # AI GitHub Workflow Guidelines
 
-This document outlines the standardized approach for AI assistants working with GitHub issues, PRs, and project management in the Specado project.
+This document outlines the standardized approach for AI assistants working with GitHub issues, PRs, and project management in the Specado project. IT IS CRITICAL THAT IF YOU ARE AI YOU HAVE READ THE ENTIRE DOCUMENT AND UNDERSTAND THE TEMPLATES AND APPROACH AND RULES WITH GREAT ATTENTION TO DETAIL.
 
 ## 🚀 Quick Start Checklist for Every GitHub Operation
 
@@ -32,6 +32,12 @@ Before ANY GitHub operation:
    - Cross-reference liberally to maintain context
 
 ## Issue Management
+
+### Project & Epic Maintenance
+- Keep the five canonical epics (#1-#5) in sync with `SPECADO_PLAN.md`; add new epics only after the plan is updated.
+- Update each issue's `* Epic: #...` attribution via edit when work is re-scoped.
+- After every working session, set the project status field (Todo/In Progress/Done) for touched items in Org Project 14.
+- Reopen epics if child issues remain; avoid closing epics while dependent tasks are still open.
 
 ### Before Creating Issues
 **ALWAYS check for duplicates first:**

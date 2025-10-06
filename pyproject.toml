@@ -1,0 +1,15 @@
+[build-system]
+requires = ["maturin>=1.4"]
+build-backend = "maturin"
+
+[project]
+name = "specado"
+version = "0.1.0"
+description = "Specado Python bindings"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Specado" }]
+dependencies = []
+
+[tool.maturin]
+features = []
