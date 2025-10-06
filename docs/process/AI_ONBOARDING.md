@@ -7,6 +7,7 @@ You must always analyze the Github Issues to determine the current state of the 
 ## 1. GitHub Workflow
 - Read `docs/process/GITHUB_TRACKING.md` before running any `gh` commands; it contains the canonical checklist, quoting rules (single quotes), and hygiene requirements when creating, working on, updating, or closing issues.
 - The github repo is `specado/specado` and the organization is `specado`
+- Never mention the Plan/Issue documents in PR/Issue comments.
 - Maintain GitHub sub-issue links: epics #1–#5 parent their child issues. If re-scoping work, update the sub-issue relationships via `addSubIssue`/`removeSubIssue` mutations and adjust project statuses in Organization Project 14.
 
 ## 2. Language-Specific Code Rules

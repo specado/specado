@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specado.dev/schemas/provider-spec.v1.json",
+  "type": "object",
+  "required": ["provider", "models", "endpoints", "mappings", "constraints", "auth"],
+  "properties": {
+    "provider": {"type": "string"},
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {"type": "string"}
+        }
+      }
+    },
+    "auth": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "token_env"],
+          "properties": {
+            "type": {"const": "bearer"},
+            "token_env": {"type": "string"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "header", "key_env"],
+          "properties": {
+            "type": {"const": "apikey"},
+            "header": {"type": "string"},
+            "key_env": {"type": "string"}
+          }
+        }
+      ]
+    },
+    "endpoints": {
+      "type": "object",
+      "required": ["chat"],
+      "properties": {
+        "chat": {
+          "type": "object",
+          "required": ["method", "url", "headers"],
+          "properties": {
+            "method": {"type": "string", "enum": ["POST"]},
+            "url": {"type": "string", "format": "uri"},
+            "headers": {"type": "object"}
+          }
+        }
+      }
+    },
+    "mappings": {
+      "type": "object",
+      "required": ["request", "response"],
+      "properties": {
+        "request": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from": {"type": "string"},
+              "to": {"type": "string"},
+              "code": {"type": "string"},
+              "clamp": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        "response": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from": {"type": "string"},
+              "to": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "required": ["supports"],
+      "properties": {
+        "supports": {
+          "type": "object",
+          "properties": {
+            "json_mode": {"type": "boolean"},
+            "tools": {"type": "boolean"}
+          }
+        }
+      }
+    }
+  }
+}
