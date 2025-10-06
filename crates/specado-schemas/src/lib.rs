@@ -87,8 +87,29 @@ mod tests {
         let prompt = json!({
             "version": "1",
             "messages": [
-                {"role": "user", "content": "hi"}
-            ]
+                {"role": "system", "content": "You are helpful."},
+                {"role": "user", "content": "Summarize this article."}
+            ],
+            "sampling": {
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "top_k": 40
+            },
+            "response": {
+                "format": "json_schema",
+                "json_schema": {
+                    "name": "summary",
+                    "schema": {"type": "object"}
+                }
+            },
+            "tools": [
+                {
+                    "name": "fetch_url",
+                    "json_schema": {"type": "object"}
+                }
+            ],
+            "tool_choice": "auto",
+            "strict_mode": "Warn"
         });
         assert!(validator.validate_prompt(&prompt).is_ok());
     }
@@ -102,6 +123,93 @@ mod tests {
         });
 
         let err = validator.validate_prompt(&prompt).unwrap_err();
+        assert!(matches!(err, ValidationError::Validation(_)));
+    }
+
+    #[test]
+    fn prompt_schema_defaults_response_to_text() {
+        let schema_json: Value =
+            serde_json::from_str(include_str!("../schemas/prompt-spec.v1.schema.json"))
+                .expect("schema should parse");
+
+        let default_format = schema_json
+            .pointer("/properties/response/default/format")
+            .and_then(Value::as_str);
+
+        assert_eq!(default_format, Some("text"));
+    }
+
+    #[test]
+    fn validates_provider_schema() {
+        let validator = get_validator();
+        let provider = json!({
+            "provider": "openai",
+            "models": [
+                {"id": "gpt-4o"}
+            ],
+            "auth": {
+                "type": "bearer",
+                "token_env": "OPENAI_API_KEY"
+            },
+            "endpoints": {
+                "chat": {
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/chat/completions",
+                    "headers": {
+                        "content-type": "application/json"
+                    }
+                }
+            },
+            "mappings": {
+                "request": [
+                    {"from": "prompt.messages", "to": "body.messages"}
+                ],
+                "response": [
+                    {"from": "body.choices[0].message", "to": "prompt.response"}
+                ]
+            },
+            "constraints": {
+                "supports": {
+                    "json_mode": true,
+                    "tools": true
+                }
+            }
+        });
+
+        assert!(validator.validate_provider(&provider).is_ok());
+    }
+
+    #[test]
+    fn invalid_provider_requires_auth_fields() {
+        let validator = get_validator();
+        let provider = json!({
+            "provider": "openai",
+            "models": [
+                {"id": "gpt-4o"}
+            ],
+            "auth": {
+                "type": "bearer"
+            },
+            "endpoints": {
+                "chat": {
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/chat/completions",
+                    "headers": {}
+                }
+            },
+            "mappings": {
+                "request": [],
+                "response": []
+            },
+            "constraints": {
+                "supports": {
+                    "json_mode": true,
+                    "tools": false
+                }
+            }
+        });
+
+        let err = validator.validate_provider(&provider).unwrap_err();
         assert!(matches!(err, ValidationError::Validation(_)));
     }
 }
