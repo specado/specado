@@ -1,6 +1,6 @@
 use crate::types::{
-    LossinessCode, LossinessEntry, LossinessLevel, LossinessReport, Message, MessageRole,
-    PromptSpec, ProviderSpec,
+    LossinessCode, LossinessEntry, LossinessLevel, LossinessReport, MessageRole, PromptSpec,
+    ProviderSpec,
 };
 use serde_json::json;
 
@@ -38,8 +38,8 @@ pub fn detect_relocate(prompt: &PromptSpec, provider: &ProviderSpec, report: &mu
 mod tests {
     use super::*;
     use crate::types::{
-        Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig, RequestMapping,
-        ResponseMapping, StrictMode, SupportFlags,
+        Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, Message, ModelConfig,
+        RequestMapping, ResponseMapping, StrictMode, SupportFlags,
     };
 
     fn base_provider(code: Option<&str>) -> ProviderSpec {
