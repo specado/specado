@@ -8,3 +8,22 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+specado-schemas.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+reqwest.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+tracing.workspace = true
+serde_json_path.workspace = true
+once_cell.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+criterion = "0.5"
+
+[[bench]]
+name = "translation"
+harness = false
