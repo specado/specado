@@ -2,6 +2,7 @@
 
 pub mod auth;
 pub mod error;
+pub mod transformer;
 pub mod types;
 
 /// Placeholder module for the Specado core engine.
