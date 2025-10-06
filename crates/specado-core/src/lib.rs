@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 pub mod auth;
+pub mod error;
 pub mod types;
 
 /// Placeholder module for the Specado core engine.
