@@ -1,0 +1,15 @@
+# Rust build artifacts
+/target
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.so
+/.venv
+venv/
+
+# Node.js artifacts
+node_modules/
+
+# Miscellaneous
+.DS_Store

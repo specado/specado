@@ -1,39 +1,166 @@
-````markdown
-# Specado v1.0 — Single-Issue-Templated Plan (Everything Inline)
+# Specado Issue Catalog
 
-**Status:** Production-Ready • **Date:** January 2025 • **Rust:** 1.75+
+_Generated: 2025-10-06_
 
-> This single Markdown file presents **Epics** and **Issues** with a uniform template.  
-> Each Issue contains **all needed information inline**, including **files and full code** where relevant.
+This catalog mirrors the current Organization Project 14 backlog (epics and tasks). Each section reproduces the issue metadata followed by the full body text.
 
----
+## #1 — Epic: Foundation (Workspace & Schemas)
 
-# 🔱 Epics
+- **State:** open
+- **Labels:** epic
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/1
 
-- **#E1** Workspace & Build System
-- **#E2** Schemas & Validation
-- **#E3** Core Types & Error Model
-- **#E4** Auth & Secrets Handling
-- **#E5** Translation & Normalization
-- **#E6** HTTP Client & Execute
-- **#E7** Resilience (Circuit Breaker & Retry)
-- **#E8** Routing
-- **#E9** CLI
-- **#E10** Python Bindings
-- **#E11** Python Package Layer (pyproject + compat)
-- **#E12** Node.js Bindings
-- **#E13** Provider Catalog
-- **#E14** CI/CD
-- **#E15** Production Features (Design: Hot-Reload, Audit Logging)
-- **#E16** Tests, Benchmarks, Examples, Docs
+### Body
 
----
+## 📌 Scope
+Lay the groundwork for Specado v1.0 by establishing the multi-crate workspace, shared configuration, and schema validation crates that every other component relies on.
 
-# 📦 Issues
+## ✅ Exit Criteria
+- [ ] `cargo test -p specado-schemas` passes on CI
+- [ ] `cargo test -p specado-core` passes for the initial types/auth scaffolding
+- [ ] Repository layout and shared dependencies match `SPECADO_PLAN.md`
 
----
+## 📦 Linked Issues
+- [ ] #17 Repository Structure & Root Workspace
+- [ ] #18 specado-schemas Crate (Cargo & Validator)
+- [ ] #19 Prompt Schema v1 (JSON)
+- [ ] #20 Provider Schema v1 (JSON)
+- [ ] #21 specado-core Cargo
 
-## #I001 — Repository Structure & Root Workspace
+## 🧭 Next Milestone
+Unblock the Core Engine epic by handing off a validated workspace and schemas with passing smoke tests.
+
+
+## #2 — Epic: Core Engine
+
+- **State:** open
+- **Labels:** epic
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/2
+
+### Body
+
+## 📌 Scope
+Deliver the Specado core engine: orchestration layer, error model, authentication, translation pipeline, lossiness detection, HTTP client, and resilience features that power all bindings.
+
+## ✅ Exit Criteria
+- [ ] `cargo test --workspace` passes with lossiness and transformer suites
+- [ ] `specado preview` generates a lossiness report with ≥3 distinct codes
+- [ ] Public API for `specado-core` (execute/translate) is frozen and documented
+
+## 📦 Linked Issues
+- [ ] #22 Core Orchestration (specado-core/src/lib.rs)
+- [ ] #23 Error Model (specado-core/src/error.rs)
+- [ ] #24 Auth Handler (specado-core/src/auth.rs)
+- [ ] #25 Types Barrel (specado-core/src/types/mod.rs)
+- [ ] #26 Prompt Types (specado-core/src/types/prompt.rs)
+- [ ] #27 Provider Types (specado-core/src/types/provider.rs)
+- [ ] #28 Lossiness Types (specado-core/src/types/lossiness.rs)
+- [ ] #29 Uniform Response (specado-core/src/types/response.rs)
+- [ ] #30 Transformer Module Barrel (specado-core/src/transformer/mod.rs)
+- [ ] #31 Translate (specado-core/src/transformer/translate.rs)
+- [ ] #32 Normalize (specado-core/src/transformer/normalize.rs)
+- [ ] #33 Detect: Barrel (specado-core/src/transformer/detect/mod.rs)
+- [ ] #34 Detect Clamp (specado-core/src/transformer/detect/clamp.rs)
+- [ ] #35 Detect Relocate (specado-core/src/transformer/detect/relocate.rs)
+- [ ] #36 Detect Unsupported (specado-core/src/transformer/detect/unsupported.rs)
+- [ ] #37 Detect Drops (specado-core/src/transformer/detect/drop.rs)
+- [ ] #38 HTTP Client (specado-core/src/http/client.rs) & HTTP Module Shim
+- [ ] #39 Circuit Breaker (specado-core/src/circuit_breaker.rs)
+- [ ] #40 Retry Policy (specado-core/src/retry.rs)
+- [ ] #41 Routing (Trait & Primary-Fallback)
+
+## 🧭 Next Milestone
+Enable bindings work once the core library APIs, resilience tooling, and tests are locked down and stable.
+
+
+## #3 — Epic: Developer Interfaces
+
+- **State:** open
+- **Labels:** epic
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/3
+
+### Body
+
+## 📌 Scope
+Provide first-class developer interfaces by delivering the CLI tooling plus Python and Node.js bindings built on the frozen core API.
+
+## ✅ Exit Criteria
+- [ ] `specado-cli` supports `validate`, `preview`, and `run` flows end-to-end
+- [ ] `maturin develop && pytest python/tests/` passes against the Python bindings
+- [ ] `cd crates/specado-node && npm run build && npm test` passes for Node bindings
+
+## 📦 Linked Issues
+- [ ] #42 CLI Cargo (crates/specado-cli/Cargo.toml) & CLI Main
+- [ ] #43 Python Native Crate (crates/specado-py) & PyO3 Bindings
+- [ ] #44 Python Project Config & Python High-Level API + OpenAI Compat
+- [ ] #45 Node.js Bindings (napi-rs + packaging)
+
+## 🧭 Next Milestone
+Ship language integrations that consume the stable core API and unblock production hardening.
+
+
+## #4 — Epic: Production Readiness
+
+- **State:** open
+- **Labels:** epic
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/4
+
+### Body
+
+## 📌 Scope
+Harden Specado for production use by curating the built-in provider catalog and delivering observability features like hot-reload and audit logging.
+
+## ✅ Exit Criteria
+- [ ] Provider catalog covers OpenAI and Anthropic references with validated schemas
+- [ ] Hot-reload integration test demonstrates live config swaps without restart
+- [ ] Audit logging writes structured JSONL with redacted secrets
+
+## 📦 Linked Issues
+- [ ] #46 Provider Catalog (OpenAI, Anthropic)
+- [ ] #48 Production Feature: Hot-Reload (Design & Stub)
+- [ ] #49 Production Feature: Audit Logging (Design & Stub)
+
+## 🧭 Next Milestone
+Once production features are in place, focus shifts to packaging, CI, and documentation for release.
+
+
+## #5 — Epic: Release Polish
+
+- **State:** open
+- **Labels:** epic
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/5
+
+### Body
+
+## 📌 Scope
+Polish the product for release by finalising CI/CD coverage, documentation, migration guidance, and example projects.
+
+## ✅ Exit Criteria
+- [ ] CI pipeline exercises Rust, Python, and Node targets across each supported OS
+- [ ] Docs include up-to-date quickstart and migration guides validated from a clean install
+- [ ] Examples and golden/integration test scaffolding exist for end-to-end verification
+
+## 📦 Linked Issues
+- [ ] #47 CI/CD Workflow (GitHub Actions)
+- [ ] #50 Docs, Tests, Benches, Examples Scaffolding
+
+## 🧭 Next Milestone
+After these tasks, we are ready for packaging dry-runs and a public v1.0 announcement.
+
+
+## #17 — Repository Structure & Root Workspace
+
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/17
+
+### Body
 
 ### 📋 Task Overview
 Create the multi-crate workspace with the agreed directory layout and root `Cargo.toml`.
@@ -116,7 +243,7 @@ strip = true
 
 #### Dependencies
 
-* Related to: #I002 (Schemas crate init), #I020 (Core crate init)
+* Related to: #18 (Schemas crate init), #21 (Core crate init)
 
 #### API Design
 
@@ -131,7 +258,7 @@ N/A (build system & layout)
 
 ### 🧪 Testing Requirements
 
-* Build verification on all OS targets via CI (#I090).
+* Build verification on all OS targets via CI (#47).
 
 ### 📚 Documentation Requirements
 
@@ -139,15 +266,20 @@ N/A (build system & layout)
 
 ### 🔗 References
 
-* Epic: #E1 (Workspace & Build System)
+* Epic: #1 - Foundation (Workspace & Schemas)
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2–4h • **Complexity:** Low
 
----
+## #18 — specado-schemas Crate (Cargo & Validator)
 
-## #I002 — `specado-schemas` Crate (Cargo & Validator)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/18
+
+### Body
 
 ### 📋 Task Overview
 
@@ -257,7 +389,7 @@ impl SchemaValidator {
 
 #### Dependencies
 
-* Uses: #I003 (Prompt schema), #I004 (Provider schema)
+* Uses: #19 (Prompt schema), #20 (Provider schema)
 
 #### API Design
 
@@ -276,7 +408,7 @@ impl SchemaValidator {
 ### 🧪 Testing Requirements
 
 * Unit: load valid/invalid JSONs and assert error messages.
-* Integration: used via CLI validate (#I050–#I051).
+* Integration: used via CLI validate (#42).
 
 ### 📚 Documentation Requirements
 
@@ -284,15 +416,20 @@ impl SchemaValidator {
 
 ### 🔗 References
 
-* Epic: #E2 (Schemas & Validation)
+* Epic: #1 - Foundation (Workspace & Schemas)
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2–4h • **Complexity:** Low
 
----
+## #19 — Prompt Schema v1 (JSON)
 
-## #I003 — Prompt Schema v1 (JSON)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/19
+
+### Body
 
 ### 📋 Task Overview
 
@@ -409,11 +546,11 @@ Define the v1 prompt schema for messages, sampling, tools, response format, and 
 
 #### Implementation Approach
 
-* Embed schema via `include_str!` (see #I002) for fast, local validation.
+* Embed schema via `include_str!` (see #18) for fast, local validation.
 
 #### Dependencies
 
-* Related to: #I002 (Validator), #I025 (Prompt types)
+* Related to: #18 (Validator), #26 (Prompt types)
 
 #### API Design
 
@@ -423,7 +560,7 @@ N/A (data contract)
 
 ### ⚠️ Risks & Considerations
 
-* Future changes require migration doc (#I160).
+* Future changes require migration doc (#50).
 
 ### 🧪 Testing Requirements
 
@@ -436,15 +573,20 @@ N/A (data contract)
 
 ### 🔗 References
 
-* Epic: #E2
+* Epic: #1 - Foundation (Workspace & Schemas)
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 1–2h • **Complexity:** Low
 
----
+## #20 — Provider Schema v1 (JSON)
 
-## #I004 — Provider Schema v1 (JSON)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/20
+
+### Body
 
 ### 📋 Task Overview
 
@@ -570,11 +712,11 @@ Define v1 schema for provider configs (auth, endpoints, mappings, constraints).
 
 #### Implementation Approach
 
-* Same embedding strategy as #I003.
+* Same embedding strategy as #19.
 
 #### Dependencies
 
-* Related to: #I002 (Validator), #I026 (Provider types)
+* Related to: #18 (Validator), #27 (Provider types)
 
 #### API Design
 
@@ -584,11 +726,11 @@ N/A (data contract)
 
 ### ⚠️ Risks & Considerations
 
-* Mapping JSONPaths must be validated separately by runtime (#I030–#I036).
+* Mapping JSONPaths must be validated separately by runtime (#31–#37).
 
 ### 🧪 Testing Requirements
 
-* Unit: Validate OpenAI/Anthropic YAMLs (#I080–#I081).
+* Unit: Validate OpenAI/Anthropic YAMLs (#46).
 
 ### 📚 Documentation Requirements
 
@@ -596,15 +738,20 @@ N/A (data contract)
 
 ### 🔗 References
 
-* Epic: #E2
+* Epic: #1 - Foundation (Workspace & Schemas)
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 1–2h • **Complexity:** Low
 
----
+## #21 — specado-core Cargo
 
-## #I020 — `specado-core` Cargo
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/21
+
+### Body
 
 ### 📋 Task Overview
 
@@ -656,7 +803,7 @@ harness = false
 
 #### Dependencies
 
-* Uses: #I001 (workspace), #I002 (schemas)
+* Uses: #17 (workspace), #18 (schemas)
 
 #### API Design
 
@@ -670,7 +817,7 @@ N/A
 
 ### 🧪 Testing Requirements
 
-* Build via CI (#I090).
+* Build via CI (#47).
 
 ### 📚 Documentation Requirements
 
@@ -678,15 +825,20 @@ N/A
 
 ### 🔗 References
 
-* Epic: #E3
+* Epic: #1 - Foundation (Workspace & Schemas)
 
 ### ⏱️ Estimates
 
 * **Effort:** XS • **Time:** 0.5–1h • **Complexity:** Low
 
----
+## #22 — Core Orchestration (specado-core/src/lib.rs)
 
-## #I021 — Core Orchestration (`specado-core/src/lib.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/22
+
+### Body
 
 ### 📋 Task Overview
 
@@ -774,7 +926,7 @@ pub fn translate(prompt: &PromptSpec, provider: &ProviderSpec) -> Result<(serde_
 
 #### Dependencies
 
-* Uses: #I023 (Auth), #I037–#I038 (HTTP), #I030–#I031 (Transformer), #I022 (Error)
+* Uses: #24 (Auth), #38 (HTTP), #31–#32 (Transformer), #23 (Error)
 
 #### API Design
 
@@ -799,15 +951,20 @@ pub fn translate(prompt: &PromptSpec, provider: &ProviderSpec) -> Result<(serde_
 
 ### 🔗 References
 
-* Epic: #E6
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** M • **Time:** 4–6h • **Complexity:** Medium
 
----
+## #23 — Error Model (specado-core/src/error.rs)
 
-## #I022 — Error Model (`specado-core/src/error.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/23
+
+### Body
 
 ### 📋 Task Overview
 
@@ -885,7 +1042,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #### Dependencies
 
-* Related: #I023, #I039–#I040.
+* Related: #24, #39–#40.
 
 #### API Design
 
@@ -909,15 +1066,20 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 ### 🔗 References
 
-* Epic: #E3
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 1–2h • **Complexity:** Low
 
----
+## #24 — Auth Handler (specado-core/src/auth.rs)
 
-## #I023 — Auth Handler (`specado-core/src/auth.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/24
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1024,7 +1186,7 @@ impl AuthHandler {
 
 #### Dependencies
 
-* Uses: #I026 (ProviderSpec.auth)
+* Uses: #27 (ProviderSpec.auth)
 
 #### API Design
 
@@ -1036,7 +1198,7 @@ impl AuthHandler { pub fn inject_headers(&self, headers: &mut HashMap<String,Str
 
 ### ⚠️ Risks & Considerations
 
-* Ensure redaction in audit logs later (#I150).
+* Ensure redaction in audit logs later (#48).
 
 ### 🧪 Testing Requirements
 
@@ -1049,15 +1211,20 @@ impl AuthHandler { pub fn inject_headers(&self, headers: &mut HashMap<String,Str
 
 ### 🔗 References
 
-* Epic: #E4
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2–3h • **Complexity:** Low
 
----
+## #25 — Types Barrel (specado-core/src/types/mod.rs)
 
-## #I024 — Types Barrel (`specado-core/src/types/mod.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/25
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1087,7 +1254,7 @@ pub use response::{UniformResponse, FinishReason, Usage, Extensions};
 
 #### Dependencies
 
-* Uses: #I025–#I028
+* Uses: #26–#29
 
 ### 🧪 Testing Requirements
 
@@ -1095,15 +1262,20 @@ pub use response::{UniformResponse, FinishReason, Usage, Extensions};
 
 ### 🔗 References
 
-* Epic: #E3
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** XS • **Time:** 0.5h • **Complexity:** Low
 
----
+## #26 — Prompt Types (specado-core/src/types/prompt.rs)
 
-## #I025 — Prompt Types (`specado-core/src/types/prompt.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/26
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1235,7 +1407,7 @@ pub enum StrictMode {
 
 #### Dependencies
 
-* Related to: #I003 (Prompt schema)
+* Related to: #19 (Prompt schema)
 
 ### 🧪 Testing Requirements
 
@@ -1244,15 +1416,20 @@ pub enum StrictMode {
 
 ### 🔗 References
 
-* Epic: #E3
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2–3h • **Complexity:** Low
 
----
+## #27 — Provider Types (specado-core/src/types/provider.rs)
 
-## #I026 — Provider Types (`specado-core/src/types/provider.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/27
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1335,7 +1512,7 @@ pub struct SupportFlags {
 
 #### Dependencies
 
-* Uses: #I004 (Provider schema), #I023 (Auth)
+* Uses: #20 (Provider schema), #24 (Auth)
 
 ### 🧪 Testing Requirements
 
@@ -1343,15 +1520,20 @@ pub struct SupportFlags {
 
 ### 🔗 References
 
-* Epic: #E3
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2h • **Complexity:** Low
 
----
+## #28 — Lossiness Types (specado-core/src/types/lossiness.rs)
 
-## #I027 — Lossiness Types (`specado-core/src/types/lossiness.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/28
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1432,7 +1614,7 @@ impl LossinessReport {
 
 #### Dependencies
 
-* Used by: #I030–#I036 and #I021
+* Used by: #31–#37 and #22
 
 ### 🧪 Testing Requirements
 
@@ -1440,15 +1622,20 @@ impl LossinessReport {
 
 ### 🔗 References
 
-* Epic: #E3
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** XS • **Time:** 1h • **Complexity:** Low
 
----
+## #29 — Uniform Response (specado-core/src/types/response.rs)
 
-## #I028 — Uniform Response (`specado-core/src/types/response.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/29
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1504,7 +1691,7 @@ pub struct Extensions {
 
 #### Dependencies
 
-* Used by: #I021, #I031
+* Used by: #22, #32
 
 ### 🧪 Testing Requirements
 
@@ -1512,15 +1699,20 @@ pub struct Extensions {
 
 ### 🔗 References
 
-* Epic: #E3
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** XS • **Time:** 1h • **Complexity:** Low
 
----
+## #30 — Transformer Module Barrel (specado-core/src/transformer/mod.rs)
 
-## #I029 — Transformer Module Barrel (`specado-core/src/transformer/mod.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/30
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1547,7 +1739,7 @@ pub use normalize::normalize;
 
 #### Dependencies
 
-* Uses: #I030, #I031, #I032–#I036
+* Uses: #31, #32, #33–#37
 
 ### 🧪 Testing Requirements
 
@@ -1555,15 +1747,20 @@ pub use normalize::normalize;
 
 ### 🔗 References
 
-* Epic: #E5
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** XS • **Time:** 0.5h • **Complexity:** Low
 
----
+## #31 — Translate (specado-core/src/transformer/translate.rs)
 
-## #I030 — Translate (`specado-core/src/transformer/translate.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/31
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1660,7 +1857,7 @@ fn set_value_at_path(target: &mut Value, path: &str, value: Value) -> Result<()>
 
 #### Dependencies
 
-* Uses: #I032–#I036 detectors, #I027 lossiness
+* Uses: #33–#37 detectors, #28 lossiness
 
 ### 🧪 Testing Requirements
 
@@ -1669,15 +1866,20 @@ fn set_value_at_path(target: &mut Value, path: &str, value: Value) -> Result<()>
 
 ### 🔗 References
 
-* Epic: #E5
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** M • **Time:** 5–8h • **Complexity:** Medium
 
----
+## #32 — Normalize (specado-core/src/transformer/normalize.rs)
 
-## #I031 — Normalize (`specado-core/src/transformer/normalize.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/32
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1755,7 +1957,7 @@ fn map_finish_reason(raw: &str) -> FinishReason {
 
 #### Dependencies
 
-* Uses: #I028, #I026
+* Uses: #29, #27
 
 ### 🧪 Testing Requirements
 
@@ -1764,15 +1966,20 @@ fn map_finish_reason(raw: &str) -> FinishReason {
 
 ### 🔗 References
 
-* Epic: #E5
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2–3h • **Complexity:** Low
 
----
+## #33 — Detect: Barrel (specado-core/src/transformer/detect/mod.rs)
 
-## #I032 — Detect: Barrel (`specado-core/src/transformer/detect/mod.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/33
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1802,7 +2009,7 @@ pub use drop::detect_drops;
 
 ### Dependencies
 
-* Uses: #I033–#I036
+* Uses: #34–#37
 
 ### 🧪 Testing Requirements
 
@@ -1810,15 +2017,20 @@ pub use drop::detect_drops;
 
 ### 🔗 References
 
-* Epic: #E5
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** XS • **Time:** 0.5h • **Complexity:** Low
 
----
+## #34 — Detect Clamp (specado-core/src/transformer/detect/clamp.rs)
 
-## #I033 — Detect Clamp (`specado-core/src/transformer/detect/clamp.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/34
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1868,7 +2080,7 @@ pub fn clamp_value(value: f64, range: [f64; 2], path: String, report: &mut Lossi
 
 ### Dependencies
 
-* Related: #I027
+* Related: #28
 
 ### 🧪 Testing Requirements
 
@@ -1876,15 +2088,20 @@ pub fn clamp_value(value: f64, range: [f64; 2], path: String, report: &mut Lossi
 
 ### 🔗 References
 
-* Epic: #E5
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** XS • **Time:** 1h • **Complexity:** Low
 
----
+## #35 — Detect Relocate (specado-core/src/transformer/detect/relocate.rs)
 
-## #I034 — Detect Relocate (`specado-core/src/transformer/detect/relocate.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/35
+
+### Body
 
 ### 📋 Task Overview
 
@@ -1934,7 +2151,7 @@ pub fn detect_relocate(
 
 ### Dependencies
 
-* Uses: #I025 (Prompt), #I026 (Provider)
+* Uses: #26 (Prompt), #27 (Provider)
 
 ### 🧪 Testing Requirements
 
@@ -1942,15 +2159,20 @@ pub fn detect_relocate(
 
 ### 🔗 References
 
-* Epic: #E5
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** XS • **Time:** 1h • **Complexity:** Low
 
----
+## #36 — Detect Unsupported (specado-core/src/transformer/detect/unsupported.rs)
 
-## #I035 — Detect Unsupported (`specado-core/src/transformer/detect/unsupported.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/36
+
+### Body
 
 ### 📋 Task Overview
 
@@ -2001,7 +2223,7 @@ pub fn detect_unsupported(
 
 ### Dependencies
 
-* Uses: #I025, #I026
+* Uses: #26, #27
 
 ### 🧪 Testing Requirements
 
@@ -2009,15 +2231,20 @@ pub fn detect_unsupported(
 
 ### 🔗 References
 
-* Epic: #E5
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** XS • **Time:** 1h • **Complexity:** Low
 
----
+## #37 — Detect Drops (specado-core/src/transformer/detect/drop.rs)
 
-## #I036 — Detect Drops (`specado-core/src/transformer/detect/drop.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/37
+
+### Body
 
 ### 📋 Task Overview
 
@@ -2063,7 +2290,7 @@ pub fn detect_drops(
 
 ### Dependencies
 
-* Uses: #I027
+* Uses: #28
 
 ### 🧪 Testing Requirements
 
@@ -2071,15 +2298,20 @@ pub fn detect_drops(
 
 ### 🔗 References
 
-* Epic: #E5
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** XS • **Time:** 1h • **Complexity:** Low
 
----
+## #38 — HTTP Client (specado-core/src/http/client.rs) & HTTP Module Shim
 
-## #I037 — HTTP Client (`specado-core/src/http/client.rs`) & #I038 — HTTP Module Shim
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/38
+
+### Body
 
 ### 📋 Task Overview
 
@@ -2123,7 +2355,7 @@ pub use client::get_client;
 
 #### Dependencies
 
-* Used by: #I021
+* Used by: #22
 
 ### 🧪 Testing Requirements
 
@@ -2131,15 +2363,20 @@ pub use client::get_client;
 
 ### 🔗 References
 
-* Epic: #E6
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** XS • **Time:** 1h • **Complexity:** Low
 
----
+## #39 — Circuit Breaker (specado-core/src/circuit_breaker.rs)
 
-## #I039 — Circuit Breaker (`specado-core/src/circuit_breaker.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/39
+
+### Body
 
 ### 📋 Task Overview
 
@@ -2267,7 +2504,7 @@ impl Default for CircuitBreaker {
 
 #### Dependencies
 
-* Related: #I022
+* Related: #23
 
 ### 🧪 Testing Requirements
 
@@ -2275,15 +2512,20 @@ impl Default for CircuitBreaker {
 
 ### 🔗 References
 
-* Epic: #E7
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** M • **Time:** 4–6h • **Complexity:** Medium
 
----
+## #40 — Retry Policy (specado-core/src/retry.rs)
 
-## #I040 — Retry Policy (`specado-core/src/retry.rs`)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/40
+
+### Body
 
 ### 📋 Task Overview
 
@@ -2343,7 +2585,7 @@ impl RetryPolicy {
 
 #### Dependencies
 
-* Related: #I021 (future use)
+* Related: #22 (future use)
 
 ### 🧪 Testing Requirements
 
@@ -2351,15 +2593,20 @@ impl RetryPolicy {
 
 ### 🔗 References
 
-* Epic: #E7
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2–3h • **Complexity:** Low
 
----
+## #41 — Routing (Trait & Primary-Fallback)
 
-## #I041–#I043 — Routing (Trait & Primary-Fallback)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/41
+
+### Body
 
 ### 📋 Task Overview
 
@@ -2425,7 +2672,7 @@ pub use primary_fallback::PrimaryFallbackRouter;
 
 #### Dependencies
 
-* Uses: #I021
+* Uses: #22
 
 ### 🧪 Testing Requirements
 
@@ -2433,15 +2680,20 @@ pub use primary_fallback::PrimaryFallbackRouter;
 
 ### 🔗 References
 
-* Epic: #E8
+* Epic: #2 - Core Engine
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2–3h • **Complexity:** Low
 
----
+## #42 — CLI Cargo (crates/specado-cli/Cargo.toml) & CLI Main
 
-## #I050 — CLI Cargo (`crates/specado-cli/Cargo.toml`) & #I051 — CLI Main
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/42
+
+### Body
 
 ### 📋 Task Overview
 
@@ -2606,7 +2858,7 @@ async fn run_command(prompt_path: PathBuf, provider_path: PathBuf) -> anyhow::Re
 
 #### Dependencies
 
-* Uses: #I002–#I004, #I021, #I030–#I031
+* Uses: #18–#20, #22, #31–#32
 
 ### 🧪 Testing Requirements
 
@@ -2614,15 +2866,20 @@ async fn run_command(prompt_path: PathBuf, provider_path: PathBuf) -> anyhow::Re
 
 ### 🔗 References
 
-* Epic: #E9
+* Epic: #3 - Developer Interfaces
 
 ### ⏱️ Estimates
 
 * **Effort:** M • **Time:** 4–6h • **Complexity:** Medium
 
----
+## #43 — Python Native Crate (crates/specado-py) & PyO3 Bindings
 
-## #I060 — Python Native Crate (`crates/specado-py`) & #I061 — PyO3 Bindings
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/43
+
+### Body
 
 ### 📋 Task Overview
 
@@ -2719,7 +2976,7 @@ fn specado(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #### Dependencies
 
-* Uses: #I021
+* Uses: #22
 
 ### 🧪 Testing Requirements
 
@@ -2727,15 +2984,20 @@ fn specado(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 ### 🔗 References
 
-* Epic: #E10
+* Epic: #3 - Developer Interfaces
 
 ### ⏱️ Estimates
 
 * **Effort:** M • **Time:** 4–6h • **Complexity:** Medium
 
----
+## #44 — Python Project Config & Python High-Level API + OpenAI Compat
 
-## #I062 — Python Project Config & #I063–#I065 — Python High-Level API + OpenAI Compat
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/44
+
+### Body
 
 ### 📋 Task Overview
 
@@ -2879,7 +3141,7 @@ class OpenAI:
 
 #### Dependencies
 
-* Uses: #I060–#I061
+* Uses: #43
 
 ### 🧪 Testing Requirements
 
@@ -2887,15 +3149,20 @@ class OpenAI:
 
 ### 🔗 References
 
-* Epic: #E11
+* Epic: #3 - Developer Interfaces
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2–3h • **Complexity:** Low
 
----
+## #45 — Node.js Bindings (napi-rs + packaging)
 
-## #I070–#I074 — Node.js Bindings (napi-rs + packaging)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/45
+
+### Body
 
 ### 📋 Task Overview
 
@@ -3031,7 +3298,7 @@ export class Client {
 
 #### Dependencies
 
-* Uses: #I021
+* Uses: #22
 
 ### 🧪 Testing Requirements
 
@@ -3039,15 +3306,20 @@ export class Client {
 
 ### 🔗 References
 
-* Epic: #E12
+* Epic: #3 - Developer Interfaces
 
 ### ⏱️ Estimates
 
 * **Effort:** M • **Time:** 4–6h • **Complexity:** Medium
 
----
+## #46 — Provider Catalog (OpenAI, Anthropic)
 
-## #I080–#I081 — Provider Catalog (OpenAI, Anthropic)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/46
+
+### Body
 
 ### 📋 Task Overview
 
@@ -3147,7 +3419,7 @@ constraints:
 
 #### Dependencies
 
-* Uses: #I004 schema, #I030–#I031
+* Uses: #20 schema, #31–#32
 
 ### 🧪 Testing Requirements
 
@@ -3155,15 +3427,20 @@ constraints:
 
 ### 🔗 References
 
-* Epic: #E13
+* Epic: #4 - Production Readiness
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2–3h • **Complexity:** Low
 
----
+## #47 — CI/CD Workflow (GitHub Actions)
 
-## #I090 — CI/CD Workflow (GitHub Actions)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/47
+
+### Body
 
 ### 📋 Task Overview
 
@@ -3290,15 +3567,20 @@ jobs:
 
 ### 🔗 References
 
-* Epic: #E14
+* Epic: #5 - Release Polish
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2–3h • **Complexity:** Low
 
----
+## #48 — Production Feature: Hot-Reload (Design & Stub)
 
-## #I150 — Production Feature: Hot-Reload (Design & Stub)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/48
+
+### Body
 
 ### 📋 Task Overview
 
@@ -3318,7 +3600,7 @@ Add design and basic stubs for watching provider spec dirs and atomically swappi
 
 #### Dependencies
 
-* Related to: #I021 (execute), #I062/#I070 (bindings toggles)
+* Related to: #22 (execute), #44/#45 (bindings toggles)
 
 #### API Design
 
@@ -3345,15 +3627,20 @@ impl ProviderCache {
 
 ### 🔗 References
 
-* Epic: #E15
+* Epic: #4 - Production Readiness
 
 ### ⏱️ Estimates
 
 * **Effort:** L • **Time:** 10–16h • **Complexity:** Medium-High
 
----
+## #49 — Production Feature: Audit Logging (Design & Stub)
 
-## #I151 — Production Feature: Audit Logging (Design & Stub)
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/49
+
+### Body
 
 ### 📋 Task Overview
 
@@ -3373,7 +3660,7 @@ Structured JSONL logs with redaction, correlation IDs, latency, outcome, lossine
 
 #### Dependencies
 
-* Uses: #I021, #I023
+* Uses: #22, #24
 
 #### API Design
 
@@ -3398,15 +3685,20 @@ pub fn with_audit(config: AuditConfig) -> ClientDecorator;
 
 ### 🔗 References
 
-* Epic: #E15
+* Epic: #4 - Production Readiness
 
 ### ⏱️ Estimates
 
 * **Effort:** M • **Time:** 6–10h • **Complexity:** Medium
 
----
+## #50 — Docs, Tests, Benches, Examples Scaffolding
 
-## #I160 — Docs, Tests, Benches, Examples Scaffolding
+- **State:** open
+- **Labels:** task
+- **Assignees:** —
+- **URL:** https://github.com/specado/specado/issues/50
+
+### Body
 
 ### 📋 Task Overview
 
@@ -3448,18 +3740,9 @@ N/A
 
 ### 🔗 References
 
-* Epic: #E16
+* Epic: #5 - Release Polish
 
 ### ⏱️ Estimates
 
 * **Effort:** S • **Time:** 2–4h • **Complexity:** Low
 
----
-
-# ✅ Summary
-
-* **All code and files** referenced by the plan are embedded above within the relevant Issues.
-* Each Issue includes overview, acceptance criteria, dependencies, risks, testing, docs, references, and estimates.
-
-```
-```

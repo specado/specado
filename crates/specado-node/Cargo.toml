@@ -1,0 +1,14 @@
+[package]
+name = "specado-node"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "specado_node"
+crate-type = ["lib"]
+
+[dependencies]
