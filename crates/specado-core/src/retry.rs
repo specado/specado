@@ -23,17 +23,20 @@ impl RetryPolicy {
     }
 
     fn backoff_delay(&self, attempt: usize) -> Duration {
-        if attempt == 0 {
-            return Duration::from_secs(0);
+        if attempt <= 1 {
+            return self.base_delay.min(self.max_delay);
         }
 
         let mut delay = self.base_delay;
-        for _ in 1..=attempt.saturating_sub(1) {
-            delay = delay.mul_f32(2.0);
+        for _ in 1..attempt {
+            delay = delay
+                .checked_mul(2)
+                .unwrap_or(self.max_delay);
             if delay >= self.max_delay {
                 return self.max_delay;
             }
         }
+
         delay.min(self.max_delay)
     }
 

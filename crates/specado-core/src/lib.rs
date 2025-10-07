@@ -5,6 +5,7 @@ pub mod circuit_breaker;
 pub mod error;
 pub mod http;
 pub mod retry;
+pub mod router;
 pub mod transformer;
 pub mod types;
 
