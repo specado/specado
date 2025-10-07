@@ -3,12 +3,19 @@ name = "specado-py"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-repository.workspace = true
-rust-version.workspace = true
 publish = false
 
 [lib]
-name = "specado_py"
-crate-type = ["lib"]
+name = "specado"
+crate-type = ["cdylib"]
 
 [dependencies]
+specado-core.workspace = true
+pyo3 = { version = "0.22.6", features = ["extension-module", "abi3-py39"] }
+tokio.workspace = true
+serde_json.workspace = true
+pythonize = "0.22.0"
+once_cell.workspace = true
+
+[build-dependencies]
+pyo3-build-config = "0.22.6"
