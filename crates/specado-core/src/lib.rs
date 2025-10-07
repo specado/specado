@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 pub mod auth;
+pub mod circuit_breaker;
 pub mod error;
 pub mod http;
 pub mod retry;
