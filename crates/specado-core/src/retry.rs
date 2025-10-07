@@ -29,9 +29,7 @@ impl RetryPolicy {
 
         let mut delay = self.base_delay;
         for _ in 1..attempt {
-            delay = delay
-                .checked_mul(2)
-                .unwrap_or(self.max_delay);
+            delay = delay.checked_mul(2).unwrap_or(self.max_delay);
             if delay >= self.max_delay {
                 return self.max_delay;
             }
