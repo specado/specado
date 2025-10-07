@@ -75,7 +75,7 @@ fn translate(
 }
 
 #[pymodule]
-fn specado(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _native(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Client>()?;
     m.add_function(wrap_pyfunction!(translate, m)?)?;
     Ok(())

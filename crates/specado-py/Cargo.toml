@@ -6,7 +6,7 @@ license.workspace = true
 publish = false
 
 [lib]
-name = "specado"
+name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]
