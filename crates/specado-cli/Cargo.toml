@@ -3,8 +3,26 @@ name = "specado-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-repository.workspace = true
-rust-version.workspace = true
 publish = false
 
+[[bin]]
+name = "specado"
+path = "src/main.rs"
+
 [dependencies]
+anyhow = "1.0"
+clap.workspace = true
+colored.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+specado-core.workspace = true
+specado-schemas.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+httpmock = "0.7"
+serde_json.workspace = true
+serde_yaml.workspace = true
+tempfile = "3.10"
