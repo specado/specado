@@ -35,6 +35,8 @@ assert_cmd = "2.0"
 predicates = "3.1"
 httpmock = "0.7"
 tempfile = "3.10"
+pythonize = "0.22.0"
+pyo3 = { version = "0.22.6", features = ["extension-module", "abi3-py39"] }
 specado-core = { path = "crates/specado-core" }
 specado-schemas = { path = "crates/specado-schemas" }
 
