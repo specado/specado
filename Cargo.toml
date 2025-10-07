@@ -30,6 +30,11 @@ jsonschema = "0.26.1"
 serde_json_path = "0.7.2"
 clap = { version = "4.5.23", features = ["derive", "env"] }
 colored = "2.1.0"
+anyhow = "1.0"
+assert_cmd = "2.0"
+predicates = "3.1"
+httpmock = "0.7"
+tempfile = "3.10"
 specado-core = { path = "crates/specado-core" }
 specado-schemas = { path = "crates/specado-schemas" }
 
