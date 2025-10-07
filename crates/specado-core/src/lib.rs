@@ -3,6 +3,7 @@
 pub mod auth;
 pub mod error;
 pub mod http;
+pub mod retry;
 pub mod transformer;
 pub mod types;
 
