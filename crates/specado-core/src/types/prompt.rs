@@ -101,18 +101,13 @@ pub enum ToolChoiceString {
     Required,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "PascalCase")]
 pub enum StrictMode {
     Strict,
+    #[default]
     Warn,
     Coerce,
-}
-
-impl Default for StrictMode {
-    fn default() -> Self {
-        StrictMode::Warn
-    }
 }
 
 #[cfg(test)]

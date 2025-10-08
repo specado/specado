@@ -1,3 +1,5 @@
+#![allow(clippy::useless_conversion)] // PyResult alias evaluates to PyErr; Clippy 1.80 flags false positives
+
 use once_cell::sync::Lazy;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -59,6 +61,7 @@ impl Client {
         })
     }
 
+    #[allow(clippy::useless_conversion)] // PyResult alias raises false positive in Clippy 1.80
     fn complete(&self, py: Python<'_>, prompt: &Bound<'_, PyDict>) -> PyResult<PyObject> {
         let prompt_json = depythonize::<serde_json::Value>(prompt)?;
         let prompt_spec: PromptSpec = serde_json::from_value(prompt_json)
@@ -91,6 +94,7 @@ impl Client {
 }
 
 #[pyfunction]
+#[allow(clippy::useless_conversion)] // PyResult alias raises false positive in Clippy 1.80
 fn translate(
     py: Python<'_>,
     prompt: &Bound<'_, PyDict>,

@@ -206,27 +206,26 @@ impl std::str::FromStr for AuditTargetChoice {
 }
 
 #[cfg(feature = "hot-reload")]
-fn apply_hot_reload_config(options: &RuntimeOptions, provider_path: &PathBuf) {
+fn apply_hot_reload_config(options: &RuntimeOptions, provider_path: &Path) {
     if !options.watch {
         return;
     }
 
     let mut paths = if options.watch_dirs.is_empty() {
-        vec![provider_path.clone()]
+        vec![provider_path.to_path_buf()]
     } else {
         options.watch_dirs.clone()
     };
 
     if paths.is_empty() {
-        paths.push(provider_path.clone());
+        paths.push(provider_path.to_path_buf());
     }
 
     let config = HotReloadConfig::enabled(paths, Duration::from_millis(250));
     set_global_config(config);
     eprintln!(
-        "{} {}",
-        "⚠".yellow(),
-        "Hot reload is experimental; no watcher is started until the feature is fully implemented."
+        "{} Hot reload is experimental; no watcher is started until the feature is fully implemented.",
+        "⚠".yellow()
     );
 }
 
@@ -263,9 +262,8 @@ fn build_audit_context(options: &RuntimeOptions) -> Result<Option<AuditContext>>
     }
 
     eprintln!(
-        "{} {}",
-        "⚠".yellow(),
-        "Audit logging is experimental and currently writes JSONL synchronously."
+        "{} Audit logging is experimental and currently writes JSONL synchronously.",
+        "⚠".yellow()
     );
 
     Ok(Some(AuditContext::new(config)))
@@ -309,7 +307,7 @@ fn print_lossiness(report: &LossinessReport) {
                 level, entry.code, entry.reason, entry.path
             );
             if let Some(details) = &entry.details {
-                println!("    details: {}", details.to_string());
+                println!("    details: {}", details);
             }
             if let Some(fix) = &entry.suggested_fix {
                 println!("    suggested fix: {}", fix);
