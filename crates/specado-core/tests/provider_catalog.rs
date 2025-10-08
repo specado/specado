@@ -1,8 +1,10 @@
+use serde_json::json;
 use specado_core::transformer::translate;
-use specado_core::types::{LossinessCode, Message, MessageRole, PromptSpec, SamplingConfig, StrictMode};
+use specado_core::types::{
+    LossinessCode, Message, MessageRole, PromptSpec, SamplingConfig, StrictMode,
+};
 use specado_core::ProviderSpec;
 use specado_schemas::get_validator;
-use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 
@@ -49,10 +51,9 @@ fn openai_catalog_validates_and_translates() {
     let provider = load_provider("openai/gpt-5.yaml");
     let validator = get_validator();
 
-    let provider_json: serde_json::Value = serde_yaml::from_str(
-        &fs::read_to_string(provider_path("openai/gpt-5.yaml")).unwrap(),
-    )
-    .expect("provider json");
+    let provider_json: serde_json::Value =
+        serde_yaml::from_str(&fs::read_to_string(provider_path("openai/gpt-5.yaml")).unwrap())
+            .expect("provider json");
     validator
         .validate_provider(&provider_json)
         .expect("provider spec valid");
