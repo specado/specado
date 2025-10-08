@@ -28,6 +28,7 @@ pub fn detect_drops(prompt: &PromptSpec, provider: &ProviderSpec, report: &mut L
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::ProviderApi;
     use crate::types::{
         Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig, RequestMapping,
         ResponseConfig, ResponseMapping, SamplingConfig, StrictMode, SupportFlags,
@@ -47,6 +48,7 @@ mod tests {
         ProviderSpec {
             provider: "demo".into(),
             models: vec![ModelConfig { id: "demo".into() }],
+            api: ProviderApi::ChatCompletions,
             endpoints: Endpoints {
                 chat: EndpointConfig {
                     method: HttpMethod::Post,

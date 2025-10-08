@@ -2,6 +2,8 @@ provider: openai
 models:
   - id: gpt-5
 
+api: openai_responses
+
 auth:
   type: bearer
   token_env: OPENAI_API_KEY
@@ -9,22 +11,26 @@ auth:
 endpoints:
   chat:
     method: POST
-    url: https://api.openai.com/v1/chat/completions
+    url: https://api.openai.com/v1/responses
     headers:
       Content-Type: application/json
 
 mappings:
   request:
+    - from: "$.metadata.openai_model"
+      to: "$.model"
+    - from: "$.metadata.openai_max_output_tokens"
+      to: "$.max_output_tokens"
+    - from: "$.metadata.openai_reasoning_effort"
+      to: "$.reasoning.effort"
+    - from: "$.metadata.openai_text_verbosity"
+      to: "$.text.verbosity"
     - from: "$.messages"
       to: "$.messages"
-    - from: "$.sampling.temperature"
-      to: "$.temperature"
-    - from: "$.sampling.top_p"
-      to: "$.top_p"
   response:
-    - from: "$.choices[0].message.content"
+    - from: "$.output[?(@.type=='message')].content[0].text"
       to: "content"
-    - from: "$.choices[0].finish_reason"
+    - from: "$.output[?(@.type=='message')].status"
       to: "finish_reason"
 
 constraints:

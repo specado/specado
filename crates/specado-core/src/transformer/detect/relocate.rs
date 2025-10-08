@@ -37,6 +37,7 @@ pub fn detect_relocate(prompt: &PromptSpec, provider: &ProviderSpec, report: &mu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::ProviderApi;
     use crate::types::{
         Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, Message, ModelConfig,
         RequestMapping, ResponseMapping, StrictMode, SupportFlags,
@@ -48,6 +49,7 @@ mod tests {
             models: vec![ModelConfig {
                 id: "gpt-4o".into(),
             }],
+            api: ProviderApi::ChatCompletions,
             endpoints: Endpoints {
                 chat: EndpointConfig {
                     method: HttpMethod::Post,

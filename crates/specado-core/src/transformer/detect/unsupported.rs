@@ -44,6 +44,7 @@ pub fn detect_unsupported(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::ProviderApi;
     use crate::types::{
         Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig, RequestMapping,
         ResponseConfig, ResponseMapping, StrictMode, SupportFlags, Tool,
@@ -53,6 +54,7 @@ mod tests {
         ProviderSpec {
             provider: "fake".into(),
             models: vec![ModelConfig { id: "m".into() }],
+            api: ProviderApi::ChatCompletions,
             endpoints: Endpoints {
                 chat: EndpointConfig {
                     method: HttpMethod::Post,

@@ -292,6 +292,7 @@ const DEFAULT_REDACTION: &[&str] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::ProviderApi;
     use serde_json::json;
 
     #[test]
@@ -322,6 +323,7 @@ mod tests {
         ctx.note_provider(&ProviderSpec {
             provider: "demo".into(),
             models: vec![crate::types::ModelConfig { id: "m".into() }],
+            api: ProviderApi::ChatCompletions,
             endpoints: crate::types::Endpoints {
                 chat: crate::types::EndpointConfig {
                     method: crate::types::HttpMethod::Post,

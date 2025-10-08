@@ -5,6 +5,7 @@ use specado_core::types::{
 };
 use specado_core::ProviderSpec;
 use specado_schemas::get_validator;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -21,6 +22,19 @@ fn load_provider(relative: &str) -> ProviderSpec {
 }
 
 fn sample_prompt() -> PromptSpec {
+    let mut metadata: HashMap<String, serde_json::Value> = HashMap::new();
+    metadata.insert("openai_model".into(), json!("gpt-5"));
+    metadata.insert("openai_max_output_tokens".into(), json!(200));
+    metadata.insert("openai_reasoning_effort".into(), json!("minimal"));
+    metadata.insert("openai_text_verbosity".into(), json!("low"));
+    metadata.insert(
+        "anthropic_model".into(),
+        json!("claude-sonnet-4-5-20250929"),
+    );
+    metadata.insert("anthropic_max_tokens".into(), json!(256));
+    metadata.insert("anthropic_thinking_type".into(), json!("enabled"));
+    metadata.insert("anthropic_thinking_budget".into(), json!(2000));
+
     PromptSpec {
         version: "1".into(),
         messages: vec![
@@ -42,7 +56,7 @@ fn sample_prompt() -> PromptSpec {
         tools: Vec::new(),
         tool_choice: None,
         strict_mode: StrictMode::Warn,
-        metadata: Default::default(),
+        metadata,
     }
 }
 
@@ -60,8 +74,12 @@ fn openai_catalog_validates_and_translates() {
 
     let (translated, report) = translate(&sample_prompt(), &provider).expect("translate");
     assert!(!report.is_lossy);
-    assert_eq!(translated["temperature"], json!(1.5));
-    assert_eq!(translated["top_p"], json!(0.9));
+    assert_eq!(translated["model"], json!("gpt-5"));
+    assert_eq!(translated["max_output_tokens"], json!(200));
+    assert_eq!(translated["reasoning"]["effort"], json!("minimal"));
+    assert_eq!(translated["text"]["verbosity"], json!("low"));
+    assert_eq!(translated["instructions"], json!("You are helpful."));
+    assert_eq!(translated["input"][0]["content"][0]["text"], json!("Hello"));
 }
 
 #[test]
@@ -83,13 +101,12 @@ fn anthropic_catalog_relocates_and_clamps() {
     assert!(codes.contains(&LossinessCode::Relocate));
     assert!(codes.contains(&LossinessCode::Clamp));
 
+    assert_eq!(translated["model"], json!("claude-sonnet-4-5-20250929"));
+    assert_eq!(translated["max_tokens"], json!(2064));
+    assert_eq!(translated["system"], json!("You are helpful."));
     assert_eq!(translated["temperature"], json!(1.0));
-    match &translated["system"] {
-        serde_json::Value::String(s) => assert_eq!(s, "You are helpful."),
-        serde_json::Value::Array(arr) => {
-            assert_eq!(arr.len(), 1);
-            assert_eq!(arr[0], json!("You are helpful."));
-        }
-        other => panic!("unexpected system mapping: {other:?}"),
-    }
+    assert_eq!(
+        translated["messages"][0]["content"][0]["text"],
+        json!("Hello")
+    );
 }

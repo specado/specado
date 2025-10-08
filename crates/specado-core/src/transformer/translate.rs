@@ -1,10 +1,27 @@
 use crate::error::{Error, Result};
 use crate::transformer::detect;
-use crate::types::{LossinessReport, PromptSpec, ProviderSpec};
-use serde_json::{json, Value};
+use crate::types::{LossinessReport, MessageRole, PromptSpec, ProviderApi, ProviderSpec};
+use serde_json::{json, Map, Value};
 use serde_json_path::JsonPath;
 
 pub fn translate(prompt: &PromptSpec, provider: &ProviderSpec) -> Result<(Value, LossinessReport)> {
+    let (base_payload, report) = translate_with_mappings(prompt, provider)?;
+
+    let payload = match provider.api {
+        ProviderApi::ChatCompletions => base_payload,
+        ProviderApi::OpenaiResponses => reshape_openai_responses(prompt, provider, base_payload)?,
+        ProviderApi::AnthropicMessagesClaude4 => {
+            reshape_anthropic_claude4(prompt, provider, base_payload)?
+        }
+    };
+
+    Ok((payload, report))
+}
+
+fn translate_with_mappings(
+    prompt: &PromptSpec,
+    provider: &ProviderSpec,
+) -> Result<(Value, LossinessReport)> {
     let mut report = LossinessReport::new(prompt.strict_mode);
     let mut payload = json!({});
 
@@ -27,6 +44,10 @@ pub fn translate(prompt: &PromptSpec, provider: &ProviderSpec) -> Result<(Value,
             Value::Array(matches.iter().map(|v| (*v).clone()).collect())
         };
 
+        if value.is_null() {
+            continue;
+        }
+
         if let Some(range) = mapping.clamp {
             if let Some(num) = value.as_f64() {
                 let clamped = detect::clamp_value(num, range, mapping.from.clone(), &mut report);
@@ -42,6 +63,217 @@ pub fn translate(prompt: &PromptSpec, provider: &ProviderSpec) -> Result<(Value,
     detect::detect_drops(prompt, provider, &mut report);
 
     Ok((payload, report))
+}
+
+fn reshape_openai_responses(
+    prompt: &PromptSpec,
+    provider: &ProviderSpec,
+    base_payload: Value,
+) -> Result<Value> {
+    let source = base_payload
+        .as_object()
+        .cloned()
+        .ok_or_else(|| Error::Transform("Expected object payload for OpenAI Responses".into()))?;
+
+    let mut root = Map::new();
+
+    let model = source
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| provider.models.first().map(|m| m.id.clone()))
+        .ok_or_else(|| Error::Transform("Model id missing for OpenAI request".into()))?;
+    root.insert("model".into(), Value::String(model));
+
+    if let Some(tokens) = source.get("max_output_tokens") {
+        root.insert("max_output_tokens".into(), tokens.clone());
+    } else {
+        root.insert("max_output_tokens".into(), json!(1024));
+    }
+
+    if let Some(reasoning) = source.get("reasoning") {
+        if !reasoning.is_null() {
+            root.insert("reasoning".into(), reasoning.clone());
+        }
+    }
+
+    if let Some(text) = source.get("text") {
+        if !text.is_null() {
+            root.insert("text".into(), text.clone());
+        }
+    }
+
+    if let Some(service_tier) = source.get("service_tier") {
+        if !service_tier.is_null() {
+            root.insert("service_tier".into(), service_tier.clone());
+        }
+    }
+
+    let mut instructions = source.get("instructions").and_then(value_to_string);
+
+    let mut input_items = Vec::new();
+    for message in &prompt.messages {
+        match message.role {
+            MessageRole::System => {
+                if instructions.is_none() {
+                    instructions = Some(message.content.clone());
+                }
+            }
+            MessageRole::User | MessageRole::Assistant => {
+                let role = match message.role {
+                    MessageRole::User => "user",
+                    MessageRole::Assistant => "assistant",
+                    MessageRole::System => unreachable!(),
+                };
+                input_items.push(json!({
+                    "role": role,
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": message.content.clone()
+                        }
+                    ]
+                }));
+            }
+        }
+    }
+
+    if input_items.is_empty() {
+        return Err(Error::Transform(
+            "OpenAI responses request requires at least one non-system message".into(),
+        ));
+    }
+
+    if let Some(instr) = instructions {
+        root.insert("instructions".into(), Value::String(instr));
+    }
+
+    root.insert("input".into(), Value::Array(input_items));
+
+    Ok(Value::Object(root))
+}
+
+fn reshape_anthropic_claude4(
+    prompt: &PromptSpec,
+    provider: &ProviderSpec,
+    base_payload: Value,
+) -> Result<Value> {
+    let source = base_payload
+        .as_object()
+        .cloned()
+        .ok_or_else(|| Error::Transform("Expected object payload for Anthropic request".into()))?;
+
+    let mut root = Map::new();
+
+    let model = source
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| provider.models.first().map(|m| m.id.clone()))
+        .ok_or_else(|| Error::Transform("Model id missing for Anthropic request".into()))?;
+    root.insert("model".into(), Value::String(model));
+
+    let mut max_tokens_value = source
+        .get("max_tokens")
+        .cloned()
+        .unwrap_or_else(|| json!(512));
+
+    let thinking_value = source.get("thinking").cloned();
+    let mut temperature_value = source.get("temperature").cloned();
+
+    if let Some(thinking) = thinking_value.as_ref() {
+        let requires_unity_temperature = thinking
+            .as_object()
+            .and_then(|obj| obj.get("type"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.eq_ignore_ascii_case("enabled"))
+            .unwrap_or(false);
+
+        if requires_unity_temperature {
+            temperature_value = Some(json!(1.0));
+        }
+    }
+
+    if let Some(temp) = temperature_value {
+        if !temp.is_null() {
+            root.insert("temperature".into(), temp);
+        }
+    }
+
+    if let Some(thinking) = thinking_value.as_ref() {
+        if !thinking.is_null() {
+            root.insert("thinking".into(), thinking.clone());
+        }
+    }
+
+    let mut system_prompt = source.get("system").and_then(value_to_string);
+
+    let mut messages = Vec::new();
+    for message in &prompt.messages {
+        match message.role {
+            MessageRole::System => {
+                if system_prompt.is_none() {
+                    system_prompt = Some(message.content.clone());
+                }
+            }
+            MessageRole::User | MessageRole::Assistant => {
+                let role = match message.role {
+                    MessageRole::User => "user",
+                    MessageRole::Assistant => "assistant",
+                    MessageRole::System => unreachable!(),
+                };
+                messages.push(json!({
+                    "role": role,
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": message.content.clone()
+                        }
+                    ]
+                }));
+            }
+        }
+    }
+
+    if messages.is_empty() {
+        return Err(Error::Transform(
+            "Anthropic request requires at least one non-system message".into(),
+        ));
+    }
+
+    if let Some(system) = system_prompt {
+        root.insert("system".into(), Value::String(system));
+    }
+
+    if let Some(budget) = thinking_value
+        .as_ref()
+        .and_then(|val| val.as_object())
+        .and_then(|obj| obj.get("budget_tokens"))
+        .and_then(|v| v.as_u64())
+    {
+        if let Some(current_max) = max_tokens_value.as_u64() {
+            if current_max <= budget {
+                max_tokens_value = json!(budget + 64);
+            }
+        }
+    }
+
+    root.insert("max_tokens".into(), max_tokens_value);
+    root.insert("messages".into(), Value::Array(messages));
+
+    Ok(Value::Object(root))
+}
+
+fn value_to_string(value: &Value) -> Option<String> {
+    if let Some(s) = value.as_str() {
+        Some(s.to_string())
+    } else if let Some(array) = value.as_array() {
+        array
+            .iter()
+            .find_map(|item| item.as_str().map(|s| s.to_string()))
+    } else {
+        None
+    }
 }
 
 fn set_value_at_path(target: &mut Value, path: &str, value: Value) -> Result<()> {
@@ -201,6 +433,7 @@ mod tests {
             models: vec![ModelConfig {
                 id: "gpt-4o".into(),
             }],
+            api: ProviderApi::ChatCompletions,
             endpoints: Endpoints {
                 chat: EndpointConfig {
                     method: HttpMethod::Post,

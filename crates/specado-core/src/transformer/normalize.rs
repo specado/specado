@@ -57,7 +57,7 @@ pub fn normalize(raw: Value, provider: &ProviderSpec) -> Result<UniformResponse>
 
 fn map_finish_reason(raw: &str) -> FinishReason {
     match raw {
-        "stop" | "end_turn" => FinishReason::Stop,
+        "stop" | "end_turn" | "completed" => FinishReason::Stop,
         "length" | "max_tokens" => FinishReason::Length,
         "tool_calls" | "tool_use" => FinishReason::ToolCall,
         "content_filter" => FinishReason::ContentFilter,
@@ -68,6 +68,7 @@ fn map_finish_reason(raw: &str) -> FinishReason {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::ProviderApi;
     use crate::types::{
         Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig, ProviderSpec,
         ResponseMapping, SupportFlags,
@@ -80,6 +81,7 @@ mod tests {
             models: vec![ModelConfig {
                 id: "gpt-4o".into(),
             }],
+            api: ProviderApi::ChatCompletions,
             endpoints: Endpoints {
                 chat: EndpointConfig {
                     method: HttpMethod::Post,

@@ -2,10 +2,21 @@ use crate::auth::AuthScheme;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderApi {
+    #[default]
+    ChatCompletions,
+    OpenaiResponses,
+    AnthropicMessagesClaude4,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProviderSpec {
     pub provider: String,
     pub models: Vec<ModelConfig>,
+    #[serde(default)]
+    pub api: ProviderApi,
     pub endpoints: Endpoints,
     pub mappings: Mappings,
     pub constraints: Constraints,

@@ -15,6 +15,15 @@
         }
       }
     },
+    "api": {
+      "type": "string",
+      "enum": [
+        "chat_completions",
+        "openai_responses",
+        "anthropic_messages_claude4"
+      ],
+      "default": "chat_completions"
+    },
     "auth": {
       "oneOf": [
         {
