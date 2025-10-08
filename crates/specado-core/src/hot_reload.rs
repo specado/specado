@@ -2,6 +2,8 @@ use crate::error::{Error, Result};
 use crate::types::ProviderSpec;
 use once_cell::sync::Lazy;
 use serde::Serialize;
+use serde_json::to_value;
+use specado_schemas::get_validator;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -73,6 +75,12 @@ impl ProviderCache {
 
         let spec: ProviderSpec = serde_yaml::from_str(&contents)
             .map_err(|e| Error::Config(format!("Failed to parse provider spec: {}", e)))?;
+
+        let spec_value = to_value(&spec)
+            .map_err(|e| Error::Config(format!("Failed to serialize provider spec: {}", e)))?;
+        get_validator()
+            .validate_provider(&spec_value)
+            .map_err(|e| Error::SchemaValidation(e.to_string()))?;
 
         {
             let mut cache = self
@@ -175,4 +183,5 @@ constraints:
         let spec = cache.load_or_read(tmp.path()).expect("provider spec loads");
         assert_eq!(spec.provider, "demo");
     }
+
 }

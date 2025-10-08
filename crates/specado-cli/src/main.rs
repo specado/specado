@@ -232,6 +232,17 @@ fn apply_hot_reload_config(options: &RuntimeOptions, provider_path: &PathBuf) {
 
 #[cfg(feature = "audit-logging")]
 fn build_audit_context(options: &RuntimeOptions) -> Result<Option<AuditContext>> {
+    if options.audit_file.is_some()
+        && options
+            .audit_target
+            .as_ref()
+            .is_some_and(|t| matches!(t, AuditTargetChoice::Stdout))
+    {
+        return Err(anyhow!(
+            "--audit-file can only be used with --audit-target file"
+        ));
+    }
+
     let target = match &options.audit_target {
         None if options.audit_redact.is_empty() => return Ok(None),
         None => Some(AuditTarget::Stdout),
@@ -321,6 +332,7 @@ fn print_lossiness(report: &LossinessReport) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     #[cfg(feature = "audit-logging")]
@@ -335,6 +347,24 @@ mod tests {
 
         let err = build_audit_context(&opts).expect_err("file target needs path");
         assert!(err.to_string().contains("--audit-file"));
+    }
+
+    #[test]
+    #[cfg(feature = "audit-logging")]
+    fn audit_flags_validate_mutual_exclusion() {
+        let opts = RuntimeOptions {
+            watch: false,
+            watch_dirs: vec![],
+            audit_target: Some(AuditTargetChoice::Stdout),
+            audit_file: Some(PathBuf::from("ignored.jsonl")),
+            audit_redact: vec![],
+        };
+
+        let err =
+            build_audit_context(&opts).expect_err("should reject conflicting audit flag values");
+        assert!(err
+            .to_string()
+            .contains("--audit-file can only be used with --audit-target file"));
     }
 
     #[test]
