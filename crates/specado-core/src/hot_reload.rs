@@ -58,11 +58,17 @@ pub struct ProviderCache {
     inner: Arc<RwLock<HashMap<PathBuf, CachedProvider>>>,
 }
 
-impl ProviderCache {
-    pub fn new() -> Self {
+impl Default for ProviderCache {
+    fn default() -> Self {
         Self {
             inner: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+}
+
+impl ProviderCache {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Read and cache the provider spec, updating the entry if it has changed.
@@ -105,7 +111,7 @@ static GLOBAL_CONFIG: Lazy<RwLock<HotReloadConfig>> =
     Lazy::new(|| RwLock::new(HotReloadConfig::disabled()));
 
 pub fn global_cache() -> &'static ProviderCache {
-    &*GLOBAL_CACHE
+    &GLOBAL_CACHE
 }
 
 pub fn set_global_config(config: HotReloadConfig) {
@@ -183,5 +189,4 @@ constraints:
         let spec = cache.load_or_read(tmp.path()).expect("provider spec loads");
         assert_eq!(spec.provider, "demo");
     }
-
 }
