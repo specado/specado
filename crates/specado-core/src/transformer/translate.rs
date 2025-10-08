@@ -149,7 +149,7 @@ fn parse_path(path: &str) -> Result<Vec<PathSegment>> {
                     segments.push(PathSegment::Key(std::mem::take(&mut buf)));
                 }
                 let mut idx_buf = String::new();
-                while let Some(c) = chars.next() {
+                for c in chars.by_ref() {
                     if c == ']' {
                         break;
                     }

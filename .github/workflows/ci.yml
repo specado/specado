@@ -42,6 +42,11 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+      - name: Placeholder scaffolding checks
+        shell: bash
+        run: |
+          ./tests/golden/update_snapshots.sh
+          ./tests/integration/run_smoke.sh
   test-python:
     name: Python ${{ matrix.python }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -57,13 +62,19 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Install maturin
-        run: pip install maturin pytest
-
       - name: Build and test
+        shell: bash
         run: |
-          maturin develop
-          pytest python/tests/
+          python -m venv .venv
+          if [ -f .venv/bin/python ]; then
+            VENV_PY=".venv/bin/python"
+          else
+            VENV_PY=".venv/Scripts/python"
+          fi
+          "$VENV_PY" -m pip install --upgrade pip
+          "$VENV_PY" -m pip install maturin pytest
+          "$VENV_PY" -m maturin develop -m crates/specado-py/Cargo.toml
+          "$VENV_PY" -m pytest python/tests/
         env:
           OPENAI_API_KEY: test-key
           ANTHROPIC_API_KEY: test-key

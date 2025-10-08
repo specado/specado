@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "messages": [
+    {"role": "system", "content": "You are a concise assistant."},
+    {"role": "user", "content": "Summarize the Specado quickstart."}
+  ],
+  "sampling": {"temperature": 0.2},
+  "strict_mode": "Warn"
+}

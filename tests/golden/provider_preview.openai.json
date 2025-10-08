@@ -1,0 +1,18 @@
+{
+  "provider": "openai",
+  "model": "gpt-5",
+  "prompt_source": "examples/prompts/basic_chat.json",
+  "translated_request": {
+    "model": "gpt-5",
+    "messages": [
+      {"role": "system", "content": "You are a concise assistant."},
+      {"role": "user", "content": "Summarize the Specado quickstart."}
+    ],
+    "temperature": 0.2
+  },
+  "lossiness_report": {
+    "is_lossy": false,
+    "codes": [],
+    "notes": "Placeholder snapshot until golden tests emit real data."
+  }
+}

@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn wraps_io_error() {
-        let err = std::io::Error::new(std::io::ErrorKind::Other, "disk failed");
+        let err = std::io::Error::other("disk failed");
         let wrapped = Error::from(err);
         matches!(wrapped, Error::Io(_))
             .then_some(())
