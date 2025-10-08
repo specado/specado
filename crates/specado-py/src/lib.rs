@@ -4,6 +4,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::wrap_pyfunction;
 use pythonize::{depythonize, pythonize};
+#[cfg(feature = "audit-logging")]
+use specado_core::audit::{AuditConfig, AuditContext};
 use specado_core::{
     execute, translate as core_translate, PromptSpec, ProviderSpec, UniformResponse,
 };
@@ -23,13 +25,38 @@ static RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
 #[pyclass]
 struct Client {
     provider_path: String,
+    _watch_enabled: bool,
+    #[cfg(feature = "audit-logging")]
+    audit_config: Option<AuditConfig>,
 }
 
 #[pymethods]
 impl Client {
     #[new]
-    fn new(provider_path: String) -> PyResult<Self> {
-        Ok(Self { provider_path })
+    #[pyo3(signature = (provider_path, watch=None, audit_config=None))]
+    fn new(
+        provider_path: String,
+        watch: Option<bool>,
+        audit_config: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Self> {
+        let watch_enabled = watch.unwrap_or(false);
+
+        #[cfg(feature = "audit-logging")]
+        let audit_config = if let Some(cfg) = audit_config {
+            let value = depythonize::<serde_json::Value>(cfg)?;
+            let parsed = serde_json::from_value::<AuditConfig>(value)
+                .map_err(|e| PyValueError::new_err(format!("Invalid audit configuration: {e}")))?;
+            Some(parsed)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            provider_path,
+            _watch_enabled: watch_enabled,
+            #[cfg(feature = "audit-logging")]
+            audit_config,
+        })
     }
 
     fn complete(&self, py: Python<'_>, prompt: &Bound<'_, PyDict>) -> PyResult<PyObject> {
@@ -38,10 +65,21 @@ impl Client {
             .map_err(|e| PyValueError::new_err(format!("Invalid prompt spec: {e}")))?;
         let provider_path = self.provider_path.clone();
 
+        #[cfg(feature = "audit-logging")]
+        let audit_context = self.audit_config.clone().map(AuditContext::new);
+
         let runtime = RUNTIME.clone();
         let response: UniformResponse = py
             .allow_threads(|| {
-                runtime.block_on(async { execute(prompt_spec, &provider_path).await })
+                runtime.block_on(async {
+                    execute(
+                        prompt_spec,
+                        &provider_path,
+                        #[cfg(feature = "audit-logging")]
+                        audit_context,
+                    )
+                    .await
+                })
             })
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 

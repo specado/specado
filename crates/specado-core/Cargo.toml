@@ -7,6 +7,11 @@ repository.workspace = true
 rust-version.workspace = true
 publish = false
 
+[features]
+default = []
+hot-reload = []
+audit-logging = ["uuid", "regex", "time"]
+
 [dependencies]
 specado-schemas.workspace = true
 tokio.workspace = true
@@ -19,6 +24,9 @@ async-trait.workspace = true
 tracing.workspace = true
 serde_json_path.workspace = true
 once_cell.workspace = true
+uuid = { version = "1.10", features = ["v4"], optional = true }
+regex = { version = "1.11", default-features = false, features = ["std"], optional = true }
+time = { version = "0.3.36", features = ["formatting", "macros"], optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

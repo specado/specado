@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use colored::*;
 use specado_core::{
     execute, translate as core_translate, LossinessLevel, LossinessReport, PromptSpec, ProviderSpec,
@@ -8,6 +8,12 @@ use specado_schemas::get_validator;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
+use std::time::Duration;
+
+#[cfg(feature = "audit-logging")]
+use specado_core::audit::{AuditConfig, AuditContext, AuditTarget};
+#[cfg(feature = "hot-reload")]
+use specado_core::hot_reload::{set_global_config, HotReloadConfig};
 
 #[derive(Parser)]
 #[command(name = "specado")]
@@ -30,6 +36,8 @@ enum Commands {
         prompt: PathBuf,
         #[arg(long)]
         provider: PathBuf,
+        #[command(flatten)]
+        runtime: RuntimeOptions,
     },
     /// Execute the prompt against the provider and print the normalized response
     Run {
@@ -37,6 +45,8 @@ enum Commands {
         prompt: PathBuf,
         #[arg(long)]
         provider: PathBuf,
+        #[command(flatten)]
+        runtime: RuntimeOptions,
     },
 }
 
@@ -46,8 +56,16 @@ async fn main() {
 
     let result = match cli.command {
         Commands::Validate { spec } => validate_command(spec).await,
-        Commands::Preview { prompt, provider } => preview_command(prompt, provider).await,
-        Commands::Run { prompt, provider } => run_command(prompt, provider).await,
+        Commands::Preview {
+            prompt,
+            provider,
+            runtime,
+        } => preview_command(prompt, provider, runtime).await,
+        Commands::Run {
+            prompt,
+            provider,
+            runtime,
+        } => run_command(prompt, provider, runtime).await,
     };
 
     if let Err(err) = result {
@@ -82,7 +100,14 @@ async fn validate_command(spec_path: PathBuf) -> Result<()> {
     Ok(())
 }
 
-async fn preview_command(prompt_path: PathBuf, provider_path: PathBuf) -> Result<()> {
+async fn preview_command(
+    prompt_path: PathBuf,
+    provider_path: PathBuf,
+    runtime: RuntimeOptions,
+) -> Result<()> {
+    #[cfg(feature = "hot-reload")]
+    apply_hot_reload_config(&runtime, &provider_path);
+
     let prompt = load_prompt_spec(&prompt_path)?;
     let provider = load_provider_spec(&provider_path)?;
 
@@ -97,13 +122,25 @@ async fn preview_command(prompt_path: PathBuf, provider_path: PathBuf) -> Result
     Ok(())
 }
 
-async fn run_command(prompt_path: PathBuf, provider_path: PathBuf) -> Result<()> {
+async fn run_command(
+    prompt_path: PathBuf,
+    provider_path: PathBuf,
+    runtime: RuntimeOptions,
+) -> Result<()> {
+    #[cfg(feature = "hot-reload")]
+    apply_hot_reload_config(&runtime, &provider_path);
+
+    #[cfg(feature = "audit-logging")]
+    let audit_context = build_audit_context(&runtime)?;
+
     let prompt = load_prompt_spec(&prompt_path)?;
     let response = execute(
         prompt,
         provider_path
             .to_str()
             .ok_or_else(|| anyhow!("Provider path contains invalid UTF-8"))?,
+        #[cfg(feature = "audit-logging")]
+        audit_context,
     )
     .await?;
 
@@ -127,6 +164,111 @@ fn parse_to_json_value(content: &str, path: &Path) -> Result<serde_json::Value> 
             Err(_) => Ok(serde_yaml::from_str(content)?),
         }
     }
+}
+
+#[derive(Args, Default, Clone)]
+struct RuntimeOptions {
+    /// Enable experimental hot-reload and watch for spec changes
+    #[arg(long)]
+    watch: bool,
+    /// Additional directories to watch for provider updates
+    #[arg(long = "watch-provider-dir")]
+    watch_dirs: Vec<PathBuf>,
+    /// Audit logging target: stdout or file
+    #[arg(long = "audit-target")]
+    audit_target: Option<AuditTargetChoice>,
+    /// Audit log file path (required when --audit-target file)
+    #[arg(long = "audit-file")]
+    audit_file: Option<PathBuf>,
+    /// Additional case-insensitive redaction patterns
+    #[arg(long = "audit-redact")]
+    audit_redact: Vec<String>,
+}
+
+#[derive(Clone)]
+enum AuditTargetChoice {
+    Stdout,
+    File,
+}
+
+impl std::str::FromStr for AuditTargetChoice {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "stdout" => Ok(Self::Stdout),
+            "file" => Ok(Self::File),
+            other => Err(format!(
+                "Unsupported audit target '{other}'. Use stdout or file."
+            )),
+        }
+    }
+}
+
+#[cfg(feature = "hot-reload")]
+fn apply_hot_reload_config(options: &RuntimeOptions, provider_path: &PathBuf) {
+    if !options.watch {
+        return;
+    }
+
+    let mut paths = if options.watch_dirs.is_empty() {
+        vec![provider_path.clone()]
+    } else {
+        options.watch_dirs.clone()
+    };
+
+    if paths.is_empty() {
+        paths.push(provider_path.clone());
+    }
+
+    let config = HotReloadConfig::enabled(paths, Duration::from_millis(250));
+    set_global_config(config);
+    eprintln!(
+        "{} {}",
+        "⚠".yellow(),
+        "Hot reload is experimental; no watcher is started until the feature is fully implemented."
+    );
+}
+
+#[cfg(feature = "audit-logging")]
+fn build_audit_context(options: &RuntimeOptions) -> Result<Option<AuditContext>> {
+    if options.audit_file.is_some()
+        && !matches!(options.audit_target, Some(AuditTargetChoice::File))
+    {
+        return Err(anyhow!(
+            "--audit-file can only be used with --audit-target file"
+        ));
+    }
+
+    let target = match &options.audit_target {
+        None if options.audit_redact.is_empty() => return Ok(None),
+        None => Some(AuditTarget::Stdout),
+        Some(AuditTargetChoice::Stdout) => Some(AuditTarget::Stdout),
+        Some(AuditTargetChoice::File) => {
+            let path = options
+                .audit_file
+                .clone()
+                .ok_or_else(|| anyhow!("--audit-file is required when --audit-target file"))?;
+            Some(AuditTarget::File { path })
+        }
+    };
+
+    let config = AuditConfig {
+        target,
+        redact: options.audit_redact.clone(),
+    };
+
+    if !config.is_enabled() {
+        return Ok(None);
+    }
+
+    eprintln!(
+        "{} {}",
+        "⚠".yellow(),
+        "Audit logging is experimental and currently writes JSONL synchronously."
+    );
+
+    Ok(Some(AuditContext::new(config)))
 }
 
 fn load_prompt_spec(path: &Path) -> Result<PromptSpec> {
@@ -181,5 +323,68 @@ fn print_lossiness(report: &LossinessReport) {
         }
     } else {
         println!("{} No lossiness detected", "✓".green().bold());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    #[cfg(feature = "audit-logging")]
+    fn audit_file_requires_path() {
+        let opts = RuntimeOptions {
+            watch: false,
+            watch_dirs: vec![],
+            audit_target: Some(AuditTargetChoice::File),
+            audit_file: None,
+            audit_redact: vec![],
+        };
+
+        let err = build_audit_context(&opts).expect_err("file target needs path");
+        assert!(err.to_string().contains("--audit-file"));
+    }
+
+    #[test]
+    #[cfg(feature = "audit-logging")]
+    fn audit_flags_validate_mutual_exclusion() {
+        let opts = RuntimeOptions {
+            watch: false,
+            watch_dirs: vec![],
+            audit_target: Some(AuditTargetChoice::Stdout),
+            audit_file: Some(PathBuf::from("ignored.jsonl")),
+            audit_redact: vec![],
+        };
+
+        let err =
+            build_audit_context(&opts).expect_err("should reject conflicting audit flag values");
+        assert!(err
+            .to_string()
+            .contains("--audit-file can only be used with --audit-target file"));
+    }
+
+    #[test]
+    #[cfg(feature = "audit-logging")]
+    fn audit_file_requires_explicit_file_target() {
+        let opts = RuntimeOptions {
+            watch: false,
+            watch_dirs: vec![],
+            audit_target: None,
+            audit_file: Some(PathBuf::from("audit.jsonl")),
+            audit_redact: vec![],
+        };
+
+        let err =
+            build_audit_context(&opts).expect_err("audit file should require --audit-target file");
+        assert!(err
+            .to_string()
+            .contains("--audit-file can only be used with --audit-target file"));
+    }
+
+    #[test]
+    fn runtime_options_default_watch_is_disabled() {
+        let opts = RuntimeOptions::default();
+        assert!(!opts.watch);
     }
 }

@@ -46,9 +46,9 @@ pub struct Mappings {
 pub struct RequestMapping {
     pub from: String,
     pub to: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clamp: Option<[f64; 2]>,
 }
 

@@ -1,8 +1,11 @@
 #![allow(dead_code)]
 
+#[cfg(feature = "audit-logging")]
+pub mod audit;
 pub mod auth;
 pub mod circuit_breaker;
 pub mod error;
+pub mod hot_reload;
 pub mod http;
 pub mod retry;
 pub mod router;
@@ -16,18 +19,42 @@ pub use retry::RetryPolicy;
 pub use router::{PrimaryFallbackRouter, Router};
 pub use types::*;
 
+use crate::hot_reload::global_cache;
 use crate::http::get_client;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::StatusCode;
 use serde_json::Value;
-use std::fs;
+use std::path::Path;
 
-pub async fn execute(prompt: PromptSpec, provider_path: &str) -> Result<UniformResponse> {
-    let provider_content = fs::read_to_string(provider_path)
-        .map_err(|e| Error::Config(format!("Failed to read provider spec: {}", e)))?;
+#[cfg(feature = "audit-logging")]
+use crate::audit::AuditContext;
 
-    let provider_spec: ProviderSpec = serde_yaml::from_str(&provider_content)
-        .map_err(|e| Error::Config(format!("Failed to parse provider spec: {}", e)))?;
+pub async fn execute(
+    prompt: PromptSpec,
+    provider_path: &str,
+    #[cfg(feature = "audit-logging")] mut audit: Option<AuditContext>,
+) -> Result<UniformResponse> {
+    #[cfg(feature = "audit-logging")]
+    if let Some(ctx) = audit.as_mut() {
+        ctx.reset_timer();
+    }
+
+    let provider_spec = match global_cache().load_or_read(Path::new(provider_path)) {
+        Ok(spec) => {
+            #[cfg(feature = "audit-logging")]
+            if let Some(ctx) = audit.as_mut() {
+                ctx.note_provider(&spec);
+            }
+            spec
+        }
+        Err(err) => {
+            #[cfg(feature = "audit-logging")]
+            if let Some(ctx) = audit.as_mut() {
+                ctx.record_error(None, &err);
+            }
+            return Err(err);
+        }
+    };
 
     let auth_handler = AuthHandler::new(provider_spec.auth.clone());
     auth_handler.validate()?;
@@ -35,6 +62,10 @@ pub async fn execute(prompt: PromptSpec, provider_path: &str) -> Result<UniformR
     let (translated, lossiness) = translate(&prompt, &provider_spec)?;
 
     if prompt.strict_mode == StrictMode::Strict && lossiness.is_lossy {
+        #[cfg(feature = "audit-logging")]
+        if let Some(ctx) = audit.as_mut() {
+            ctx.record_error(Some(&translated), &Error::StrictModeViolation);
+        }
         return Err(Error::StrictModeViolation);
     }
 
@@ -51,17 +82,37 @@ pub async fn execute(prompt: PromptSpec, provider_path: &str) -> Result<UniformR
     }
 
     let client = get_client();
-    let response = client
+    let response = match client
         .post(&provider_spec.endpoints.chat.url)
         .headers(header_map)
         .json(&translated)
         .send()
         .await
-        .map_err(Error::Http)?;
+    {
+        Ok(resp) => resp,
+        Err(err) => {
+            let error = Error::Http(err);
+            #[cfg(feature = "audit-logging")]
+            if let Some(ctx) = audit.as_mut() {
+                ctx.record_error(Some(&translated), &error);
+            }
+            return Err(error);
+        }
+    };
 
     let status = response.status();
     if !status.is_success() {
         let kind = map_status_to_provider_error(status);
+        #[cfg(feature = "audit-logging")]
+        if let Some(ctx) = audit.as_mut() {
+            ctx.record_error(
+                Some(&translated),
+                &Error::Provider {
+                    provider: provider_spec.provider.clone(),
+                    kind: kind.clone(),
+                },
+            );
+        }
         return Err(Error::Provider {
             provider: provider_spec.provider.clone(),
             kind,
@@ -72,6 +123,15 @@ pub async fn execute(prompt: PromptSpec, provider_path: &str) -> Result<UniformR
 
     let mut uniform_response = transformer::normalize(raw_response, &provider_spec)?;
     uniform_response.extensions.lossiness = lossiness;
+
+    #[cfg(feature = "audit-logging")]
+    if let Some(ctx) = audit.as_mut() {
+        ctx.record_success(
+            &translated,
+            &uniform_response,
+            &uniform_response.extensions.lossiness,
+        );
+    }
 
     Ok(uniform_response)
 }
@@ -181,9 +241,14 @@ constraints:
         let mut tmp = NamedTempFile::new().expect("temp file");
         write!(tmp, "{}", provider_yaml(&server.url("/chat"), token_env)).expect("write spec");
 
-        let response = execute(sample_prompt(), tmp.path().to_str().unwrap())
-            .await
-            .expect("execute succeeds");
+        let response = execute(
+            sample_prompt(),
+            tmp.path().to_str().unwrap(),
+            #[cfg(feature = "audit-logging")]
+            None,
+        )
+        .await
+        .expect("execute succeeds");
 
         mock.assert_hits(1);
         assert_eq!(response.content, "hi there");
@@ -237,9 +302,14 @@ constraints:
         let mut prompt = sample_prompt();
         prompt.strict_mode = StrictMode::Strict;
 
-        let err = execute(prompt, tmp.path().to_str().unwrap())
-            .await
-            .unwrap_err();
+        let err = execute(
+            prompt,
+            tmp.path().to_str().unwrap(),
+            #[cfg(feature = "audit-logging")]
+            None,
+        )
+        .await
+        .unwrap_err();
         assert!(matches!(err, Error::StrictModeViolation));
         mock.assert_hits(0);
 

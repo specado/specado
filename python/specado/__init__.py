@@ -36,8 +36,25 @@ class PromptSpec:
 class Client:
     """High-level Python wrapper around the native Specado client."""
 
-    def __init__(self, provider_path: str):
-        self._client = _NativeClient(provider_path)
+    def __init__(
+        self,
+        provider_path: str,
+        watch: Optional[bool] = None,
+        audit_config: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Create a Specado client.
+
+        Args:
+            provider_path: Path to the provider YAML or JSON file.
+            watch: Enable experimental hot-reload plumbing (no watcher started yet).
+            audit_config: Optional audit logging configuration forwarded to the core layer.
+        """
+
+        self._client = _NativeClient(
+            provider_path,
+            watch=watch,
+            audit_config=audit_config,
+        )
 
     def complete(self, prompt: PromptSpec | Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(prompt, PromptSpec):
