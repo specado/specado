@@ -76,6 +76,23 @@ impl ProviderCache {
         let path = provider_path;
         let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
 
+        let metadata = fs::metadata(&canonical)
+            .map_err(|e| Error::Config(format!("Failed to read provider spec metadata: {}", e)))?;
+        let modified = metadata.modified().ok();
+
+        if let Some(cached) = self
+            .inner
+            .read()
+            .expect("provider cache poisoned while reading")
+            .get(&canonical)
+        {
+            if let Some(modified_time) = modified {
+                if modified_time <= cached.last_loaded {
+                    return Ok(cached.spec.clone());
+                }
+            }
+        }
+
         let contents = fs::read_to_string(&canonical)
             .map_err(|e| Error::Config(format!("Failed to read provider spec: {}", e)))?;
 
@@ -88,6 +105,12 @@ impl ProviderCache {
             .validate_provider(&spec_value)
             .map_err(|e| Error::SchemaValidation(e.to_string()))?;
 
+        let refreshed_modified = fs::metadata(&canonical)
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .or(modified)
+            .unwrap_or_else(|| SystemTime::now());
+
         {
             let mut cache = self
                 .inner
@@ -97,7 +120,7 @@ impl ProviderCache {
                 canonical,
                 CachedProvider {
                     spec: spec.clone(),
-                    last_loaded: SystemTime::now(),
+                    last_loaded: refreshed_modified,
                 },
             );
         }
@@ -188,5 +211,55 @@ constraints:
         let cache = ProviderCache::new();
         let spec = cache.load_or_read(tmp.path()).expect("provider spec loads");
         assert_eq!(spec.provider, "demo");
+    }
+
+    #[test]
+    fn provider_cache_reloads_when_file_changes() {
+        let valid = r#"
+provider: demo
+models:
+  - id: demo
+auth:
+  type: bearer
+  token_env: TEST_TOKEN
+endpoints:
+  chat:
+    method: POST
+    url: https://example.com
+    headers: {}
+mappings:
+  request: []
+  response: []
+constraints:
+  supports:
+    json_mode: false
+    tools: false
+"#;
+
+        let invalid = "not: yaml";
+
+        let tmp = NamedTempFile::new().expect("temp file");
+        std::fs::write(tmp.path(), valid).expect("write spec");
+
+        let cache = ProviderCache::new();
+        cache
+            .load_or_read(tmp.path())
+            .expect("initial provider spec loads");
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        std::fs::write(tmp.path(), invalid).expect("write invalid spec");
+
+        let err = cache
+            .load_or_read(tmp.path())
+            .expect_err("invalid spec should trigger reload failure");
+        match err {
+            Error::Config(message) => {
+                assert!(
+                    message.contains("Failed to parse provider spec"),
+                    "unexpected error: {message}"
+                );
+            }
+            other => panic!("expected config error, got {other:?}"),
+        }
     }
 }
