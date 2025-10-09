@@ -1,5 +1,5 @@
 provider: openai
-interface: conversational.generate
+interface: text.generate
 contract_version: "1.0.0"
 
 auth:

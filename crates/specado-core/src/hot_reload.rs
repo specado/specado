@@ -1,5 +1,5 @@
-use crate::error::{Error, Result};
 use crate::adapter::AdapterRegistry;
+use crate::error::{Error, Result};
 use crate::types::ProviderSpec;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -85,16 +85,27 @@ fn merge_values(base: &mut JsonValue, overlay: &JsonValue) {
     *base = overlay.clone();
 }
 
-fn load_overlays() -> Result<Vec<OverlaySpec>> {
-    let overlays_dir = Path::new("overlays");
-    if !overlays_dir.exists() {
-        return Ok(Vec::new());
-    }
+fn load_overlays(spec_path: &Path) -> Result<Vec<OverlaySpec>> {
+    let overlays_dir = spec_path
+        .ancestors()
+        .find_map(|ancestor| {
+            let candidate = ancestor.join("overlays");
+            if candidate.is_dir() {
+                Some(candidate)
+            } else {
+                None
+            }
+        });
+
+    let overlays_dir = match overlays_dir {
+        Some(dir) => dir,
+        None => return Ok(Vec::new()),
+    };
 
     let mut overlays = Vec::new();
-    for entry in fs::read_dir(overlays_dir).map_err(|e| {
-        Error::Config(format!("Failed to read overlays directory: {}", e))
-    })? {
+    for entry in fs::read_dir(overlays_dir)
+        .map_err(|e| Error::Config(format!("Failed to read overlays directory: {}", e)))?
+    {
         let path = entry
             .map_err(|e| Error::Config(format!("Failed to read overlay entry: {}", e)))?
             .path();
@@ -121,8 +132,6 @@ fn load_overlays() -> Result<Vec<OverlaySpec>> {
 }
 
 fn merge_overlays(value: JsonValue, overlays: Vec<OverlaySpec>) -> Result<JsonValue> {
-    let mut value = value;
-
     if overlays.is_empty() {
         return Ok(value);
     }
@@ -134,11 +143,12 @@ fn merge_overlays(value: JsonValue, overlays: Vec<OverlaySpec>) -> Result<JsonVa
         ))
     })?;
 
+    let mut combined = value;
+
     let adapter = AdapterRegistry::select(&provider);
     let adapter_key = adapter.kind().registry_key();
     let provider_contract = provider.contract_version().unwrap_or("1.0.0");
 
-    let mut combined = value;
     for overlay in overlays {
         if !overlay
             .target
@@ -148,11 +158,7 @@ fn merge_overlays(value: JsonValue, overlays: Vec<OverlaySpec>) -> Result<JsonVa
             continue;
         }
 
-        if !overlay
-            .target
-            .adapter
-            .eq_ignore_ascii_case(adapter_key)
-        {
+        if !overlay.target.adapter.eq_ignore_ascii_case(adapter_key) {
             continue;
         }
 
@@ -165,10 +171,7 @@ fn merge_overlays(value: JsonValue, overlays: Vec<OverlaySpec>) -> Result<JsonVa
             )));
         }
 
-        merge_values(
-            &mut combined,
-            &JsonValue::Object(overlay.data.clone()),
-        );
+        merge_values(&mut combined, &JsonValue::Object(overlay.data.clone()));
     }
 
     Ok(combined)
@@ -280,8 +283,8 @@ impl ProviderCache {
 
         let mut visited = HashSet::new();
         let merged_value = load_spec_value(&canonical, &mut visited)?;
-    let overlays = load_overlays()?;
-        let merged_value = merge_overlays(merged_value, overlays)?;
+        let overlays = load_overlays(&canonical)?;
+    let merged_value = merge_overlays(merged_value, overlays)?;
         let mut spec: ProviderSpec = serde_json::from_value(merged_value)
             .map_err(|e| Error::Config(format!("Failed to parse provider spec: {}", e)))?;
         spec.inherits = None;
@@ -516,12 +519,29 @@ unsupported_parameters:
     fn load_or_read_applies_overlays() {
         let dir = tempdir().expect("temp dir");
         let spec_path = dir.path().join("openai.yaml");
+        let overlays_dir = dir.path().join("overlays");
+        fs::create_dir(&overlays_dir).expect("overlay dir");
+        fs::write(
+            overlays_dir.join("openai.responses.yaml"),
+            r#"overlay_for:
+  provider: openai
+  adapter: openai_responses
+  contract_version: "1.0.0"
+
+extensions:
+  x-specado:
+    request_defaults:
+      max_output_tokens: 1024
+"#,
+        )
+        .expect("overlay file");
+
         fs::write(
             &spec_path,
             r#"provider: openai
 models:
   - id: test
-interface: conversational.generate
+interface: text.generate
 contract_version: "1.0.0"
 endpoints:
   chat:
@@ -543,9 +563,7 @@ auth:
         .expect("write spec");
 
         let cache = ProviderCache::new();
-        let spec = cache
-            .load_or_read(&spec_path)
-            .expect("spec with overlays");
+        let spec = cache.load_or_read(&spec_path).expect("spec with overlays");
 
         assert_eq!(spec.provider, "openai");
         let defaults = spec
