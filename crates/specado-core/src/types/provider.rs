@@ -10,6 +10,16 @@ pub enum ProviderApi {
     AnthropicMessagesClaude4,
 }
 
+impl ProviderApi {
+    pub fn registry_key(&self) -> &'static str {
+        match self {
+            ProviderApi::ChatCompletions => "chat_completions",
+            ProviderApi::OpenaiResponses => "openai_responses",
+            ProviderApi::AnthropicMessagesClaude4 => "anthropic_messages_claude4",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProviderSpec {
     pub provider: String,
