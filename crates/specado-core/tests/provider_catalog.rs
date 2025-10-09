@@ -1,4 +1,5 @@
 use serde_json::json;
+use specado_core::hot_reload::ProviderCache;
 use specado_core::transformer::translate;
 use specado_core::types::{
     LossinessCode, Message, MessageRole, PromptSpec, SamplingConfig, StrictMode,
@@ -6,7 +7,6 @@ use specado_core::types::{
 use specado_core::ProviderSpec;
 use specado_schemas::get_validator;
 use std::collections::HashMap;
-use std::fs;
 use std::path::PathBuf;
 
 fn provider_path(relative: &str) -> PathBuf {
@@ -17,8 +17,9 @@ fn provider_path(relative: &str) -> PathBuf {
 
 fn load_provider(relative: &str) -> ProviderSpec {
     let path = provider_path(relative);
-    let contents = fs::read_to_string(&path).expect("provider yaml");
-    serde_yaml::from_str(&contents).expect("valid provider spec")
+    ProviderCache::new()
+        .load_or_read(&path)
+        .expect("merged provider spec")
 }
 
 fn sample_prompt() -> PromptSpec {
@@ -65,9 +66,7 @@ fn openai_catalog_validates_and_translates() {
     let provider = load_provider("openai/gpt-5.yaml");
     let validator = get_validator();
 
-    let provider_json: serde_json::Value =
-        serde_yaml::from_str(&fs::read_to_string(provider_path("openai/gpt-5.yaml")).unwrap())
-            .expect("provider json");
+    let provider_json = serde_json::to_value(&provider).expect("provider json");
     validator
         .validate_provider(&provider_json)
         .expect("provider spec valid");
@@ -86,10 +85,7 @@ fn openai_catalog_validates_and_translates() {
 fn anthropic_catalog_relocates_and_clamps() {
     let provider = load_provider("anthropic/claude-sonnet-45.yaml");
     let validator = get_validator();
-    let provider_json: serde_json::Value = serde_yaml::from_str(
-        &fs::read_to_string(provider_path("anthropic/claude-sonnet-45.yaml")).unwrap(),
-    )
-    .expect("provider json");
+    let provider_json = serde_json::to_value(&provider).expect("provider json");
     validator
         .validate_provider(&provider_json)
         .expect("provider spec valid");
