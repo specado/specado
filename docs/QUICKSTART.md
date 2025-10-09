@@ -40,12 +40,18 @@ OPENAI_API_KEY=sk-your-key \
   --prompt examples/prompts/basic_chat.json \
   --provider crates/specado-providers/providers/openai/gpt-5/base.yaml \
   --audit-target stdout
+
+# generate embeddings using the neutral interface
+OPENAI_API_KEY=sk-your-key \
+./target/debug/specado run \
+  --prompt examples/prompts/embeddings_query.json \
+  --provider crates/specado-providers/providers/openai/gpt-5/base.yaml
 ```
 
 The helper script `examples/cli_preview.sh` wraps the preview command and documents the expected environment when you need a quick smoke test.
 
-> **Model metadata**
-> The sample prompt `examples/prompts/basic_chat.json` includes metadata that targets OpenAI's GPT-5 Responses API (`openai_model`, reasoning effort, verbosity, max output tokens) and Anthropic's Claude Sonnet 4.5 (`anthropic_model`, thinking configuration, and max tokens). Tweak these fields to match the models and limits available to your account. See `docs/process/PROVIDER_INHERITANCE.md` for a full field reference.
+> **Model metadata & overlays**
+> The sample prompt `examples/prompts/basic_chat.json` includes metadata that targets OpenAI's GPT-5 Responses API (`openai_model`, reasoning effort, verbosity, max output tokens) and Anthropic's Claude Sonnet 4.5 (`anthropic_model`, thinking configuration, and max tokens). Tweak these fields to match the models and limits available to your account. The provider specs declare neutral interfaces (see `docs/process/INTERFACE_TAXONOMY.md`), while per-adapter defaults live in `overlays/`. See `docs/process/PROVIDER_INHERITANCE.md` for the full field reference.
 
 ## 3. Python quickstart
 The Python bindings are published from `crates/specado-py` and surfaced to the Python package in `python/specado`. Use `maturin` to build the native extension in-place, then run the sample program in `examples/python_basic.py`.
