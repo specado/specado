@@ -1,0 +1,9 @@
+overlay_for:
+  provider: openai
+  adapter: openai_responses
+  contract_version: "1.0.0"
+
+extensions:
+  x-specado:
+    request_defaults:
+      max_output_tokens: 1024

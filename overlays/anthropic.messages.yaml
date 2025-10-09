@@ -1,0 +1,12 @@
+overlay_for:
+  provider: anthropic
+  adapter: anthropic_messages_claude4
+  contract_version: "1.0.0"
+
+extensions:
+  x-specado:
+    request_defaults:
+      temperature: 1.0
+      thinking:
+        type: enabled
+        budget_tokens: 2000

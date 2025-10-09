@@ -76,6 +76,7 @@ impl AdapterRegistry {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;

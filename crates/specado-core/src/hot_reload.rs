@@ -1,8 +1,9 @@
 use crate::error::{Error, Result};
+use crate::adapter::AdapterRegistry;
 use crate::types::ProviderSpec;
 use once_cell::sync::Lazy;
-use serde::Serialize;
-use serde_json::{to_value, Value as JsonValue};
+use serde::{Deserialize, Serialize};
+use serde_json::{to_value, Map as JsonMap, Value as JsonValue};
 use specado_schemas::get_validator;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -82,6 +83,116 @@ fn merge_values(base: &mut JsonValue, overlay: &JsonValue) {
     }
 
     *base = overlay.clone();
+}
+
+fn load_overlays() -> Result<Vec<OverlaySpec>> {
+    let overlays_dir = Path::new("overlays");
+    if !overlays_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut overlays = Vec::new();
+    for entry in fs::read_dir(overlays_dir).map_err(|e| {
+        Error::Config(format!("Failed to read overlays directory: {}", e))
+    })? {
+        let path = entry
+            .map_err(|e| Error::Config(format!("Failed to read overlay entry: {}", e)))?
+            .path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("yaml") {
+            continue;
+        }
+
+        let contents = fs::read_to_string(&path).map_err(|e| {
+            Error::Config(format!("Failed to read overlay {}: {}", path.display(), e))
+        })?;
+
+        let file: OverlayFile = serde_yaml::from_str(&contents).map_err(|e| {
+            Error::Config(format!("Failed to parse overlay {}: {}", path.display(), e))
+        })?;
+
+        overlays.push(OverlaySpec {
+            target: file.overlay_for,
+            data: file.data,
+            source: path,
+        });
+    }
+
+    Ok(overlays)
+}
+
+fn merge_overlays(value: JsonValue, overlays: Vec<OverlaySpec>) -> Result<JsonValue> {
+    let mut value = value;
+
+    if overlays.is_empty() {
+        return Ok(value);
+    }
+
+    let provider: ProviderSpec = serde_json::from_value(value.clone()).map_err(|e| {
+        Error::Config(format!(
+            "Failed to deserialize provider spec before overlays: {}",
+            e
+        ))
+    })?;
+
+    let adapter = AdapterRegistry::select(&provider);
+    let adapter_key = adapter.kind().registry_key();
+    let provider_contract = provider.contract_version().unwrap_or("1.0.0");
+
+    let mut combined = value;
+    for overlay in overlays {
+        if !overlay
+            .target
+            .provider
+            .eq_ignore_ascii_case(&provider.provider)
+        {
+            continue;
+        }
+
+        if !overlay
+            .target
+            .adapter
+            .eq_ignore_ascii_case(adapter_key)
+        {
+            continue;
+        }
+
+        if overlay.target.contract_version != provider_contract {
+            return Err(Error::Config(format!(
+                "Overlay {} targets contract version {} but spec uses {}",
+                overlay.source.display(),
+                overlay.target.contract_version,
+                provider_contract
+            )));
+        }
+
+        merge_values(
+            &mut combined,
+            &JsonValue::Object(overlay.data.clone()),
+        );
+    }
+
+    Ok(combined)
+}
+
+#[derive(Debug)]
+struct OverlaySpec {
+    target: OverlayTarget,
+    data: JsonMap<String, JsonValue>,
+    source: PathBuf,
+}
+
+#[derive(Debug, Deserialize)]
+struct OverlayFile {
+    overlay_for: OverlayTarget,
+    #[serde(flatten)]
+    data: JsonMap<String, JsonValue>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OverlayTarget {
+    provider: String,
+    adapter: String,
+    contract_version: String,
 }
 
 /// Configuration for experimental hot-reload support.
@@ -169,6 +280,8 @@ impl ProviderCache {
 
         let mut visited = HashSet::new();
         let merged_value = load_spec_value(&canonical, &mut visited)?;
+    let overlays = load_overlays()?;
+        let merged_value = merge_overlays(merged_value, overlays)?;
         let mut spec: ProviderSpec = serde_json::from_value(merged_value)
             .map_err(|e| Error::Config(format!("Failed to parse provider spec: {}", e)))?;
         spec.inherits = None;
@@ -397,5 +510,53 @@ unsupported_parameters:
         assert!(spec.capabilities.supports_tools);
         assert_eq!(spec.capabilities.context_window, Some(2000));
         assert_eq!(spec.unsupported_parameters, vec!["$.sampling.temperature"]);
+    }
+
+    #[test]
+    fn load_or_read_applies_overlays() {
+        let dir = tempdir().expect("temp dir");
+        let spec_path = dir.path().join("openai.yaml");
+        fs::write(
+            &spec_path,
+            r#"provider: openai
+models:
+  - id: test
+interface: conversational.generate
+contract_version: "1.0.0"
+endpoints:
+  chat:
+    method: POST
+    url: https://api.openai.com/v1/responses
+    headers: {}
+mappings:
+  request: []
+  response: []
+constraints:
+  supports:
+    json_mode: true
+    tools: true
+auth:
+  type: bearer
+  token_env: KEY
+"#,
+        )
+        .expect("write spec");
+
+        let cache = ProviderCache::new();
+        let spec = cache
+            .load_or_read(&spec_path)
+            .expect("spec with overlays");
+
+        assert_eq!(spec.provider, "openai");
+        let defaults = spec
+            .extensions
+            .get("x-specado")
+            .and_then(|value| value.get("request_defaults"));
+        assert_eq!(
+            defaults
+                .and_then(|value| value.get("max_output_tokens"))
+                .and_then(|v| v.as_i64()),
+            Some(1024)
+        );
     }
 }

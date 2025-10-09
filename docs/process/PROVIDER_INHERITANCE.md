@@ -38,8 +38,15 @@ Each spec YAML follows the schema defined in `crates/specado-schemas`:
 - `inherits` points to another spec file (relative path) that will be merged first.
 - `capabilities` stores provider-specific metadata with typed fields (context window, feature flags, reasoning controls).
 - `capabilities_extra` allows experimental `x_*` capability keys without schema churn.
+- `extensions` is reserved for experimental `x_*` fields that are not part of the stable contract.
 - `unsupported_parameters` lists PromptSpec paths that should trigger lossiness warnings.
 - `mappings` describe declarative JSONPath translations for request and response payloads.
+
+Overlays placed under `overlays/<provider>.<adapter>.yaml` can layer provider-specific defaults. Each overlay file declares `overlay_for` metadata (`provider`, `adapter`, `contract_version`) so the runtime can validate when it applies the overlay.
+
+## Overlays
+
+Overlays let you keep provider-specific defaults or quirks outside the base spec. When the adapter registry selects an adapter, it merges any matching overlays (by provider, adapter key, and contract version) on top of the spec using the precedence `spec < overlay < runtime overrides`. Overlay files live in the repo-level `overlays/` directory and use the naming convention `<provider>.<adapter>.yaml` (for example, `openai.responses.yaml`).
 
 When loading a spec, the engine merges the inheritance chain, reporting an error if cycles are detected.
 
