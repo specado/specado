@@ -16,22 +16,81 @@
       }
     },
     "inherits": {"type": "string"},
-    "api": {
+    "interface": {
       "type": "string",
-      "enum": [
-        "chat_completions",
-        "openai_responses",
-        "anthropic_messages_claude4",
-        "embeddings",
-        "images",
-        "speech",
-        "video"
-      ],
-      "default": "chat_completions"
+      "description": "Neutral interface hint (e.g., conversational.generate)",
+      "anyOf": [
+        {
+          "enum": [
+            "conversational.generate",
+            "conversational.stream",
+            "text.generate",
+            "text.extract",
+            "text.moderate",
+            "tools.call",
+            "embeddings.generate",
+            "search.rerank",
+            "vision.describe",
+            "image.generate",
+            "image.edit",
+            "image.variations",
+            "speech.synthesize",
+            "audio.transcribe",
+            "audio.translate",
+            "video.generate",
+            "video.transcribe"
+          ]
+        },
+        {
+          "pattern": "^x[_\\-A-Za-z0-9.]+$"
+        }
+      ]
+    },
+    "contract_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
     },
     "capabilities": {
       "type": "object",
-      "additionalProperties": true
+      "properties": {
+        "context_window": {"type": "integer", "minimum": 1},
+        "supports_tools": {"type": "boolean", "default": false},
+        "supports_custom_tools": {"type": "boolean", "default": false},
+        "supports_parallel_tool_calls": {"type": "boolean", "default": false},
+        "supports_allowed_tools": {"type": "boolean", "default": false},
+        "supports_json_mode": {"type": "boolean", "default": false},
+        "supports_seed": {"type": "boolean", "default": false},
+        "supports_frequency_penalty": {"type": "boolean", "default": false},
+        "supports_presence_penalty": {"type": "boolean", "default": false},
+        "supports_logit_bias": {"type": "boolean", "default": false},
+        "supports_logprobs": {"type": "boolean", "default": false},
+        "supports_top_logprobs": {"type": "boolean", "default": false},
+        "supports_n": {"type": "boolean", "default": false},
+        "supports_response_format": {"type": "boolean", "default": false},
+        "supports_stop": {"type": "boolean", "default": false},
+        "supports_temperature": {"type": "boolean", "default": false},
+        "supports_top_p": {"type": "boolean", "default": false},
+        "supports_top_k": {"type": "boolean", "default": false},
+        "supports_image_input": {"type": "boolean", "default": false},
+        "supports_extended_thinking": {"type": "boolean", "default": false},
+        "responses_api": {"type": "boolean", "default": false},
+        "reasoning_controls": {"type": "array", "items": {"type": "string"}},
+        "thought_signatures": {"type": "string"}
+      },
+      "additionalProperties": false,
+      "default": {}
+    },
+    "extensions": {
+      "type": "object",
+      "propertyNames": {"pattern": "^x[_\\-A-Za-z0-9.]+$"},
+      "additionalProperties": true,
+      "default": {}
+    },
+    "capabilities_extra": {
+      "type": "object",
+      "propertyNames": {"pattern": "^x[_\\-A-Za-z0-9.]+$"},
+      "additionalProperties": true,
+      "default": {}
     },
     "unsupported_parameters": {
       "type": "array",

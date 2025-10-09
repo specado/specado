@@ -36,7 +36,8 @@ anthropic/
 Each spec YAML follows the schema defined in `crates/specado-schemas`:
 
 - `inherits` points to another spec file (relative path) that will be merged first.
-- `capabilities` stores provider-specific metadata (context window, tool support, etc.).
+- `capabilities` stores provider-specific metadata with typed fields (context window, feature flags, reasoning controls).
+- `capabilities_extra` allows experimental `x_*` capability keys without schema churn.
 - `unsupported_parameters` lists PromptSpec paths that should trigger lossiness warnings.
 - `mappings` describe declarative JSONPath translations for request and response payloads.
 

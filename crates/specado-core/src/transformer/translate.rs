@@ -10,7 +10,7 @@ use serde_json_path::JsonPath;
 pub fn translate(prompt: &PromptSpec, provider: &ProviderSpec) -> Result<(Value, LossinessReport)> {
     let (base_payload, report) = translate_with_mappings(prompt, provider)?;
 
-    let payload = match provider.api {
+    let payload = match provider.api_kind() {
         ProviderApi::ChatCompletions => base_payload,
         ProviderApi::OpenaiResponses => reshape_openai_responses(prompt, provider, base_payload)?,
         ProviderApi::AnthropicMessagesClaude4 => {
@@ -470,9 +470,9 @@ enum PathSegment {
 mod tests {
     use super::*;
     use crate::types::{
-        Constraints, EndpointConfig, Endpoints, HttpMethod, JsonSchema, Mappings, Message,
-        MessageRole, ModelConfig, PromptSpec, RequestMapping, ResponseConfig, ResponseMapping,
-        SamplingConfig, StrictMode, SupportFlags, Tool,
+        Capabilities, Constraints, EndpointConfig, Endpoints, HttpMethod, JsonSchema, Mappings,
+        Message, MessageRole, ModelConfig, PromptSpec, RequestMapping, ResponseConfig,
+        ResponseMapping, SamplingConfig, StrictMode, SupportFlags, Tool,
     };
     use std::collections::HashMap;
 
@@ -482,7 +482,8 @@ mod tests {
             models: vec![ModelConfig {
                 id: "gpt-4o".into(),
             }],
-            api: ProviderApi::ChatCompletions,
+            interface: Some("conversational.generate".into()),
+            contract_version: Some("1.0.0".into()),
             inherits: None,
             endpoints: Endpoints {
                 chat: EndpointConfig {
@@ -507,7 +508,9 @@ mod tests {
             auth: crate::auth::AuthScheme::Bearer {
                 token_env: "OPENAI_KEY".into(),
             },
-            capabilities: HashMap::new(),
+            capabilities: Capabilities::default(),
+            capabilities_extra: HashMap::new(),
+            extensions: HashMap::new(),
             unsupported_parameters: Vec::new(),
         }
     }

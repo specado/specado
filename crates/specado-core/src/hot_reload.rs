@@ -246,7 +246,6 @@ pub fn start_hot_reload(_config: HotReloadConfig, _cache: ProviderCache) -> HotR
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
     use tempfile::{tempdir, NamedTempFile};
 
     #[test]
@@ -395,8 +394,8 @@ unsupported_parameters:
         assert_eq!(spec.provider, "demo");
         assert_eq!(spec.models[0].id, "child");
         assert_eq!(spec.endpoints.chat.url, "https://api.example.com");
-        assert_eq!(spec.capabilities.get("supports_tools"), Some(&json!(true)));
-        assert_eq!(spec.capabilities.get("context_window"), Some(&json!(2000)));
+        assert!(spec.capabilities.supports_tools);
+        assert_eq!(spec.capabilities.context_window, Some(2000));
         assert_eq!(spec.unsupported_parameters, vec!["$.sampling.temperature"]);
     }
 }

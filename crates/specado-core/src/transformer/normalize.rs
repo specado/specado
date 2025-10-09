@@ -2,7 +2,7 @@ use crate::error::{Error, Result};
 use crate::types::{
     Extensions, FinishReason, LossinessReport, ProviderSpec, StrictMode, UniformResponse,
 };
-use serde_json::{Map as JsonMap, Value};
+use serde_json::Value;
 use serde_json_path::JsonPath;
 
 pub fn normalize(raw: Value, provider: &ProviderSpec) -> Result<UniformResponse> {
@@ -38,17 +38,7 @@ pub fn normalize(raw: Value, provider: &ProviderSpec) -> Result<UniformResponse>
         }
     }
 
-    let provider_capabilities = if provider.capabilities.is_empty() {
-        None
-    } else {
-        Some(Value::Object(
-            provider
-                .capabilities
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect::<JsonMap<_, _>>(),
-        ))
-    };
+    let provider_capabilities = provider.capabilities_json();
 
     Ok(UniformResponse {
         content,
@@ -81,10 +71,9 @@ fn map_finish_reason(raw: &str) -> FinishReason {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::ProviderApi;
     use crate::types::{
-        Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig, ProviderSpec,
-        ResponseMapping, SupportFlags,
+        Capabilities, Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig,
+        ProviderSpec, ResponseMapping, SupportFlags,
     };
     use serde_json::json;
     use std::collections::HashMap;
@@ -95,7 +84,8 @@ mod tests {
             models: vec![ModelConfig {
                 id: "gpt-4o".into(),
             }],
-            api: ProviderApi::ChatCompletions,
+            interface: Some("conversational.generate".into()),
+            contract_version: Some("1.0.0".into()),
             inherits: None,
             endpoints: Endpoints {
                 chat: EndpointConfig {
@@ -126,7 +116,9 @@ mod tests {
             auth: crate::auth::AuthScheme::Bearer {
                 token_env: "KEY".into(),
             },
-            capabilities: HashMap::new(),
+            capabilities: Capabilities::default(),
+            capabilities_extra: HashMap::new(),
+            extensions: HashMap::new(),
             unsupported_parameters: Vec::new(),
         }
     }

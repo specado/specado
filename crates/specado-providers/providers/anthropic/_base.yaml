@@ -1,5 +1,6 @@
 provider: anthropic
-api: anthropic_messages_claude4
+interface: conversational.generate
+contract_version: "1.0.0"
 
 auth:
   type: apikey
