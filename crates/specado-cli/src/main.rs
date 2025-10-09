@@ -2,7 +2,8 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Args, Parser, Subcommand};
 use colored::*;
 use specado_core::{
-    execute, translate as core_translate, LossinessLevel, LossinessReport, PromptSpec, ProviderSpec,
+    execute, translate as core_translate, LossinessLevel, LossinessReport, Message, MessageRole,
+    PromptSpec, ProviderSpec, ResponseConfig, SamplingConfig, StrictMode,
 };
 use specado_schemas::get_validator;
 use std::fs;
@@ -25,6 +26,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Ask a quick question using the default provider/model
+    Ask {
+        /// The user prompt to send to the model
+        prompt: String,
+        #[command(flatten)]
+        runtime: RuntimeOptions,
+    },
     /// Validate a prompt or provider specification against the schemas
     Validate {
         #[arg(long)]
@@ -55,6 +63,7 @@ async fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
+        Commands::Ask { prompt, runtime } => ask_command(prompt, runtime).await,
         Commands::Validate { spec } => validate_command(spec).await,
         Commands::Preview {
             prompt,
@@ -96,6 +105,50 @@ async fn validate_command(spec_path: PathBuf) -> Result<()> {
             .map_err(|e| anyhow!("Prompt spec invalid: {}", e))?;
         println!("{} Prompt spec is valid", "✓".green().bold());
     }
+
+    Ok(())
+}
+
+async fn ask_command(prompt: String, runtime: RuntimeOptions) -> Result<()> {
+    let provider_path = default_provider_path()?;
+
+    #[cfg(feature = "hot-reload")]
+    apply_hot_reload_config(&runtime, &provider_path);
+
+    #[cfg(feature = "audit-logging")]
+    let audit_context = build_audit_context(&runtime)?;
+
+    let prompt_spec = PromptSpec {
+        version: "1".to_string(),
+        messages: vec![
+            Message {
+                role: MessageRole::System,
+                content: "You are a helpful assistant.".to_string(),
+            },
+            Message {
+                role: MessageRole::User,
+                content: prompt,
+            },
+        ],
+        sampling: SamplingConfig::default(),
+        response: ResponseConfig::default(),
+        tools: Vec::new(),
+        tool_choice: None,
+        strict_mode: StrictMode::Warn,
+        metadata: Default::default(),
+    };
+
+    let response = execute(
+        prompt_spec,
+        provider_path
+            .to_str()
+            .ok_or_else(|| anyhow!("Provider path contains invalid UTF-8"))?,
+        #[cfg(feature = "audit-logging")]
+        audit_context,
+    )
+    .await?;
+
+    println!("{}", response.content.trim());
 
     Ok(())
 }
@@ -164,6 +217,28 @@ fn parse_to_json_value(content: &str, path: &Path) -> Result<serde_json::Value> 
             Err(_) => Ok(serde_yaml::from_str(content)?),
         }
     }
+}
+
+fn default_provider_path() -> Result<PathBuf> {
+    if let Ok(path) = std::env::var("SPECADO_DEFAULT_PROVIDER") {
+        let path = PathBuf::from(path);
+        if path.exists() {
+            return Ok(path);
+        }
+        return Err(anyhow!(
+            "Provider path specified via SPECADO_DEFAULT_PROVIDER does not exist: {}",
+            path.display()
+        ));
+    }
+
+    let fallback = PathBuf::from("crates/specado-providers/providers/openai/gpt-5/base.yaml");
+    if fallback.exists() {
+        return Ok(fallback);
+    }
+
+    Err(anyhow!(
+        "Default provider spec not found. Set SPECADO_DEFAULT_PROVIDER to a valid provider YAML."
+    ))
 }
 
 #[derive(Args, Default, Clone)]

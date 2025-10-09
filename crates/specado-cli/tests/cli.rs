@@ -28,6 +28,8 @@ fn sample_prompt_json() -> serde_json::Value {
 fn sample_provider_yaml(url: &str, token_env: &str) -> String {
     format!(
         r#"provider: test
+interface: text.generate
+contract_version: "1.0.0"
 auth:
   type: bearer
   token_env: {token_env}
@@ -170,5 +172,47 @@ fn run_executes_against_provider() {
         .stdout(predicate::str::contains("hi from cli"));
 
     mock.assert_hits(1);
+    std::env::remove_var(token_env);
+}
+
+#[test]
+fn ask_uses_default_provider_for_single_turn() {
+    let dir = TempDir::new().expect("temp dir");
+
+    let server = MockServer::start();
+    let token_env = "SPECADO_ASK_TOKEN";
+    std::env::set_var(token_env, "ask-secret");
+
+    let mock = server.mock(|when, then| {
+        when.method(POST)
+            .path("/chat")
+            .header("authorization", "Bearer ask-secret");
+        then.status(200)
+            .header("content-type", "application/json")
+            .json_body(json!({
+                "data": {
+                    "content": "hi from ask",
+                    "finish_reason": "stop"
+                }
+            }));
+    });
+
+    let provider_path = write_file(
+        &dir,
+        "provider.yaml",
+        sample_provider_yaml(&server.url("/chat"), token_env).as_str(),
+    );
+
+    std::env::set_var("SPECADO_DEFAULT_PROVIDER", &provider_path);
+
+    let mut cmd = Command::cargo_bin("specado").expect("binary");
+    cmd.env("NO_COLOR", "1").arg("ask").arg("Hello there");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("hi from ask"));
+
+    mock.assert_hits(1);
+    std::env::remove_var("SPECADO_DEFAULT_PROVIDER");
     std::env::remove_var(token_env);
 }
