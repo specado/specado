@@ -87,7 +87,7 @@ fn openai_catalog_validates_and_translates() {
 
 #[test]
 fn anthropic_catalog_relocates_and_clamps() {
-    let provider = load_provider("anthropic/claude-sonnet-45.yaml");
+    let provider = load_provider("anthropic/claude-sonnet-4-5.yaml");
     let validator = get_validator();
     let provider_json = serde_json::to_value(&provider).expect("provider json");
     validator
