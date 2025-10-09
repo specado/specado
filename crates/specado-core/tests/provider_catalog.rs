@@ -63,7 +63,7 @@ fn sample_prompt() -> PromptSpec {
 
 #[test]
 fn openai_catalog_validates_and_translates() {
-    let provider = load_provider("openai/gpt-5.yaml");
+    let provider = load_provider("openai/gpt-5-family.yaml");
     let validator = get_validator();
 
     let provider_json = serde_json::to_value(&provider).expect("provider json");
@@ -72,7 +72,11 @@ fn openai_catalog_validates_and_translates() {
         .expect("provider spec valid");
 
     let (translated, report) = translate(&sample_prompt(), &provider).expect("translate");
-    assert!(!report.is_lossy);
+    assert!(report.is_lossy);
+    assert!(report
+        .entries
+        .iter()
+        .any(|entry| entry.code == LossinessCode::Unsupported));
     assert_eq!(translated["model"], json!("gpt-5"));
     assert_eq!(translated["max_output_tokens"], json!(200));
     assert_eq!(translated["reasoning"]["effort"], json!("minimal"));

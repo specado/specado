@@ -1,4 +1,0 @@
-inherits: ./_base-responses.yaml
-
-models:
-  - id: gpt-5
