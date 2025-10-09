@@ -63,6 +63,59 @@ constraints:
     )
 }
 
+fn provider_yaml_with_models(
+    provider: &str,
+    models: &[&str],
+    url: &str,
+    token_env: &str,
+) -> String {
+    let models_block = models
+        .iter()
+        .map(|id| format!("  - id: {}", id))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    format!(
+        r#"provider: {provider}
+interface: text.generate
+contract_version: "1.0.0"
+
+auth:
+  type: bearer
+  token_env: {token_env}
+
+models:
+{models_block}
+
+endpoints:
+  chat:
+    method: POST
+    url: {url}
+    headers:
+      content-type: application/json
+
+mappings:
+  request:
+    - from: $.messages
+      to: $.body.messages
+  response:
+    - from: $.data.content
+      to: content
+    - from: $.data.finish_reason
+      to: finish_reason
+
+constraints:
+  supports:
+    json_mode: true
+    tools: true
+"#,
+        provider = provider,
+        models_block = models_block,
+        url = url,
+        token_env = token_env
+    )
+}
+
 #[test]
 fn validate_prompt_and_provider() {
     let dir = TempDir::new().expect("temp dir");
@@ -215,4 +268,74 @@ fn ask_uses_default_provider_for_single_turn() {
     mock.assert_hits(1);
     std::env::remove_var("SPECADO_DEFAULT_PROVIDER");
     std::env::remove_var(token_env);
+}
+
+#[test]
+fn ask_provider_and_model_flags_select_catalog_spec() {
+    let dir = TempDir::new().expect("temp dir");
+    let catalog_root = dir.path().join("providers");
+    std::fs::create_dir_all(&catalog_root.join("flag-provider")).expect("catalog provider dir");
+
+    let server = MockServer::start();
+    let token_env = "SPECADO_FLAG_TOKEN";
+    std::env::set_var(token_env, "flag-secret");
+
+    let mock = server.mock(|when, then| {
+        when.method(POST)
+            .path("/chat")
+            .header("authorization", "Bearer flag-secret");
+        then.status(200)
+            .header("content-type", "application/json")
+            .json_body(json!({
+                "data": {
+                    "content": "flagged response",
+                    "finish_reason": "stop"
+                }
+            }));
+    });
+
+    let provider_yaml = provider_yaml_with_models(
+        "flag-provider",
+        &["test-model", "alternate-model"],
+        &server.url("/chat"),
+        token_env,
+    );
+    let provider_spec_path = catalog_root.join("flag-provider").join("catalog.yaml");
+    std::fs::write(&provider_spec_path, provider_yaml).expect("write provider spec");
+
+    std::env::set_var("SPECADO_PROVIDERS_DIR", &catalog_root);
+
+    let mut cmd = Command::cargo_bin("specado").expect("binary");
+    cmd.env("NO_COLOR", "1")
+        .arg("ask")
+        .arg("Hello flags")
+        .arg("--provider")
+        .arg("flag-provider")
+        .arg("--model")
+        .arg("test-model");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("flagged response"));
+
+    mock.assert_hits(1);
+    std::env::remove_var("SPECADO_PROVIDERS_DIR");
+    std::env::remove_var(token_env);
+}
+
+#[test]
+fn ask_model_flag_requires_provider() {
+    std::env::remove_var("SPECADO_PROVIDERS_DIR");
+    std::env::remove_var("SPECADO_DEFAULT_PROVIDER");
+
+    let mut cmd = Command::cargo_bin("specado").expect("binary");
+    cmd.env("NO_COLOR", "1")
+        .arg("ask")
+        .arg("Hello there")
+        .arg("--model")
+        .arg("gpt-5");
+
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("--model requires --provider"));
 }
