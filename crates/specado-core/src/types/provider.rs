@@ -180,9 +180,7 @@ impl ProviderSpec {
 
         if url.contains("/responses") {
             ProviderApi::OpenaiResponses
-        } else if url.contains("/messages") {
-            ProviderApi::AnthropicMessagesClaude4
-        } else if self.provider.eq_ignore_ascii_case("anthropic") {
+        } else if url.contains("/messages") || self.provider.eq_ignore_ascii_case("anthropic") {
             ProviderApi::AnthropicMessagesClaude4
         } else {
             ProviderApi::ChatCompletions
