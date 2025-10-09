@@ -1,5 +1,6 @@
 use crate::auth::AuthScheme;
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -17,10 +18,16 @@ pub struct ProviderSpec {
     pub models: Vec<ModelConfig>,
     #[serde(default)]
     pub api: ProviderApi,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inherits: Option<String>,
     pub endpoints: Endpoints,
     pub mappings: Mappings,
     pub constraints: Constraints,
     pub auth: AuthScheme,
+    #[serde(default)]
+    pub capabilities: HashMap<String, JsonValue>,
+    #[serde(default)]
+    pub unsupported_parameters: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

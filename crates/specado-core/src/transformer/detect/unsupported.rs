@@ -49,12 +49,14 @@ mod tests {
         Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig, RequestMapping,
         ResponseConfig, ResponseMapping, StrictMode, SupportFlags, Tool,
     };
+    use std::collections::HashMap;
 
     fn provider_supports(json_mode: bool, tools: bool) -> ProviderSpec {
         ProviderSpec {
             provider: "fake".into(),
             models: vec![ModelConfig { id: "m".into() }],
             api: ProviderApi::ChatCompletions,
+            inherits: None,
             endpoints: Endpoints {
                 chat: EndpointConfig {
                     method: HttpMethod::Post,
@@ -80,6 +82,8 @@ mod tests {
             auth: crate::auth::AuthScheme::Bearer {
                 token_env: "TOKEN".into(),
             },
+            capabilities: HashMap::new(),
+            unsupported_parameters: Vec::new(),
         }
     }
 

@@ -294,6 +294,7 @@ mod tests {
     use super::*;
     use crate::types::ProviderApi;
     use serde_json::json;
+    use std::collections::HashMap;
 
     #[test]
     fn redacts_matching_keys() {
@@ -324,6 +325,7 @@ mod tests {
             provider: "demo".into(),
             models: vec![crate::types::ModelConfig { id: "m".into() }],
             api: ProviderApi::ChatCompletions,
+            inherits: None,
             endpoints: crate::types::Endpoints {
                 chat: crate::types::EndpointConfig {
                     method: crate::types::HttpMethod::Post,
@@ -342,8 +344,10 @@ mod tests {
                 },
             },
             auth: crate::auth::AuthScheme::Custom {
-                headers: std::collections::HashMap::new(),
+                headers: HashMap::new(),
             },
+            capabilities: HashMap::new(),
+            unsupported_parameters: Vec::new(),
         });
 
         ctx.record_success(
@@ -357,6 +361,7 @@ mod tests {
                 usage: None,
                 extensions: crate::types::Extensions {
                     lossiness: LossinessReport::new(crate::types::StrictMode::Warn),
+                    provider_capabilities: None,
                 },
             },
             &LossinessReport::new(crate::types::StrictMode::Warn),

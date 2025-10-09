@@ -68,6 +68,7 @@ mod tests {
             usage: None,
             extensions: Extensions {
                 lossiness: LossinessReport::new(StrictMode::Warn),
+                provider_capabilities: None,
             },
         }
     }

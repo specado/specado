@@ -42,6 +42,7 @@ mod tests {
         Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, Message, ModelConfig,
         RequestMapping, ResponseMapping, StrictMode, SupportFlags,
     };
+    use std::collections::HashMap;
 
     fn base_provider(code: Option<&str>) -> ProviderSpec {
         ProviderSpec {
@@ -50,6 +51,7 @@ mod tests {
                 id: "gpt-4o".into(),
             }],
             api: ProviderApi::ChatCompletions,
+            inherits: None,
             endpoints: Endpoints {
                 chat: EndpointConfig {
                     method: HttpMethod::Post,
@@ -78,6 +80,8 @@ mod tests {
             auth: crate::auth::AuthScheme::Bearer {
                 token_env: "DUMMY".into(),
             },
+            capabilities: HashMap::new(),
+            unsupported_parameters: Vec::new(),
         }
     }
 

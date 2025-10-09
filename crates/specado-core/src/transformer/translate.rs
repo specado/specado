@@ -1,6 +1,9 @@
 use crate::error::{Error, Result};
 use crate::transformer::detect;
-use crate::types::{LossinessReport, MessageRole, PromptSpec, ProviderApi, ProviderSpec};
+use crate::types::{
+    LossinessCode, LossinessEntry, LossinessLevel, LossinessReport, MessageRole, PromptSpec,
+    ProviderApi, ProviderSpec,
+};
 use serde_json::{json, Map, Value};
 use serde_json_path::JsonPath;
 
@@ -27,6 +30,8 @@ fn translate_with_mappings(
 
     let prompt_value = serde_json::to_value(prompt)
         .map_err(|e| Error::Transform(format!("Failed to serialize prompt: {}", e)))?;
+
+    detect_unsupported_parameters(&prompt_value, provider, &mut report)?;
 
     for mapping in &provider.mappings.request {
         let path = JsonPath::parse(&mapping.from).map_err(|e| {
@@ -276,6 +281,49 @@ fn value_to_string(value: &Value) -> Option<String> {
     }
 }
 
+fn detect_unsupported_parameters(
+    prompt_value: &Value,
+    provider: &ProviderSpec,
+    report: &mut LossinessReport,
+) -> Result<()> {
+    for path in &provider.unsupported_parameters {
+        let json_path = JsonPath::parse(path).map_err(|e| {
+            Error::Config(format!(
+                "Invalid unsupported parameter path '{}' in provider spec: {}",
+                path, e
+            ))
+        })?;
+
+        let matches = json_path.query(prompt_value).all();
+        let mut values = Vec::new();
+        let mut present = false;
+
+        for value in matches {
+            if !value.is_null() {
+                present = true;
+                if values.len() < 3 {
+                    values.push(value.clone());
+                }
+            }
+        }
+
+        if present {
+            report.add_entry(LossinessEntry {
+                code: LossinessCode::Unsupported,
+                level: LossinessLevel::Warn,
+                path: path.clone(),
+                reason: format!("Parameter '{}' is unsupported by this provider", path),
+                suggested_fix: Some(
+                    "Remove the parameter or choose a provider that supports it".into(),
+                ),
+                details: Some(json!({ "examples": values })),
+            });
+        }
+    }
+
+    Ok(())
+}
+
 fn set_value_at_path(target: &mut Value, path: &str, value: Value) -> Result<()> {
     let segments = parse_path(path)?;
     if segments.is_empty() {
@@ -426,6 +474,7 @@ mod tests {
         MessageRole, ModelConfig, PromptSpec, RequestMapping, ResponseConfig, ResponseMapping,
         SamplingConfig, StrictMode, SupportFlags, Tool,
     };
+    use std::collections::HashMap;
 
     fn base_provider(mappings: Vec<RequestMapping>) -> ProviderSpec {
         ProviderSpec {
@@ -434,6 +483,7 @@ mod tests {
                 id: "gpt-4o".into(),
             }],
             api: ProviderApi::ChatCompletions,
+            inherits: None,
             endpoints: Endpoints {
                 chat: EndpointConfig {
                     method: HttpMethod::Post,
@@ -457,6 +507,8 @@ mod tests {
             auth: crate::auth::AuthScheme::Bearer {
                 token_env: "OPENAI_KEY".into(),
             },
+            capabilities: HashMap::new(),
+            unsupported_parameters: Vec::new(),
         }
     }
 
@@ -548,6 +600,27 @@ mod tests {
         assert!(codes.contains(&crate::types::LossinessCode::Drop));
         assert!(codes.contains(&crate::types::LossinessCode::Unsupported));
         assert!(report.omissions.contains(&"$.sampling.top_k".to_string()));
+    }
+
+    #[test]
+    fn reports_configured_unsupported_parameters() {
+        let prompt = prompt_with_sampling();
+        let mut provider = base_provider(vec![RequestMapping {
+            from: "$.messages".into(),
+            to: "$.body.messages".into(),
+            code: None,
+            clamp: None,
+        }]);
+        provider.unsupported_parameters = vec!["$.sampling.temperature".into()];
+
+        let (_payload, report) = translate(&prompt, &provider).expect("translate");
+        let unsupported = report
+            .entries
+            .iter()
+            .find(|entry| entry.code == LossinessCode::Unsupported)
+            .expect("lossiness entry");
+        assert_eq!(unsupported.path, "$.sampling.temperature");
+        assert_eq!(unsupported.level, LossinessLevel::Warn);
     }
 
     #[test]

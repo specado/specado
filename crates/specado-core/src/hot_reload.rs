@@ -2,13 +2,87 @@ use crate::error::{Error, Result};
 use crate::types::ProviderSpec;
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use serde_json::to_value;
+use serde_json::{to_value, Value as JsonValue};
 use specado_schemas::get_validator;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime};
+
+fn load_spec_value(path: &Path, visited: &mut HashSet<PathBuf>) -> Result<JsonValue> {
+    let canonical = path
+        .canonicalize()
+        .map_err(|e| Error::Config(format!("Failed to canonicalize provider spec: {}", e)))?;
+
+    if !visited.insert(canonical.clone()) {
+        return Err(Error::Config(format!(
+            "Cyclic provider inheritance detected at {}",
+            canonical.display()
+        )));
+    }
+
+    let contents = fs::read_to_string(&canonical)
+        .map_err(|e| Error::Config(format!("Failed to read provider spec: {}", e)))?;
+
+    let value: JsonValue = serde_yaml::from_str(&contents)
+        .map_err(|e| Error::Config(format!("Failed to parse provider spec: {}", e)))?;
+
+    let mut map = value.as_object().cloned().ok_or_else(|| {
+        Error::Config(format!(
+            "Provider spec at {} must be a YAML mapping",
+            canonical.display()
+        ))
+    })?;
+
+    let inherits = map
+        .remove("inherits")
+        .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+    let mut result = if let Some(relative) = inherits {
+        let base_path = canonical
+            .parent()
+            .map(|dir| dir.join(&relative))
+            .unwrap_or_else(|| PathBuf::from(relative));
+        let mut base_value = load_spec_value(&base_path, visited)?;
+        merge_values(&mut base_value, &JsonValue::Object(map));
+        base_value
+    } else {
+        JsonValue::Object(map)
+    };
+
+    visited.remove(&canonical);
+    if let JsonValue::Object(ref mut final_map) = result {
+        final_map.remove("inherits");
+    }
+
+    Ok(result)
+}
+
+fn merge_values(base: &mut JsonValue, overlay: &JsonValue) {
+    if let JsonValue::Object(overlay_map) = overlay {
+        if let JsonValue::Object(base_map) = base {
+            for (key, value) in overlay_map {
+                if value.is_null() {
+                    base_map.remove(key);
+                    continue;
+                }
+
+                match base_map.get_mut(key) {
+                    Some(existing @ JsonValue::Object(_)) if value.is_object() => {
+                        merge_values(existing, value);
+                    }
+                    _ => {
+                        base_map.insert(key.clone(), value.clone());
+                    }
+                }
+            }
+            return;
+        }
+    }
+
+    *base = overlay.clone();
+}
 
 /// Configuration for experimental hot-reload support.
 #[derive(Debug, Clone, Serialize)]
@@ -93,11 +167,11 @@ impl ProviderCache {
             }
         }
 
-        let contents = fs::read_to_string(&canonical)
-            .map_err(|e| Error::Config(format!("Failed to read provider spec: {}", e)))?;
-
-        let spec: ProviderSpec = serde_yaml::from_str(&contents)
+        let mut visited = HashSet::new();
+        let merged_value = load_spec_value(&canonical, &mut visited)?;
+        let mut spec: ProviderSpec = serde_json::from_value(merged_value)
             .map_err(|e| Error::Config(format!("Failed to parse provider spec: {}", e)))?;
+        spec.inherits = None;
 
         let spec_value = to_value(&spec)
             .map_err(|e| Error::Config(format!("Failed to serialize provider spec: {}", e)))?;
@@ -172,7 +246,8 @@ pub fn start_hot_reload(_config: HotReloadConfig, _cache: ProviderCache) -> HotR
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
+    use serde_json::json;
+    use tempfile::{tempdir, NamedTempFile};
 
     #[test]
     fn hot_reload_config_defaults_to_disabled() {
@@ -261,5 +336,67 @@ constraints:
             }
             other => panic!("expected config error, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn load_or_read_merges_inherited_specs() {
+        let dir = tempdir().expect("temp dir");
+        let base_path = dir.path().join("base.yaml");
+        fs::write(
+            &base_path,
+            r#"provider: demo
+models:
+  - id: base
+api: chat_completions
+auth:
+  type: bearer
+  token_env: BASE_KEY
+endpoints:
+  chat:
+    method: POST
+    url: https://api.example.com
+    headers: {}
+mappings:
+  request:
+    - from: "$.messages"
+      to: "$.body.messages"
+  response:
+    - from: "$.body.result"
+      to: "content"
+constraints:
+  supports:
+    json_mode: true
+    tools: true
+capabilities:
+  supports_tools: true
+"#,
+        )
+        .expect("write base spec");
+
+        let child_path = dir.path().join("child.yaml");
+        fs::write(
+            &child_path,
+            r#"inherits: base.yaml
+models:
+  - id: child
+capabilities:
+  context_window: 2000
+unsupported_parameters:
+  - "$.sampling.temperature"
+"#,
+        )
+        .expect("write child spec");
+
+        let cache = ProviderCache::new();
+        let spec = cache
+            .load_or_read(&child_path)
+            .expect("merged provider spec");
+
+        assert_eq!(spec.provider, "demo");
+        assert_eq!(spec.models[0].id, "child");
+        assert_eq!(spec.endpoints.chat.url, "https://api.example.com");
+        assert_eq!(spec.capabilities.get("supports_tools"), Some(&json!(true)));
+        assert_eq!(spec.capabilities.get("context_window"), Some(&json!(2000)));
+        assert_eq!(spec.unsupported_parameters, vec!["$.sampling.temperature"]);
     }
 }
