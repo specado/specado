@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+pub mod adapter;
 #[cfg(feature = "audit-logging")]
 pub mod audit;
 pub mod auth;
@@ -12,6 +13,7 @@ pub mod router;
 pub mod transformer;
 pub mod types;
 
+pub use adapter::{AdapterMatchRule, AdapterRegistry, AdapterSelection};
 pub use auth::{AuthError, AuthHandler, AuthScheme};
 pub use circuit_breaker::CircuitBreaker;
 pub use error::{Error, ProviderErrorKind, Result};

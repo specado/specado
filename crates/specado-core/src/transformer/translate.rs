@@ -4,13 +4,16 @@ use crate::types::{
     LossinessCode, LossinessEntry, LossinessLevel, LossinessReport, MessageRole, PromptSpec,
     ProviderApi, ProviderSpec,
 };
+use crate::AdapterRegistry;
 use serde_json::{json, Map, Value};
 use serde_json_path::JsonPath;
 
 pub fn translate(prompt: &PromptSpec, provider: &ProviderSpec) -> Result<(Value, LossinessReport)> {
     let (base_payload, report) = translate_with_mappings(prompt, provider)?;
 
-    let payload = match provider.api_kind() {
+    let selection = AdapterRegistry::select(provider);
+
+    let payload = match selection.kind() {
         ProviderApi::ChatCompletions => base_payload,
         ProviderApi::OpenaiResponses => reshape_openai_responses(prompt, provider, base_payload)?,
         ProviderApi::AnthropicMessagesClaude4 => {
