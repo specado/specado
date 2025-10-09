@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "metadata": {
+    "openai_model": "text-embedding-3-small"
+  },
+  "input": {
+    "documents": [
+      "Specado keeps provider specs portable.",
+      "Declarative adapters map prompts between APIs."
+    ],
+    "query": "portable prompt adapters"
+  }
+}
