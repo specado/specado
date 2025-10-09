@@ -292,7 +292,7 @@ const DEFAULT_REDACTION: &[&str] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::ProviderApi;
+    use crate::types::Capabilities;
     use serde_json::json;
     use std::collections::HashMap;
 
@@ -324,7 +324,8 @@ mod tests {
         ctx.note_provider(&ProviderSpec {
             provider: "demo".into(),
             models: vec![crate::types::ModelConfig { id: "m".into() }],
-            api: ProviderApi::ChatCompletions,
+            interface: Some("conversational.generate".into()),
+            contract_version: Some("1.0.0".into()),
             inherits: None,
             endpoints: crate::types::Endpoints {
                 chat: crate::types::EndpointConfig {
@@ -346,7 +347,9 @@ mod tests {
             auth: crate::auth::AuthScheme::Custom {
                 headers: HashMap::new(),
             },
-            capabilities: HashMap::new(),
+            capabilities: Capabilities::default(),
+            capabilities_extra: HashMap::new(),
+            extensions: HashMap::new(),
             unsupported_parameters: Vec::new(),
         });
 

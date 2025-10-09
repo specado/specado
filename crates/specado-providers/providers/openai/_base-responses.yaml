@@ -1,5 +1,6 @@
 provider: openai
-api: openai_responses
+interface: conversational.generate
+contract_version: "1.0.0"
 
 auth:
   type: bearer

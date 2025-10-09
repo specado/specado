@@ -28,10 +28,9 @@ pub fn detect_drops(prompt: &PromptSpec, provider: &ProviderSpec, report: &mut L
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::ProviderApi;
     use crate::types::{
-        Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig, RequestMapping,
-        ResponseConfig, ResponseMapping, SamplingConfig, StrictMode, SupportFlags,
+        Capabilities, Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig,
+        RequestMapping, ResponseConfig, ResponseMapping, SamplingConfig, StrictMode, SupportFlags,
     };
     use std::collections::HashMap;
 
@@ -49,7 +48,8 @@ mod tests {
         ProviderSpec {
             provider: "demo".into(),
             models: vec![ModelConfig { id: "demo".into() }],
-            api: ProviderApi::ChatCompletions,
+            interface: Some("conversational.generate".into()),
+            contract_version: Some("1.0.0".into()),
             inherits: None,
             endpoints: Endpoints {
                 chat: EndpointConfig {
@@ -74,7 +74,9 @@ mod tests {
             auth: crate::auth::AuthScheme::Bearer {
                 token_env: "TOKEN".into(),
             },
-            capabilities: HashMap::new(),
+            capabilities: Capabilities::default(),
+            capabilities_extra: HashMap::new(),
+            extensions: HashMap::new(),
             unsupported_parameters: Vec::new(),
         }
     }

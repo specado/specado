@@ -37,10 +37,9 @@ pub fn detect_relocate(prompt: &PromptSpec, provider: &ProviderSpec, report: &mu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::ProviderApi;
     use crate::types::{
-        Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, Message, ModelConfig,
-        RequestMapping, ResponseMapping, StrictMode, SupportFlags,
+        Capabilities, Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, Message,
+        ModelConfig, RequestMapping, ResponseMapping, StrictMode, SupportFlags,
     };
     use std::collections::HashMap;
 
@@ -50,7 +49,8 @@ mod tests {
             models: vec![ModelConfig {
                 id: "gpt-4o".into(),
             }],
-            api: ProviderApi::ChatCompletions,
+            interface: Some("conversational.generate".into()),
+            contract_version: Some("1.0.0".into()),
             inherits: None,
             endpoints: Endpoints {
                 chat: EndpointConfig {
@@ -80,7 +80,9 @@ mod tests {
             auth: crate::auth::AuthScheme::Bearer {
                 token_env: "DUMMY".into(),
             },
-            capabilities: HashMap::new(),
+            capabilities: Capabilities::default(),
+            capabilities_extra: HashMap::new(),
+            extensions: HashMap::new(),
             unsupported_parameters: Vec::new(),
         }
     }

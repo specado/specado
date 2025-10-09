@@ -1,12 +1,10 @@
 use crate::auth::AuthScheme;
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
+use serde_json::{Map as JsonMap, Value as JsonValue};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderApi {
-    #[default]
     ChatCompletions,
     OpenaiResponses,
     AnthropicMessagesClaude4,
@@ -16,8 +14,10 @@ pub enum ProviderApi {
 pub struct ProviderSpec {
     pub provider: String,
     pub models: Vec<ModelConfig>,
-    #[serde(default)]
-    pub api: ProviderApi,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interface: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contract_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inherits: Option<String>,
     pub endpoints: Endpoints,
@@ -25,7 +25,11 @@ pub struct ProviderSpec {
     pub constraints: Constraints,
     pub auth: AuthScheme,
     #[serde(default)]
-    pub capabilities: HashMap<String, JsonValue>,
+    pub capabilities: Capabilities,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub capabilities_extra: HashMap<String, JsonValue>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub extensions: HashMap<String, JsonValue>,
     #[serde(default)]
     pub unsupported_parameters: Vec<String>,
 }
@@ -85,6 +89,123 @@ pub struct Constraints {
 pub struct SupportFlags {
     pub json_mode: bool,
     pub tools: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct Capabilities {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_tools: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_custom_tools: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_parallel_tool_calls: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_allowed_tools: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_json_mode: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_seed: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_frequency_penalty: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_presence_penalty: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_logit_bias: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_logprobs: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_top_logprobs: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_n: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_response_format: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_stop: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_temperature: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_top_p: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_top_k: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_image_input: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supports_extended_thinking: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub responses_api: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reasoning_controls: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thought_signatures: Option<String>,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+impl ProviderSpec {
+    pub fn interface_hint(&self) -> Option<&str> {
+        self.interface.as_deref()
+    }
+
+    pub fn contract_version(&self) -> Option<&str> {
+        self.contract_version.as_deref()
+    }
+
+    pub fn api_kind(&self) -> ProviderApi {
+        if let Some(interface) = self.interface_hint() {
+            if interface.starts_with("x_") {
+                return self.infer_api_from_context();
+            }
+
+            match interface {
+                "conversational.generate"
+                | "conversational.stream"
+                | "text.generate"
+                | "text.extract"
+                | "tools.call" => {
+                    return self.infer_api_from_context();
+                }
+                _ => {}
+            }
+        }
+
+        self.infer_api_from_context()
+    }
+
+    fn infer_api_from_context(&self) -> ProviderApi {
+        let url = self.endpoints.chat.url.to_ascii_lowercase();
+
+        if url.contains("/responses") {
+            ProviderApi::OpenaiResponses
+        } else if url.contains("/messages") {
+            ProviderApi::AnthropicMessagesClaude4
+        } else if self.provider.eq_ignore_ascii_case("anthropic") {
+            ProviderApi::AnthropicMessagesClaude4
+        } else {
+            ProviderApi::ChatCompletions
+        }
+    }
+
+    pub fn capabilities_json(&self) -> Option<JsonValue> {
+        let mut map = JsonMap::new();
+
+        if let Ok(JsonValue::Object(obj)) = serde_json::to_value(&self.capabilities) {
+            map.extend(obj);
+        }
+
+        for (key, value) in &self.capabilities_extra {
+            map.insert(key.clone(), value.clone());
+        }
+
+        if map.is_empty() {
+            None
+        } else {
+            Some(JsonValue::Object(map))
+        }
+    }
 }
 
 #[cfg(test)]
