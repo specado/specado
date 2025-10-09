@@ -20,6 +20,8 @@ openai/
 
 anthropic/
 ├── _base.yaml                      # Shared mappings for Claude Messages API
+├── claude-4.5/
+│   └── sonnet.yaml
 ├── claude-3/
 │   └── opus.yaml
 ├── claude-3.5/
