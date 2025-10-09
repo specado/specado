@@ -28,10 +28,12 @@ pub fn detect_drops(prompt: &PromptSpec, provider: &ProviderSpec, report: &mut L
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::ProviderApi;
     use crate::types::{
         Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig, RequestMapping,
         ResponseConfig, ResponseMapping, SamplingConfig, StrictMode, SupportFlags,
     };
+    use std::collections::HashMap;
 
     fn provider_with_top_k_mapping(has_mapping: bool) -> ProviderSpec {
         let mut request = Vec::new();
@@ -47,6 +49,8 @@ mod tests {
         ProviderSpec {
             provider: "demo".into(),
             models: vec![ModelConfig { id: "demo".into() }],
+            api: ProviderApi::ChatCompletions,
+            inherits: None,
             endpoints: Endpoints {
                 chat: EndpointConfig {
                     method: HttpMethod::Post,
@@ -70,6 +74,8 @@ mod tests {
             auth: crate::auth::AuthScheme::Bearer {
                 token_env: "TOKEN".into(),
             },
+            capabilities: HashMap::new(),
+            unsupported_parameters: Vec::new(),
         }
     }
 

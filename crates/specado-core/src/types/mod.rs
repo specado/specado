@@ -9,7 +9,7 @@ pub use prompt::{
     StrictMode, Tool, ToolChoice, ToolChoiceString,
 };
 pub use provider::{
-    Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig, ProviderSpec,
-    RequestMapping, ResponseMapping, SupportFlags,
+    Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig, ProviderApi,
+    ProviderSpec, RequestMapping, ResponseMapping, SupportFlags,
 };
 pub use response::{Extensions, FinishReason, UniformResponse, Usage};

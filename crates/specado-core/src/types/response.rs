@@ -33,6 +33,8 @@ pub struct Usage {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Extensions {
     pub lossiness: LossinessReport,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_capabilities: Option<serde_json::Value>,
 }
 
 #[cfg(test)]
@@ -64,7 +66,10 @@ mod tests {
                 prompt_tokens: 12,
                 completion_tokens: 34,
             }),
-            extensions: Extensions { lossiness: report },
+            extensions: Extensions {
+                lossiness: report,
+                provider_capabilities: Some(json!({"context_window": 128000})),
+            },
         };
 
         let serialized = serde_json::to_string(&response).expect("serialize");
@@ -73,6 +78,15 @@ mod tests {
         assert_eq!(decoded.finish_reason, FinishReason::Stop);
         assert_eq!(decoded.tool_calls.len(), 1);
         assert!(decoded.extensions.lossiness.is_lossy);
+        assert_eq!(
+            decoded
+                .extensions
+                .provider_capabilities
+                .as_ref()
+                .and_then(|value| value.get("context_window"))
+                .and_then(|v| v.as_u64()),
+            Some(128000)
+        );
     }
 
     #[test]
@@ -96,5 +110,6 @@ mod tests {
         assert!(decoded.tool_calls.is_empty());
         assert!(decoded.usage.is_none());
         assert!(!decoded.extensions.lossiness.is_lossy);
+        assert!(decoded.extensions.provider_capabilities.is_none());
     }
 }

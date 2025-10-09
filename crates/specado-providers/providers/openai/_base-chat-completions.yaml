@@ -1,6 +1,5 @@
 provider: openai
-models:
-  - id: gpt-5
+api: chat_completions
 
 auth:
   type: bearer

@@ -2,7 +2,7 @@ use crate::error::{Error, Result};
 use crate::types::{
     Extensions, FinishReason, LossinessReport, ProviderSpec, StrictMode, UniformResponse,
 };
-use serde_json::Value;
+use serde_json::{Map as JsonMap, Value};
 use serde_json_path::JsonPath;
 
 pub fn normalize(raw: Value, provider: &ProviderSpec) -> Result<UniformResponse> {
@@ -38,6 +38,18 @@ pub fn normalize(raw: Value, provider: &ProviderSpec) -> Result<UniformResponse>
         }
     }
 
+    let provider_capabilities = if provider.capabilities.is_empty() {
+        None
+    } else {
+        Some(Value::Object(
+            provider
+                .capabilities
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<JsonMap<_, _>>(),
+        ))
+    };
+
     Ok(UniformResponse {
         content,
         tool_calls: Vec::new(),
@@ -51,13 +63,14 @@ pub fn normalize(raw: Value, provider: &ProviderSpec) -> Result<UniformResponse>
         usage: None,
         extensions: Extensions {
             lossiness: LossinessReport::new(StrictMode::Warn),
+            provider_capabilities,
         },
     })
 }
 
 fn map_finish_reason(raw: &str) -> FinishReason {
     match raw {
-        "stop" | "end_turn" => FinishReason::Stop,
+        "stop" | "end_turn" | "completed" => FinishReason::Stop,
         "length" | "max_tokens" => FinishReason::Length,
         "tool_calls" | "tool_use" => FinishReason::ToolCall,
         "content_filter" => FinishReason::ContentFilter,
@@ -68,11 +81,13 @@ fn map_finish_reason(raw: &str) -> FinishReason {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::ProviderApi;
     use crate::types::{
         Constraints, EndpointConfig, Endpoints, HttpMethod, Mappings, ModelConfig, ProviderSpec,
         ResponseMapping, SupportFlags,
     };
     use serde_json::json;
+    use std::collections::HashMap;
 
     fn provider() -> ProviderSpec {
         ProviderSpec {
@@ -80,6 +95,8 @@ mod tests {
             models: vec![ModelConfig {
                 id: "gpt-4o".into(),
             }],
+            api: ProviderApi::ChatCompletions,
+            inherits: None,
             endpoints: Endpoints {
                 chat: EndpointConfig {
                     method: HttpMethod::Post,
@@ -109,6 +126,8 @@ mod tests {
             auth: crate::auth::AuthScheme::Bearer {
                 token_env: "KEY".into(),
             },
+            capabilities: HashMap::new(),
+            unsupported_parameters: Vec::new(),
         }
     }
 
