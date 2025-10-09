@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SPECADO_BIN="${SPECADO_BIN:-$ROOT_DIR/target/debug/specado}"
 PROMPT_SPEC="${PROMPT_SPEC:-$ROOT_DIR/examples/prompts/basic_chat.json}"
-PROVIDER_SPEC="${PROVIDER_SPEC:-$ROOT_DIR/crates/specado-providers/providers/openai/gpt-5-family.yaml}"
+PROVIDER_SPEC="${PROVIDER_SPEC:-$ROOT_DIR/crates/specado-providers/providers/openai/gpt-5/base.yaml}"
 
 if [ ! -x "$SPECADO_BIN" ]; then
   echo "specado binary not found at $SPECADO_BIN" >&2

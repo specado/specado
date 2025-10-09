@@ -21,7 +21,11 @@
       "enum": [
         "chat_completions",
         "openai_responses",
-        "anthropic_messages_claude4"
+        "anthropic_messages_claude4",
+        "embeddings",
+        "images",
+        "speech",
+        "video"
       ],
       "default": "chat_completions"
     },
@@ -56,9 +60,44 @@
     },
     "endpoints": {
       "type": "object",
-      "required": ["chat"],
       "properties": {
         "chat": {
+          "type": "object",
+          "required": ["method", "url", "headers"],
+          "properties": {
+            "method": {"type": "string", "enum": ["POST"]},
+            "url": {"type": "string", "format": "uri"},
+            "headers": {"type": "object"}
+          }
+        },
+        "embeddings": {
+          "type": "object",
+          "required": ["method", "url", "headers"],
+          "properties": {
+            "method": {"type": "string", "enum": ["POST"]},
+            "url": {"type": "string", "format": "uri"},
+            "headers": {"type": "object"}
+          }
+        },
+        "images": {
+          "type": "object",
+          "required": ["method", "url", "headers"],
+          "properties": {
+            "method": {"type": "string", "enum": ["POST"]},
+            "url": {"type": "string", "format": "uri"},
+            "headers": {"type": "object"}
+          }
+        },
+        "speech": {
+          "type": "object",
+          "required": ["method", "url", "headers"],
+          "properties": {
+            "method": {"type": "string", "enum": ["POST"]},
+            "url": {"type": "string", "format": "uri"},
+            "headers": {"type": "object"}
+          }
+        },
+        "video": {
           "type": "object",
           "required": ["method", "url", "headers"],
           "properties": {

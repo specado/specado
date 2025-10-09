@@ -11,7 +11,7 @@
     "openai_max_output_tokens": 512,
     "openai_reasoning_effort": "minimal",
     "openai_text_verbosity": "low",
-    "anthropic_model": "claude-sonnet-4-5-20250929",
+    "anthropic_model": "claude-4-opus-20250514",
     "anthropic_max_tokens": 1024,
     "anthropic_thinking_type": "enabled",
     "anthropic_thinking_budget": 2000

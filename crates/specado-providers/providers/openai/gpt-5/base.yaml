@@ -1,4 +1,4 @@
-inherits: ./_base-responses.yaml
+inherits: ../_base-responses.yaml
 
 models:
   - id: gpt-5
@@ -11,8 +11,12 @@ capabilities:
   supports_custom_tools: true
   responses_api: true
   reasoning_controls: ["effort", "verbosity"]
+  supports_temperature: true
+  supports_top_p: true
 
 unsupported_parameters:
-  - "$.sampling.temperature"
-  - "$.sampling.top_p"
   - "$.sampling.top_k"
+  - "$.sampling.frequency_penalty"
+  - "$.sampling.presence_penalty"
+  - "$.sampling.logit_bias"
+  - "$.sampling.n"

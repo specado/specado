@@ -13,7 +13,7 @@ function printUsage() {
   console.log(`Usage: node examples/node_basic.mjs [options]
 
 Options:
-  --provider <path>   Provider spec (default: crates/specado-providers/providers/openai/gpt-5-family.yaml)
+  --provider <path>   Provider spec (default: crates/specado-providers/providers/openai/gpt-5/base.yaml)
   --prompt <path>     Prompt spec JSON/YAML (default: examples/prompts/basic_chat.json)
   --watch             Enable experimental watch plumbing
   --audit             Forward audit logs to stdout
@@ -24,7 +24,7 @@ Options:
 
 function parseArgs(argv) {
   const options = {
-    provider: 'crates/specado-providers/providers/openai/gpt-5-family.yaml',
+    provider: 'crates/specado-providers/providers/openai/gpt-5/base.yaml',
     prompt: 'examples/prompts/basic_chat.json',
     watch: false,
     audit: false,

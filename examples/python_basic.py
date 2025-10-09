@@ -85,7 +85,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run the Specado Python example")
     parser.add_argument(
         "--provider",
-        default="crates/specado-providers/providers/openai/gpt-5-family.yaml",
+        default="crates/specado-providers/providers/openai/gpt-5/base.yaml",
     )
     parser.add_argument("--prompt", default="examples/prompts/basic_chat.json")
     parser.add_argument("--watch", action="store_true", help="Enable experimental watch plumbing")

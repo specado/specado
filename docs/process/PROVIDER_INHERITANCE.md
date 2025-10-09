@@ -8,14 +8,24 @@ Each provider lives under `crates/specado-providers/providers/<provider>/`:
 
 ```
 openai/
-├── _base-responses.yaml          # Shared mappings for the Responses API
-├── _base-chat-completions.yaml   # Shared mappings for the Chat Completions API
-├── gpt-5-family.yaml             # Inherits from _base-responses
-└── README.md                     # Notes about the layout
+├── _base-responses.yaml            # Shared mappings for the Responses API
+├── _base-chat-completions.yaml     # Shared mappings for the Chat Completions API
+├── gpt-5/
+│   ├── base.yaml                   # Responses API variants
+│   └── chat.yaml                   # Chat Completions entry point
+├── gpt-4/
+│   ├── o.yaml
+│   └── turbo.yaml
+└── README.md                       # Notes about the layout
 
 anthropic/
-├── _base.yaml                    # Shared mappings for Claude Messages API
-├── claude-sonnet-4-5.yaml        # Inherits from _base.yaml
+├── _base.yaml                      # Shared mappings for Claude Messages API
+├── claude-3/
+│   └── opus.yaml
+├── claude-3.5/
+│   └── sonnet.yaml
+├── claude-4/
+│   └── opus.yaml
 └── README.md
 ```
 
@@ -33,12 +43,12 @@ When loading a spec, the engine merges the inheritance chain, reporting an error
 ## Adding a new model family
 
 1. Decide which base spec applies (e.g., `_base-responses.yaml` for GPT-5).
-2. Add a new `<model>-family.yaml` that sets:
-   - `inherits` pointing to the base file.
-   - `models` array listing all variants in the family.
-   - `capabilities` with context windows, tool support, reasoning controls, etc.
-   - `unsupported_parameters` for prompt fields the provider rejects.
-3. Update docs and examples to reference the new spec file.
+2. Create a new directory (for example `gpt-6/`) with one or more YAML specs (`base.yaml`, `chat.yaml`, etc.) that:
+   - set `inherits` to the appropriate base file.
+   - list supported `models`.
+   - describe `capabilities` such as context window, tool support, reasoning controls.
+   - declare `unsupported_parameters` for prompt fields the provider rejects.
+3. Update docs and examples to reference the new spec files.
 4. Extend tests (typically `provider_catalog`) to validate translation and lossiness behaviour.
 
 ## Lossiness reporting
@@ -49,6 +59,6 @@ When loading a spec, the engine merges the inheritance chain, reporting an error
 ## Metadata requirements
 
 - GPT-5 specs expect prompt metadata keys like `openai_model`, `openai_max_output_tokens`, `openai_reasoning_effort`, and `openai_text_verbosity`.
-- Claude 4.5 specs expect keys such as `anthropic_model`, `anthropic_max_tokens`, `anthropic_thinking_type`, and `anthropic_thinking_budget`.
+- Claude 4 specs expect keys such as `anthropic_model`, `anthropic_max_tokens`, `anthropic_thinking_type`, and `anthropic_thinking_budget`.
 
 When adding new models, document their required metadata in Quickstart or provider README files so CLI users know which fields to supply.

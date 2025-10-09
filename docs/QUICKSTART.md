@@ -26,26 +26,26 @@ The CLI lives in `crates/specado-cli` and exposes `validate`, `preview`, and `ru
 cargo build -p specado-cli
 
 # validate a provider or prompt spec
-./target/debug/specado validate --spec crates/specado-providers/providers/openai/gpt-5-family.yaml
+./target/debug/specado validate --spec crates/specado-providers/providers/openai/gpt-5/base.yaml
 ./target/debug/specado validate --spec examples/prompts/basic_chat.json
 
 # preview the translated payload and lossiness report (no network call)
 ./target/debug/specado preview \
   --prompt examples/prompts/basic_chat.json \
-  --provider crates/specado-providers/providers/openai/gpt-5-family.yaml
+  --provider crates/specado-providers/providers/openai/gpt-5/base.yaml
 
 # execute a prompt against the provider (requires API credentials)
 OPENAI_API_KEY=sk-your-key \
 ./target/debug/specado run \
   --prompt examples/prompts/basic_chat.json \
-  --provider crates/specado-providers/providers/openai/gpt-5-family.yaml \
+  --provider crates/specado-providers/providers/openai/gpt-5/base.yaml \
   --audit-target stdout
 ```
 
 The helper script `examples/cli_preview.sh` wraps the preview command and documents the expected environment when you need a quick smoke test.
 
 > **Model metadata**
-> The sample prompt `examples/prompts/basic_chat.json` includes metadata that targets OpenAI's GPT-5 Responses API (`openai_model`, reasoning effort, verbosity, max output tokens) and Anthropic's Claude Sonnet 4.5 (`anthropic_model`, thinking configuration, and max tokens). Tweak these fields to match the models and limits available to your account. See `docs/process/PROVIDER_INHERITANCE.md` for a full field reference.
+> The sample prompt `examples/prompts/basic_chat.json` includes metadata that targets OpenAI's GPT-5 Responses API (`openai_model`, reasoning effort, verbosity, max output tokens) and Anthropic's Claude 4 Opus (`anthropic_model`, thinking configuration, and max tokens). Tweak these fields to match the models and limits available to your account. See `docs/process/PROVIDER_INHERITANCE.md` for a full field reference.
 
 ## 3. Python quickstart
 The Python bindings are published from `crates/specado-py` and surfaced to the Python package in `python/specado`. Use `maturin` to build the native extension in-place, then run the sample program in `examples/python_basic.py`.
@@ -60,7 +60,7 @@ maturin develop -m crates/specado-py/Cargo.toml
 # run the sample which instantiates the high-level client
 OPENAI_API_KEY=sk-your-key \
 python examples/python_basic.py \
-  --provider crates/specado-providers/providers/openai/gpt-5-family.yaml \
+  --provider crates/specado-providers/providers/openai/gpt-5/base.yaml \
   --prompt examples/prompts/basic_chat.json
 ```
 
@@ -76,7 +76,7 @@ The Node binding under `crates/specado-node` is built with napi-rs. After instal
 # run the example using the transpiled JavaScript entrypoint
 OPENAI_API_KEY=sk-your-key \
 node examples/node_basic.mjs \
-  --provider crates/specado-providers/providers/openai/gpt-5-family.yaml \
+  --provider crates/specado-providers/providers/openai/gpt-5/base.yaml \
   --prompt examples/prompts/basic_chat.json
 ```
 

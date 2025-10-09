@@ -1,0 +1,28 @@
+inherits: ../_base-chat-completions.yaml
+
+models:
+  - id: gpt-3.5-turbo
+
+capabilities:
+  context_window: 16384
+  supports_tools: true
+  supports_json_mode: true
+  supports_seed: true
+  supports_frequency_penalty: true
+  supports_presence_penalty: true
+  supports_logit_bias: true
+  supports_logprobs: false
+  supports_top_logprobs: false
+  supports_n: true
+  supports_response_format: true
+  supports_stop: true
+  supports_temperature: true
+  supports_top_p: true
+
+unsupported_parameters:
+  - "$.reasoning_effort"
+  - "$.verbosity"
+  - "$.web_search_options"
+  - "$.sampling.top_k"
+  - "$.sampling.logprobs"
+  - "$.sampling.top_logprobs"
