@@ -3,10 +3,11 @@ use clap::{Args, Parser, Subcommand};
 use colored::*;
 use specado_core::{
     execute, translate as core_translate, LossinessLevel, LossinessReport, Message, MessageRole,
-    PromptSpec, ProviderSpec, ResponseConfig, SamplingConfig, StrictMode,
+    PromptSpec, ProviderSpec, ResponseConfig, SamplingConfig, StrictMode, UniformResponse,
 };
 use specado_schemas::get_validator;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::time::Duration;
@@ -16,6 +17,8 @@ use specado_core::audit::{AuditConfig, AuditContext, AuditTarget};
 use specado_core::hot_reload::ProviderCache;
 #[cfg(feature = "hot-reload")]
 use specado_core::hot_reload::{set_global_config, HotReloadConfig};
+use tokio::io::AsyncBufReadExt;
+use tokio::signal;
 
 #[derive(Parser)]
 #[command(name = "specado")]
@@ -30,13 +33,16 @@ enum Commands {
     /// Ask a quick question using the default provider/model
     Ask {
         /// The user prompt to send to the model
-        prompt: String,
+        prompt: Option<String>,
         /// Provider name or path to the provider spec
         #[arg(long)]
         provider: Option<String>,
         /// Model identifier for the chosen provider
         #[arg(long)]
         model: Option<String>,
+        /// Start an interactive chat session that preserves history
+        #[arg(long, alias = "chat")]
+        interactive: bool,
         #[command(flatten)]
         runtime: RuntimeOptions,
     },
@@ -74,8 +80,9 @@ async fn main() {
             prompt,
             provider,
             model,
+            interactive,
             runtime,
-        } => ask_command(prompt, provider, model, runtime).await,
+        } => ask_command(prompt, provider, model, interactive, runtime).await,
         Commands::Validate { spec } => validate_command(spec).await,
         Commands::Preview {
             prompt,
@@ -122,50 +129,43 @@ async fn validate_command(spec_path: PathBuf) -> Result<()> {
 }
 
 async fn ask_command(
-    prompt: String,
+    prompt: Option<String>,
     provider_flag: Option<String>,
     model_flag: Option<String>,
+    interactive: bool,
     runtime: RuntimeOptions,
 ) -> Result<()> {
+    if !interactive && prompt.as_ref().map(|p| p.trim().is_empty()).unwrap_or(true) {
+        return Err(anyhow!(
+            "Prompt argument is required unless --interactive is provided."
+        ));
+    }
+
     let provider_path = resolve_provider_path(provider_flag.as_deref(), model_flag.as_deref())?;
 
     #[cfg(feature = "hot-reload")]
     apply_hot_reload_config(&runtime, &provider_path);
 
-    #[cfg(feature = "audit-logging")]
-    let audit_context = build_audit_context(&runtime)?;
-
-    let prompt_spec = PromptSpec {
-        version: "1".to_string(),
-        messages: vec![
-            Message {
-                role: MessageRole::System,
-                content: "You are a helpful assistant.".to_string(),
-            },
-            Message {
-                role: MessageRole::User,
-                content: prompt,
-            },
-        ],
-        sampling: SamplingConfig::default(),
-        response: ResponseConfig::default(),
-        tools: Vec::new(),
-        tool_choice: None,
-        strict_mode: StrictMode::Warn,
-        metadata: Default::default(),
-    };
-
-    let response = execute(
-        prompt_spec,
-        provider_path
-            .to_str()
-            .ok_or_else(|| anyhow!("Provider path contains invalid UTF-8"))?,
-        #[cfg(feature = "audit-logging")]
-        audit_context,
-    )
-    .await?;
-
-    println!("{}", response.content.trim());
+    if interactive {
+        let provider_spec = ProviderCache::new()
+            .load_or_read(&provider_path)
+            .map_err(|err| {
+                anyhow!(
+                    "Failed to load provider spec {}: {}",
+                    provider_path.display(),
+                    err
+                )
+            })?;
+        run_interactive_chat(prompt, &provider_path, &provider_spec, &runtime).await?;
+    } else {
+        let mut messages = base_system_messages();
+        messages.push(Message {
+            role: MessageRole::User,
+            content: prompt.expect("prompt required when not interactive"),
+        });
+        let response = execute_messages(&messages, &provider_path, &runtime).await?;
+        println!("{}", response.content.trim());
+    }
 
     Ok(())
 }
@@ -563,6 +563,179 @@ fn list_available_providers(root: &Path) -> Result<Vec<String>> {
 struct ProviderCandidate {
     path: PathBuf,
     models: Vec<String>,
+}
+
+fn base_system_messages() -> Vec<Message> {
+    vec![Message {
+        role: MessageRole::System,
+        content: "You are a helpful assistant.".to_string(),
+    }]
+}
+
+fn build_prompt_spec(messages: &[Message]) -> PromptSpec {
+    PromptSpec {
+        version: "1".to_string(),
+        messages: messages.to_vec(),
+        sampling: SamplingConfig::default(),
+        response: ResponseConfig::default(),
+        tools: Vec::new(),
+        tool_choice: None,
+        strict_mode: StrictMode::Warn,
+        metadata: Default::default(),
+    }
+}
+
+async fn execute_messages(
+    messages: &[Message],
+    provider_path: &Path,
+    runtime: &RuntimeOptions,
+) -> Result<UniformResponse> {
+    let provider_str = provider_path
+        .to_str()
+        .ok_or_else(|| anyhow!("Provider path contains invalid UTF-8"))?;
+
+    #[cfg(feature = "audit-logging")]
+    let audit_context = build_audit_context(runtime)?;
+
+    let response = execute(
+        build_prompt_spec(messages),
+        provider_str,
+        #[cfg(feature = "audit-logging")]
+        audit_context,
+    )
+    .await?;
+
+    Ok(response)
+}
+
+fn warn_if_context_near_limit(messages: &[Message], provider: &ProviderSpec) {
+    let Some(window) = provider.capabilities.context_window else {
+        return;
+    };
+
+    if window == 0 {
+        return;
+    }
+
+    let total_chars: usize = messages.iter().map(|message| message.content.len()).sum();
+    let approx_tokens = ((total_chars as f64) / 4.0).ceil() as u64;
+    let threshold = ((window as f64) * 0.8).floor() as u64;
+
+    if approx_tokens >= threshold && approx_tokens < window {
+        println!(
+            "{} Approaching context window (~{} of {} tokens). Consider clearing history.",
+            "⚠".yellow(),
+            approx_tokens,
+            window
+        );
+    } else if approx_tokens >= window {
+        println!(
+            "{} Estimated conversation length (~{} tokens) exceeds provider context window ({}).",
+            "⚠".yellow(),
+            approx_tokens,
+            window
+        );
+    }
+}
+
+async fn run_interactive_chat(
+    initial_prompt: Option<String>,
+    provider_path: &Path,
+    provider_spec: &ProviderSpec,
+    runtime: &RuntimeOptions,
+) -> Result<()> {
+    println!(
+        "{} Type ':exit' or ':quit' (or press Ctrl+C) to end the session.",
+        "Starting interactive chat.".cyan()
+    );
+
+    let mut messages = base_system_messages();
+
+    if let Some(initial) = initial_prompt {
+        if !initial.trim().is_empty() {
+            messages.push(Message {
+                role: MessageRole::User,
+                content: initial,
+            });
+            warn_if_context_near_limit(&messages, provider_spec);
+            match execute_messages(&messages, provider_path, runtime).await {
+                Ok(response) => {
+                    let content = response.content.clone();
+                    println!("{}", content.trim());
+                    messages.push(Message {
+                        role: MessageRole::Assistant,
+                        content,
+                    });
+                }
+                Err(err) => {
+                    eprintln!("{} {}", "Error:".red().bold(), err);
+                    messages.pop();
+                }
+            }
+        }
+    }
+
+    let stdin = tokio::io::stdin();
+    let mut reader = tokio::io::BufReader::new(stdin);
+    let mut line = String::new();
+
+    loop {
+        print!("{} ", ">>>".cyan());
+        std::io::stdout()
+            .flush()
+            .with_context(|| "Failed to flush prompt")?;
+
+        line.clear();
+        let read = tokio::select! {
+            result = reader.read_line(&mut line) => result,
+            _ = signal::ctrl_c() => {
+                println!();
+                println!("{}", "Exiting interactive chat.".yellow());
+                return Ok(());
+            }
+        }?;
+
+        if read == 0 {
+            println!();
+            println!("{}", "End of input. Exiting interactive chat.".yellow());
+            break;
+        }
+
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if matches!(trimmed.to_ascii_lowercase().as_str(), ":exit" | ":quit") {
+            println!("{}", "Exiting interactive chat.".yellow());
+            break;
+        }
+
+        messages.push(Message {
+            role: MessageRole::User,
+            content: trimmed.to_string(),
+        });
+
+        warn_if_context_near_limit(&messages, provider_spec);
+
+        match execute_messages(&messages, provider_path, runtime).await {
+            Ok(response) => {
+                let content = response.content.clone();
+                println!("{}", content.trim());
+                messages.push(Message {
+                    role: MessageRole::Assistant,
+                    content,
+                });
+            }
+            Err(err) => {
+                eprintln!("{} {}", "Error:".red().bold(), err);
+                messages.pop();
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Args, Default, Clone)]

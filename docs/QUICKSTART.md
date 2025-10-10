@@ -29,6 +29,16 @@ cargo build -p specado-cli
 OPENAI_API_KEY=sk-your-key \
 ./target/debug/specado ask "What is Specado?"
 
+# start an interactive chat session (type :exit to quit)
+OPENAI_API_KEY=sk-your-key \
+./target/debug/specado ask --interactive
+
+# interactive chat with an initial prompt
+OPENAI_API_KEY=sk-your-key \
+./target/debug/specado ask \
+  --interactive \
+  "Walk me through the request pipeline"
+
 # target a specific provider/model from the catalog
 OPENAI_API_KEY=sk-your-key \
 ./target/debug/specado ask \
@@ -63,6 +73,8 @@ The helper script `examples/cli_preview.sh` wraps the preview command and docume
 
 > **Model metadata & overlays**
 > The sample prompt `examples/prompts/basic_chat.json` includes metadata that targets OpenAI's GPT-5 Responses API (`openai_model`, reasoning effort, verbosity, max output tokens) and Anthropic's Claude Sonnet 4.5 (`anthropic_model`, thinking configuration, and max tokens). Tweak these fields to match the models and limits available to your account. The provider specs declare neutral interfaces (see `docs/process/INTERFACE_TAXONOMY.md`), while per-adapter defaults live in `overlays/`. See `docs/process/PROVIDER_INHERITANCE.md` for the full field reference.
+
+When chatting interactively, Specado preserves the full conversation history and warns as you approach the provider’s context window. Use `:exit`, `:quit`, or `Ctrl+C` to leave the session at any time.
 
 ## 3. Python quickstart
 The Python bindings are published from `crates/specado-py` and surfaced to the Python package in `python/specado`. Use `maturin` to build the native extension in-place, then run the sample program in `examples/python_basic.py`.
