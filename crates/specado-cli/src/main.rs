@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
-use clap::{Args, Parser, Subcommand};
+use clap::CommandFactory;
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use colored::*;
 use specado_core::{
     execute, translate as core_translate, LossinessLevel, LossinessReport, Message, MessageRole,
@@ -72,6 +73,12 @@ enum Commands {
         #[command(flatten)]
         runtime: RuntimeOptions,
     },
+    /// Generate shell completion scripts for supported shells
+    Completions {
+        /// Target shell to generate completions for
+        #[arg(value_enum)]
+        shell: CompletionShell,
+    },
 }
 
 #[tokio::main]
@@ -98,6 +105,7 @@ async fn main() {
             provider,
             runtime,
         } => run_command(prompt, provider, runtime).await,
+        Commands::Completions { shell } => completions_command(shell),
     };
 
     if let Err(err) = result {
@@ -577,6 +585,28 @@ struct ProviderCandidate {
     models: Vec<String>,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+enum CompletionShell {
+    Bash,
+    Zsh,
+    Fish,
+    #[allow(clippy::enum_variant_names)]
+    Powershell,
+    Elvish,
+}
+
+impl CompletionShell {
+    fn to_clap_shell(self) -> clap_complete::Shell {
+        match self {
+            CompletionShell::Bash => clap_complete::Shell::Bash,
+            CompletionShell::Zsh => clap_complete::Shell::Zsh,
+            CompletionShell::Fish => clap_complete::Shell::Fish,
+            CompletionShell::Powershell => clap_complete::Shell::PowerShell,
+            CompletionShell::Elvish => clap_complete::Shell::Elvish,
+        }
+    }
+}
+
 fn base_system_messages() -> Vec<Message> {
     vec![Message {
         role: MessageRole::System,
@@ -597,6 +627,17 @@ fn ensure_system_message(messages: &mut Vec<Message>) {
             },
         );
     }
+}
+
+fn completions_command(shell: CompletionShell) -> Result<()> {
+    use clap_complete::generate;
+    use std::io;
+
+    let mut cmd = Cli::command();
+    let name = cmd.get_name().to_string();
+    generate(shell.to_clap_shell(), &mut cmd, name, &mut io::stdout());
+
+    Ok(())
 }
 
 fn load_history_messages(path: &Path) -> Result<Vec<Message>> {

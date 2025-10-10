@@ -379,6 +379,25 @@ fn ask_interactive_chat_session_handles_multiple_turns() {
 }
 
 #[test]
+fn completions_generate_scripts() {
+    let mut bash_cmd = Command::cargo_bin("specado").expect("binary");
+    bash_cmd.env("NO_COLOR", "1").arg("completions").arg("bash");
+
+    bash_cmd
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty().not());
+
+    let mut zsh_cmd = Command::cargo_bin("specado").expect("binary");
+    zsh_cmd.env("NO_COLOR", "1").arg("completions").arg("zsh");
+
+    zsh_cmd
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("compdef"));
+}
+
+#[test]
 fn ask_interactive_uses_messages_file_history() {
     let dir = TempDir::new().expect("temp dir");
 
