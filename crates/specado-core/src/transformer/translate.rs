@@ -105,6 +105,12 @@ fn reshape_openai_responses(
         }
     }
 
+    if let Some(seed) = source.get("seed") {
+        if !seed.is_null() {
+            root.insert("seed".into(), seed.clone());
+        }
+    }
+
     if let Some(text) = source.get("text") {
         if !text.is_null() {
             root.insert("text".into(), text.clone());

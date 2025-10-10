@@ -3,6 +3,10 @@ use httpmock::prelude::*;
 use predicates::prelude::*;
 use serde_json::json;
 use std::fs::write;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::TcpListener;
+use std::sync::{Arc, Mutex};
+use std::thread;
 use tempfile::TempDir;
 
 fn write_file(dir: &TempDir, name: &str, contents: &str) -> std::path::PathBuf {
@@ -466,6 +470,145 @@ fn ask_thinking_rejects_when_provider_lacks_capability() {
 }
 
 #[test]
+fn ask_reasoning_injects_metadata_for_supported_provider() {
+    let dir = TempDir::new().expect("temp dir");
+
+    let token_env = "SPECADO_REASONING_TOKEN";
+
+    let captured = Arc::new(Mutex::new(None::<String>));
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
+    let addr = listener.local_addr().expect("listener addr");
+    let store = Arc::clone(&captured);
+    let server_handle = thread::spawn(move || {
+        if let Ok((mut stream, _)) = listener.accept() {
+            let mut reader = BufReader::new(&mut stream);
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_err() {
+                return;
+            }
+            let mut content_length = 0usize;
+            loop {
+                line.clear();
+                if reader.read_line(&mut line).is_err() {
+                    return;
+                }
+                if line == "\r\n" {
+                    break;
+                }
+                let lower = line.to_ascii_lowercase();
+                if let Some(rest) = lower.strip_prefix("content-length:") {
+                    if let Ok(value) = rest.trim().parse::<usize>() {
+                        content_length = value;
+                    }
+                }
+            }
+
+            let mut body_buf = vec![0u8; content_length];
+            if reader.read_exact(&mut body_buf).is_err() {
+                return;
+            }
+            if let Ok(body_str) = String::from_utf8(body_buf) {
+                *store.lock().unwrap() = Some(body_str);
+            }
+
+            let response_body =
+                r#"{"data":{"content":"reasoned response","finish_reason":"stop"}}"#;
+            let _ = write!(
+                reader.get_mut(),
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                response_body.len(),
+                response_body
+            );
+        }
+    });
+
+    let server_url = format!("http://{}:{}/responses", addr.ip(), addr.port());
+
+    let provider_path = write_file(
+        &dir,
+        "openai.yaml",
+        openai_provider_yaml(&server_url, token_env).as_str(),
+    );
+
+    let mut cmd = Command::cargo_bin("specado").expect("binary");
+    cmd.env("NO_COLOR", "1")
+        .env(token_env, "reasoning-secret")
+        .arg("ask")
+        .arg("--provider")
+        .arg(&provider_path)
+        .arg("--reasoning")
+        .arg("--reasoning-effort")
+        .arg("high")
+        .arg("--seed")
+        .arg("123")
+        .arg("Solve 2+2");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("reasoned response"));
+
+    server_handle.join().expect("server thread");
+
+    let body = captured
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("captured reasoning payload");
+    let body_json: serde_json::Value = serde_json::from_str(&body).expect("request json");
+    assert_eq!(body_json["reasoning"]["effort"], json!("high"));
+    assert_eq!(body_json["seed"], json!(123));
+}
+
+#[test]
+fn ask_reasoning_rejects_when_provider_lacks_control() {
+    let dir = TempDir::new().expect("temp dir");
+
+    let server = MockServer::start();
+    let provider_path = write_file(
+        &dir,
+        "provider.yaml",
+        sample_provider_yaml(&server.url("/chat"), "SPECADO_NO_REASONING").as_str(),
+    );
+
+    let mut cmd = Command::cargo_bin("specado").expect("binary");
+    cmd.env("NO_COLOR", "1")
+        .arg("ask")
+        .arg("--provider")
+        .arg(&provider_path)
+        .arg("--reasoning")
+        .arg("Hello");
+
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("reasoning controls"));
+}
+
+#[test]
+fn ask_seed_rejects_when_provider_lacks_support() {
+    let dir = TempDir::new().expect("temp dir");
+    let server = MockServer::start();
+
+    let provider_path = write_file(
+        &dir,
+        "provider.yaml",
+        sample_provider_yaml(&server.url("/chat"), "SPECADO_NO_SEED").as_str(),
+    );
+
+    let mut cmd = Command::cargo_bin("specado").expect("binary");
+    cmd.env("NO_COLOR", "1")
+        .arg("ask")
+        .arg("--provider")
+        .arg(&provider_path)
+        .arg("--seed")
+        .arg("42")
+        .arg("Hello");
+
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("deterministic seeding"));
+}
+
+#[test]
 fn ask_interactive_uses_messages_file_history() {
     let dir = TempDir::new().expect("temp dir");
 
@@ -603,6 +746,54 @@ capabilities:
 constraints:
   supports:
     json_mode: false
+    tools: true
+"#,
+        url = url,
+        token_env = token_env
+    )
+}
+
+fn openai_provider_yaml(url: &str, token_env: &str) -> String {
+    format!(
+        r#"provider: openai
+interface: text.generate
+contract_version: "1.0.0"
+
+auth:
+  type: bearer
+  token_env: {token_env}
+
+models:
+  - id: gpt-5
+
+endpoints:
+  chat:
+    method: POST
+    url: {url}
+    headers:
+      content-type: application/json
+
+mappings:
+  request:
+    - from: $.metadata.reasoning.effort
+      to: $.reasoning.effort
+    - from: $.sampling.seed
+      to: $.seed
+    - from: $.messages
+      to: $.messages
+  response:
+    - from: $.data.content
+      to: content
+    - from: $.data.finish_reason
+      to: finish_reason
+
+capabilities:
+  reasoning_controls: ["effort"]
+  supports_seed: true
+
+constraints:
+  supports:
+    json_mode: true
     tools: true
 "#,
         url = url,

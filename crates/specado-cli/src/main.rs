@@ -23,6 +23,9 @@ async fn main() {
             messages_file,
             thinking,
             thinking_budget,
+            reasoning,
+            reasoning_effort,
+            seed,
             runtime,
         } => {
             commands::ask_command(
@@ -34,6 +37,9 @@ async fn main() {
                     messages_file,
                     thinking,
                     thinking_budget,
+                    reasoning,
+                    reasoning_effort,
+                    seed,
                     runtime,
                 },
             )

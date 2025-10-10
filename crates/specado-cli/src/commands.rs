@@ -1,5 +1,5 @@
 use crate::chat;
-use crate::cli::{CompletionShell, RuntimeOptions};
+use crate::cli::{CompletionShell, ReasoningEffort, RuntimeOptions};
 use crate::io::{load_prompt_spec, load_provider_spec, parse_to_json_value};
 use crate::resolver::resolve_provider_path;
 use crate::runtime;
@@ -95,6 +95,9 @@ pub struct AskOptions {
     pub messages_file: Option<PathBuf>,
     pub thinking: bool,
     pub thinking_budget: Option<u32>,
+    pub reasoning: bool,
+    pub reasoning_effort: Option<ReasoningEffort>,
+    pub seed: Option<i64>,
     pub runtime: RuntimeOptions,
 }
 
@@ -109,6 +112,9 @@ pub async fn ask_command(
         messages_file,
         thinking,
         thinking_budget,
+        reasoning,
+        reasoning_effort,
+        seed,
         runtime,
     } = options;
 
@@ -134,7 +140,7 @@ pub async fn ask_command(
         })?;
 
     let mut metadata = JsonMap::new();
-    let sampling = SamplingConfig::default();
+    let mut sampling = SamplingConfig::default();
 
     if thinking || thinking_budget.is_some() {
         if !provider_spec.capabilities.supports_extended_thinking {
@@ -150,6 +156,55 @@ pub async fn ask_command(
             thinking_map.insert("budget_tokens".into(), JsonValue::from(budget));
         }
         metadata.insert("thinking".into(), JsonValue::Object(thinking_map));
+    }
+
+    if reasoning || reasoning_effort.is_some() {
+        let controls = provider_spec
+            .capabilities
+            .reasoning_controls
+            .iter()
+            .map(|control| control.to_ascii_lowercase())
+            .collect::<Vec<_>>();
+
+        if controls.is_empty() {
+            return Err(anyhow!(
+                "Provider '{}' does not support reasoning controls",
+                provider_spec.provider
+            ));
+        }
+
+        let supports_effort = controls.iter().any(|c| c == "effort");
+        if !supports_effort {
+            return Err(anyhow!(
+                "Provider '{}' does not expose reasoning effort control required by --reasoning",
+                provider_spec.provider
+            ));
+        }
+
+        let effort = reasoning_effort
+            .or(if reasoning { Some(ReasoningEffort::Medium) } else { None })
+            .ok_or_else(|| {
+                anyhow!(
+                    "--reasoning requires an effort level. Pass --reasoning-effort to select a value."
+                )
+            })?;
+
+        let mut reasoning_map = JsonMap::new();
+        reasoning_map.insert(
+            "effort".into(),
+            JsonValue::String(effort.as_str().to_string()),
+        );
+        metadata.insert("reasoning".into(), JsonValue::Object(reasoning_map));
+    }
+
+    if let Some(seed_value) = seed {
+        if !provider_spec.capabilities.supports_seed {
+            return Err(anyhow!(
+                "Provider '{}' does not support deterministic seeding",
+                provider_spec.provider
+            ));
+        }
+        sampling.seed = Some(seed_value);
     }
 
     if interactive {

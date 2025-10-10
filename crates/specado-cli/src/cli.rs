@@ -33,6 +33,15 @@ pub enum Commands {
         /// Override the thinking budget (tokens) when --thinking is enabled
         #[arg(long = "thinking-budget", requires = "thinking", value_name = "TOKENS")]
         thinking_budget: Option<u32>,
+        /// Enable reasoning controls for capable providers
+        #[arg(long)]
+        reasoning: bool,
+        /// Set reasoning effort when --reasoning is enabled
+        #[arg(long = "reasoning-effort", requires = "reasoning", value_enum)]
+        reasoning_effort: Option<ReasoningEffort>,
+        /// Set a deterministic seed when supported by the provider
+        #[arg(long)]
+        seed: Option<i64>,
         #[command(flatten)]
         runtime: RuntimeOptions,
     },
@@ -124,6 +133,23 @@ impl CompletionShell {
             CompletionShell::Fish => clap_complete::Shell::Fish,
             CompletionShell::Powershell => clap_complete::Shell::PowerShell,
             CompletionShell::Elvish => clap_complete::Shell::Elvish,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+pub enum ReasoningEffort {
+    Minimal,
+    Medium,
+    High,
+}
+
+impl ReasoningEffort {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReasoningEffort::Minimal => "minimal",
+            ReasoningEffort::Medium => "medium",
+            ReasoningEffort::High => "high",
         }
     }
 }
