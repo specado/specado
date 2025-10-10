@@ -21,11 +21,10 @@ async fn main() {
             model,
             interactive,
             messages_file,
-            thinking,
-            thinking_budget,
-            reasoning,
-            reasoning_effort,
-            seed,
+            reason,
+            reason_effort,
+            reason_budget,
+            reason_seed,
             runtime,
         } => {
             commands::ask_command(
@@ -35,11 +34,10 @@ async fn main() {
                 commands::AskOptions {
                     interactive,
                     messages_file,
-                    thinking,
-                    thinking_budget,
-                    reasoning,
-                    reasoning_effort,
-                    seed,
+                    reason,
+                    reason_effort,
+                    reason_budget,
+                    reason_seed,
                     runtime,
                 },
             )

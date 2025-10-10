@@ -1,5 +1,5 @@
 use crate::chat;
-use crate::cli::{CompletionShell, ReasoningEffort, RuntimeOptions};
+use crate::cli::{CompletionShell, ReasonEffort, RuntimeOptions};
 use crate::io::{load_prompt_spec, load_provider_spec, parse_to_json_value};
 use crate::resolver::resolve_provider_path;
 use crate::runtime;
@@ -93,11 +93,10 @@ pub async fn run_command(
 pub struct AskOptions {
     pub interactive: bool,
     pub messages_file: Option<PathBuf>,
-    pub thinking: bool,
-    pub thinking_budget: Option<u32>,
-    pub reasoning: bool,
-    pub reasoning_effort: Option<ReasoningEffort>,
-    pub seed: Option<i64>,
+    pub reason: bool,
+    pub reason_effort: Option<ReasonEffort>,
+    pub reason_budget: Option<u32>,
+    pub reason_seed: Option<i64>,
     pub runtime: RuntimeOptions,
 }
 
@@ -110,11 +109,10 @@ pub async fn ask_command(
     let AskOptions {
         interactive,
         messages_file,
-        thinking,
-        thinking_budget,
-        reasoning,
-        reasoning_effort,
-        seed,
+        reason,
+        reason_effort,
+        reason_budget,
+        reason_seed,
         runtime,
     } = options;
 
@@ -142,23 +140,7 @@ pub async fn ask_command(
     let mut metadata = JsonMap::new();
     let mut sampling = SamplingConfig::default();
 
-    if thinking || thinking_budget.is_some() {
-        if !provider_spec.capabilities.supports_extended_thinking {
-            return Err(anyhow!(
-                "Provider '{}' does not support --thinking",
-                provider_spec.provider
-            ));
-        }
-
-        let mut thinking_map = JsonMap::new();
-        thinking_map.insert("type".into(), JsonValue::String("enabled".into()));
-        if let Some(budget) = thinking_budget {
-            thinking_map.insert("budget_tokens".into(), JsonValue::from(budget));
-        }
-        metadata.insert("thinking".into(), JsonValue::Object(thinking_map));
-    }
-
-    if reasoning || reasoning_effort.is_some() {
+    if reason || reason_effort.is_some() || reason_budget.is_some() || reason_seed.is_some() {
         let controls = provider_spec
             .capabilities
             .reasoning_controls
@@ -166,38 +148,64 @@ pub async fn ask_command(
             .map(|control| control.to_ascii_lowercase())
             .collect::<Vec<_>>();
 
-        if controls.is_empty() {
+        if !controls.is_empty() {
+            let supports_effort = controls.iter().any(|c| c == "effort");
+            if reason_effort.is_some() && !supports_effort {
+                return Err(anyhow!(
+                    "Provider '{}' does not expose reasoning effort control required by --reason-effort",
+                    provider_spec.provider
+                ));
+            }
+
+            let effort = reason_effort
+                .or(if reason {
+                    Some(ReasonEffort::Medium)
+                } else {
+                    None
+                })
+                .unwrap_or(ReasonEffort::Medium);
+
+            let mut reasoning_map = JsonMap::new();
+            reasoning_map.insert(
+                "effort".into(),
+                JsonValue::String(effort.as_str().to_string()),
+            );
+            if let Some(budget) = reason_budget {
+                reasoning_map.insert("budget_tokens".into(), JsonValue::from(budget));
+            }
+            metadata.insert("reasoning".into(), JsonValue::Object(reasoning_map));
+        } else if provider_spec.capabilities.supports_extended_thinking {
+            if reason_effort.is_some() {
+                return Err(anyhow!(
+                    "Provider '{}' maps --reason to thinking mode and does not support --reason-effort",
+                    provider_spec.provider
+                ));
+            }
+
+            let thinking_obj = metadata
+                .entry("thinking".to_string())
+                .or_insert_with(|| JsonValue::Object(JsonMap::new()));
+
+            if !thinking_obj.is_object() {
+                *thinking_obj = JsonValue::Object(JsonMap::new());
+            }
+
+            if let Some(map) = thinking_obj.as_object_mut() {
+                map.entry("type".to_string())
+                    .or_insert_with(|| JsonValue::String("enabled".into()));
+                if let Some(budget) = reason_budget {
+                    map.insert("budget_tokens".to_string(), JsonValue::from(budget));
+                }
+            }
+        } else {
             return Err(anyhow!(
-                "Provider '{}' does not support reasoning controls",
+                "Provider '{}' does not support reasoning or extended thinking capabilities",
                 provider_spec.provider
             ));
         }
-
-        let supports_effort = controls.iter().any(|c| c == "effort");
-        if !supports_effort {
-            return Err(anyhow!(
-                "Provider '{}' does not expose reasoning effort control required by --reasoning",
-                provider_spec.provider
-            ));
-        }
-
-        let effort = reasoning_effort
-            .or(if reasoning { Some(ReasoningEffort::Medium) } else { None })
-            .ok_or_else(|| {
-                anyhow!(
-                    "--reasoning requires an effort level. Pass --reasoning-effort to select a value."
-                )
-            })?;
-
-        let mut reasoning_map = JsonMap::new();
-        reasoning_map.insert(
-            "effort".into(),
-            JsonValue::String(effort.as_str().to_string()),
-        );
-        metadata.insert("reasoning".into(), JsonValue::Object(reasoning_map));
     }
 
-    if let Some(seed_value) = seed {
+    if let Some(seed_value) = reason_seed {
         if !provider_spec.capabilities.supports_seed {
             return Err(anyhow!(
                 "Provider '{}' does not support deterministic seeding",

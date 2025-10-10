@@ -402,31 +402,65 @@ fn completions_generate_scripts() {
 }
 
 #[test]
-fn ask_thinking_injects_metadata_for_supported_provider() {
+fn ask_reason_enables_thinking_for_supported_provider() {
     let dir = TempDir::new().expect("temp dir");
 
-    let server = MockServer::start();
     let token_env = "SPECADO_THINKING_TOKEN";
-
-    let mock = server.mock(|when, then| {
-        when.method(POST)
-            .path("/messages")
-            .header("authorization", "Bearer thinking-secret")
-            .body_contains("\"thinking\":{\"type\":\"enabled\"");
-        then.status(200)
-            .header("content-type", "application/json")
-            .json_body(json!({
-                "data": {
-                    "content": "anthropic response",
-                    "finish_reason": "stop"
+    let captured = Arc::new(Mutex::new(None::<serde_json::Value>));
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
+    let addr = listener.local_addr().expect("listener addr");
+    let store = Arc::clone(&captured);
+    let server_handle = thread::spawn(move || {
+        if let Ok((mut stream, _)) = listener.accept() {
+            let mut reader = BufReader::new(&mut stream);
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_err() {
+                return;
+            }
+            let mut content_length = 0usize;
+            loop {
+                line.clear();
+                if reader.read_line(&mut line).is_err() {
+                    return;
                 }
-            }));
+                if line == "\r\n" {
+                    break;
+                }
+                let lower = line.to_ascii_lowercase();
+                if let Some(rest) = lower.strip_prefix("content-length:") {
+                    if let Ok(value) = rest.trim().parse::<usize>() {
+                        content_length = value;
+                    }
+                }
+            }
+
+            let mut body_buf = vec![0u8; content_length];
+            if reader.read_exact(&mut body_buf).is_err() {
+                return;
+            }
+            if let Ok(body_str) = String::from_utf8(body_buf) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str) {
+                    *store.lock().unwrap() = Some(json);
+                }
+            }
+
+            let response_body =
+                r#"{"data":{"content":"anthropic response","finish_reason":"stop"}}"#;
+            let _ = write!(
+                reader.get_mut(),
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                response_body.len(),
+                response_body
+            );
+        }
     });
+
+    let server_url = format!("http://{}:{}/messages", addr.ip(), addr.port());
 
     let provider_path = write_file(
         &dir,
         "anthropic.yaml",
-        anthropic_provider_yaml(&server.url("/messages"), token_env).as_str(),
+        anthropic_provider_yaml(&server_url, token_env).as_str(),
     );
 
     let mut cmd = Command::cargo_bin("specado").expect("binary");
@@ -435,18 +469,28 @@ fn ask_thinking_injects_metadata_for_supported_provider() {
         .arg("ask")
         .arg("--provider")
         .arg(&provider_path)
-        .arg("--thinking")
+        .arg("--reason")
+        .arg("--reason-budget")
+        .arg("1000")
         .arg("Plan the day");
 
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("anthropic response"));
 
-    mock.assert_hits(1);
+    server_handle.join().expect("server thread");
+
+    let body = captured
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("captured thinking payload");
+    assert_eq!(body["thinking"]["type"], json!("enabled"));
+    assert_eq!(body["thinking"]["budget_tokens"], json!(1000));
 }
 
 #[test]
-fn ask_thinking_rejects_when_provider_lacks_capability() {
+fn ask_reason_rejects_when_provider_lacks_thinking() {
     let dir = TempDir::new().expect("temp dir");
     let server = MockServer::start();
 
@@ -461,12 +505,12 @@ fn ask_thinking_rejects_when_provider_lacks_capability() {
         .arg("ask")
         .arg("--provider")
         .arg(&provider_path)
-        .arg("--thinking")
+        .arg("--reason")
         .arg("Hello");
 
-    cmd.assert()
-        .failure()
-        .stderr(predicate::str::contains("does not support --thinking"));
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "does not support reasoning or extended thinking capabilities",
+    ));
 }
 
 #[test]
@@ -536,10 +580,12 @@ fn ask_reasoning_injects_metadata_for_supported_provider() {
         .arg("ask")
         .arg("--provider")
         .arg(&provider_path)
-        .arg("--reasoning")
-        .arg("--reasoning-effort")
+        .arg("--reason")
+        .arg("--reason-effort")
         .arg("high")
-        .arg("--seed")
+        .arg("--reason-budget")
+        .arg("800")
+        .arg("--reason-seed")
         .arg("123")
         .arg("Solve 2+2");
 
@@ -556,6 +602,7 @@ fn ask_reasoning_injects_metadata_for_supported_provider() {
         .expect("captured reasoning payload");
     let body_json: serde_json::Value = serde_json::from_str(&body).expect("request json");
     assert_eq!(body_json["reasoning"]["effort"], json!("high"));
+    assert_eq!(body_json["reasoning"]["budget_tokens"], json!(800));
     assert_eq!(body_json["seed"], json!(123));
 }
 
@@ -575,23 +622,26 @@ fn ask_reasoning_rejects_when_provider_lacks_control() {
         .arg("ask")
         .arg("--provider")
         .arg(&provider_path)
-        .arg("--reasoning")
+        .arg("--reason")
         .arg("Hello");
 
-    cmd.assert()
-        .failure()
-        .stderr(predicate::str::contains("reasoning controls"));
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "does not support reasoning or extended thinking capabilities",
+    ));
 }
 
 #[test]
 fn ask_seed_rejects_when_provider_lacks_support() {
     let dir = TempDir::new().expect("temp dir");
-    let server = MockServer::start();
 
     let provider_path = write_file(
         &dir,
         "provider.yaml",
-        sample_provider_yaml(&server.url("/chat"), "SPECADO_NO_SEED").as_str(),
+        openai_provider_without_seed_yaml(
+            "https://unused.example/responses",
+            "SPECADO_NO_SEED_TOKEN",
+        )
+        .as_str(),
     );
 
     let mut cmd = Command::cargo_bin("specado").expect("binary");
@@ -599,7 +649,8 @@ fn ask_seed_rejects_when_provider_lacks_support() {
         .arg("ask")
         .arg("--provider")
         .arg(&provider_path)
-        .arg("--seed")
+        .arg("--reason")
+        .arg("--reason-seed")
         .arg("42")
         .arg("Hello");
 
@@ -777,6 +828,8 @@ mappings:
   request:
     - from: $.metadata.reasoning.effort
       to: $.reasoning.effort
+    - from: $.metadata.reasoning.budget_tokens
+      to: $.reasoning.budget_tokens
     - from: $.sampling.seed
       to: $.seed
     - from: $.messages
@@ -790,6 +843,54 @@ mappings:
 capabilities:
   reasoning_controls: ["effort"]
   supports_seed: true
+
+constraints:
+  supports:
+    json_mode: true
+    tools: true
+"#,
+        url = url,
+        token_env = token_env
+    )
+}
+
+fn openai_provider_without_seed_yaml(url: &str, token_env: &str) -> String {
+    format!(
+        r#"provider: openai
+interface: text.generate
+contract_version: "1.0.0"
+
+auth:
+  type: bearer
+  token_env: {token_env}
+
+models:
+  - id: gpt-5
+
+endpoints:
+  chat:
+    method: POST
+    url: {url}
+    headers:
+      content-type: application/json
+
+mappings:
+  request:
+    - from: $.metadata.reasoning.effort
+      to: $.reasoning.effort
+    - from: $.metadata.reasoning.budget_tokens
+      to: $.reasoning.budget_tokens
+    - from: $.messages
+      to: $.messages
+  response:
+    - from: $.data.content
+      to: content
+    - from: $.data.finish_reason
+      to: finish_reason
+
+capabilities:
+  reasoning_controls: ["effort"]
+  supports_seed: false
 
 constraints:
   supports:

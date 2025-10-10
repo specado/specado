@@ -21,6 +21,8 @@ mappings:
       to: "$.max_output_tokens"
     - from: "$.metadata.reasoning.effort"
       to: "$.reasoning.effort"
+    - from: "$.metadata.reasoning.budget_tokens"
+      to: "$.reasoning.budget_tokens"
     - from: "$.metadata.openai_reasoning_effort"
       to: "$.reasoning.effort"
     - from: "$.metadata.openai_text_verbosity"

@@ -27,21 +27,18 @@ pub enum Commands {
         /// Load prior conversation history from a PromptSpec or messages file
         #[arg(long = "messages-file", value_name = "PATH", requires = "interactive")]
         messages_file: Option<PathBuf>,
-        /// Enable extended thinking mode for supported providers
+        /// Enable provider-neutral reasoning mode (maps to vendor capabilities)
         #[arg(long)]
-        thinking: bool,
-        /// Override the thinking budget (tokens) when --thinking is enabled
-        #[arg(long = "thinking-budget", requires = "thinking", value_name = "TOKENS")]
-        thinking_budget: Option<u32>,
-        /// Enable reasoning controls for capable providers
-        #[arg(long)]
-        reasoning: bool,
-        /// Set reasoning effort when --reasoning is enabled
-        #[arg(long = "reasoning-effort", requires = "reasoning", value_enum)]
-        reasoning_effort: Option<ReasoningEffort>,
+        reason: bool,
+        /// Set reasoning effort when --reason is enabled
+        #[arg(long = "reason-effort", requires = "reason", value_enum)]
+        reason_effort: Option<ReasonEffort>,
+        /// Override the reasoning budget (tokens) when supported
+        #[arg(long = "reason-budget", requires = "reason", value_name = "TOKENS")]
+        reason_budget: Option<u32>,
         /// Set a deterministic seed when supported by the provider
-        #[arg(long)]
-        seed: Option<i64>,
+        #[arg(long = "reason-seed", requires = "reason")]
+        reason_seed: Option<i64>,
         #[command(flatten)]
         runtime: RuntimeOptions,
     },
@@ -138,18 +135,18 @@ impl CompletionShell {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
-pub enum ReasoningEffort {
-    Minimal,
+pub enum ReasonEffort {
+    Low,
     Medium,
     High,
 }
 
-impl ReasoningEffort {
+impl ReasonEffort {
     pub fn as_str(self) -> &'static str {
         match self {
-            ReasoningEffort::Minimal => "minimal",
-            ReasoningEffort::Medium => "medium",
-            ReasoningEffort::High => "high",
+            ReasonEffort::Low => "low",
+            ReasonEffort::Medium => "medium",
+            ReasonEffort::High => "high",
         }
     }
 }
