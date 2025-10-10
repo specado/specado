@@ -190,7 +190,6 @@ fn run_executes_against_provider() {
 
     let server = MockServer::start();
     let token_env = "SPECADO_CLI_TOKEN";
-    std::env::set_var(token_env, "cli-secret");
 
     let mock = server.mock(|when, then| {
         when.method(POST)
@@ -214,6 +213,7 @@ fn run_executes_against_provider() {
 
     let mut cmd = Command::cargo_bin("specado").expect("binary");
     cmd.env("NO_COLOR", "1")
+        .env(token_env, "cli-secret")
         .arg("run")
         .arg("--prompt")
         .arg(&prompt_path)
@@ -225,7 +225,6 @@ fn run_executes_against_provider() {
         .stdout(predicate::str::contains("hi from cli"));
 
     mock.assert_hits(1);
-    std::env::remove_var(token_env);
 }
 
 #[test]
@@ -234,7 +233,6 @@ fn ask_uses_default_provider_for_single_turn() {
 
     let server = MockServer::start();
     let token_env = "SPECADO_ASK_TOKEN";
-    std::env::set_var(token_env, "ask-secret");
 
     let mock = server.mock(|when, then| {
         when.method(POST)
@@ -256,18 +254,18 @@ fn ask_uses_default_provider_for_single_turn() {
         sample_provider_yaml(&server.url("/chat"), token_env).as_str(),
     );
 
-    std::env::set_var("SPECADO_DEFAULT_PROVIDER", &provider_path);
-
     let mut cmd = Command::cargo_bin("specado").expect("binary");
-    cmd.env("NO_COLOR", "1").arg("ask").arg("Hello there");
+    cmd.env("NO_COLOR", "1")
+        .env(token_env, "ask-secret")
+        .env("SPECADO_DEFAULT_PROVIDER", &provider_path)
+        .arg("ask")
+        .arg("Hello there");
 
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("hi from ask"));
 
     mock.assert_hits(1);
-    std::env::remove_var("SPECADO_DEFAULT_PROVIDER");
-    std::env::remove_var(token_env);
 }
 
 #[test]
@@ -278,7 +276,6 @@ fn ask_provider_and_model_flags_select_catalog_spec() {
 
     let server = MockServer::start();
     let token_env = "SPECADO_FLAG_TOKEN";
-    std::env::set_var(token_env, "flag-secret");
 
     let mock = server.mock(|when, then| {
         when.method(POST)
@@ -303,10 +300,10 @@ fn ask_provider_and_model_flags_select_catalog_spec() {
     let provider_spec_path = catalog_root.join("flag-provider").join("catalog.yaml");
     std::fs::write(&provider_spec_path, provider_yaml).expect("write provider spec");
 
-    std::env::set_var("SPECADO_PROVIDERS_DIR", &catalog_root);
-
     let mut cmd = Command::cargo_bin("specado").expect("binary");
     cmd.env("NO_COLOR", "1")
+        .env(token_env, "flag-secret")
+        .env("SPECADO_PROVIDERS_DIR", &catalog_root)
         .arg("ask")
         .arg("Hello flags")
         .arg("--provider")
@@ -319,17 +316,14 @@ fn ask_provider_and_model_flags_select_catalog_spec() {
         .stdout(predicate::str::contains("flagged response"));
 
     mock.assert_hits(1);
-    std::env::remove_var("SPECADO_PROVIDERS_DIR");
-    std::env::remove_var(token_env);
 }
 
 #[test]
 fn ask_model_flag_requires_provider() {
-    std::env::remove_var("SPECADO_PROVIDERS_DIR");
-    std::env::remove_var("SPECADO_DEFAULT_PROVIDER");
-
     let mut cmd = Command::cargo_bin("specado").expect("binary");
     cmd.env("NO_COLOR", "1")
+        .env_remove("SPECADO_PROVIDERS_DIR")
+        .env_remove("SPECADO_DEFAULT_PROVIDER")
         .arg("ask")
         .arg("Hello there")
         .arg("--model")
@@ -338,4 +332,48 @@ fn ask_model_flag_requires_provider() {
     cmd.assert()
         .failure()
         .stderr(predicate::str::contains("--model requires --provider"));
+}
+
+#[test]
+fn ask_interactive_chat_session_handles_multiple_turns() {
+    let dir = TempDir::new().expect("temp dir");
+
+    let server = MockServer::start();
+    let token_env = "SPECADO_INTERACTIVE_TOKEN";
+
+    let mock = server.mock(|when, then| {
+        when.method(POST)
+            .path("/chat")
+            .header("authorization", "Bearer chat-secret");
+        then.status(200)
+            .header("content-type", "application/json")
+            .json_body(json!({
+                "data": {
+                    "content": "response from interactive mode",
+                    "finish_reason": "stop"
+                }
+            }));
+    });
+
+    let provider_path = write_file(
+        &dir,
+        "provider.yaml",
+        sample_provider_yaml(&server.url("/chat"), token_env).as_str(),
+    );
+
+    let mut cmd = Command::cargo_bin("specado").expect("binary");
+    cmd.env("NO_COLOR", "1")
+        .env(token_env, "chat-secret")
+        .arg("ask")
+        .arg("--interactive")
+        .arg("--provider")
+        .arg(&provider_path)
+        .write_stdin("Hello there\nHow are you?\n:exit\n");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Starting interactive chat"))
+        .stdout(predicate::str::contains("response from interactive mode"));
+
+    mock.assert_hits(2);
 }
