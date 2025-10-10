@@ -48,6 +48,10 @@ OPENAI_API_KEY=sk-your-key \
   --model gpt-5 \
   "Continue where we left off"
 
+# generate shell completions (Bash example)
+./target/debug/specado completions bash > ~/.local/share/specado/completions.bash
+echo 'source ~/.local/share/specado/completions.bash' >> ~/.bashrc
+
 # target a specific provider/model from the catalog
 OPENAI_API_KEY=sk-your-key \
 ./target/debug/specado ask \
@@ -94,6 +98,8 @@ When chatting interactively, Specado preserves the full conversation history and
   ]
 }
 ```
+
+Shell completions are available for Bash, Zsh, Fish, PowerShell, and Elvish. Use `specado completions <shell>` to print the script, then follow your shell’s standard installation instructions (see `scripts`, e.g., sourcing in your shell profile or placing under `/usr/local/share`).
 
 ## 3. Python quickstart
 The Python bindings are published from `crates/specado-py` and surfaced to the Python package in `python/specado`. Use `maturin` to build the native extension in-place, then run the sample program in `examples/python_basic.py`.

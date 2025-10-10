@@ -18,6 +18,7 @@ path = "src/main.rs"
 anyhow = "1.0"
 clap.workspace = true
 colored.workspace = true
+clap_complete = "4.5"
 serde_json.workspace = true
 serde_yaml.workspace = true
 specado-core = { workspace = true, features = ["hot-reload", "audit-logging"] }
