@@ -272,7 +272,7 @@ fn ask_uses_default_provider_for_single_turn() {
 fn ask_provider_and_model_flags_select_catalog_spec() {
     let dir = TempDir::new().expect("temp dir");
     let catalog_root = dir.path().join("providers");
-    std::fs::create_dir_all(&catalog_root.join("flag-provider")).expect("catalog provider dir");
+    std::fs::create_dir_all(catalog_root.join("flag-provider")).expect("catalog provider dir");
 
     let server = MockServer::start();
     let token_env = "SPECADO_FLAG_TOKEN";
