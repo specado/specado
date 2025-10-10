@@ -27,6 +27,12 @@ pub enum Commands {
         /// Load prior conversation history from a PromptSpec or messages file
         #[arg(long = "messages-file", value_name = "PATH", requires = "interactive")]
         messages_file: Option<PathBuf>,
+        /// Enable extended thinking mode for supported providers
+        #[arg(long)]
+        thinking: bool,
+        /// Override the thinking budget (tokens) when --thinking is enabled
+        #[arg(long = "thinking-budget", requires = "thinking", value_name = "TOKENS")]
+        thinking_budget: Option<u32>,
         #[command(flatten)]
         runtime: RuntimeOptions,
     },

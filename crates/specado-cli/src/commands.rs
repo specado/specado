@@ -6,9 +6,11 @@ use crate::runtime;
 use anyhow::{anyhow, Context, Result};
 use clap::CommandFactory;
 use colored::Colorize;
+use serde_json::{Map as JsonMap, Value as JsonValue};
 use specado_core::hot_reload::ProviderCache;
 use specado_core::{
     execute, translate as core_translate, LossinessLevel, LossinessReport, Message, MessageRole,
+    SamplingConfig,
 };
 use specado_schemas::get_validator;
 use std::path::PathBuf;
@@ -88,14 +90,28 @@ pub async fn run_command(
     Ok(())
 }
 
+pub struct AskOptions {
+    pub interactive: bool,
+    pub messages_file: Option<PathBuf>,
+    pub thinking: bool,
+    pub thinking_budget: Option<u32>,
+    pub runtime: RuntimeOptions,
+}
+
 pub async fn ask_command(
     prompt: Option<String>,
     provider_flag: Option<String>,
     model_flag: Option<String>,
-    interactive: bool,
-    messages_file: Option<PathBuf>,
-    runtime: RuntimeOptions,
+    options: AskOptions,
 ) -> Result<()> {
+    let AskOptions {
+        interactive,
+        messages_file,
+        thinking,
+        thinking_budget,
+        runtime,
+    } = options;
+
     if !interactive && prompt.as_ref().map(|p| p.trim().is_empty()).unwrap_or(true) {
         return Err(anyhow!(
             "Prompt argument is required unless --interactive is provided."
@@ -107,6 +123,35 @@ pub async fn ask_command(
     #[cfg(feature = "hot-reload")]
     runtime::apply_hot_reload_config(&runtime, &provider_path);
 
+    let provider_spec = ProviderCache::new()
+        .load_or_read(&provider_path)
+        .map_err(|err| {
+            anyhow!(
+                "Failed to load provider spec {}: {}",
+                provider_path.display(),
+                err
+            )
+        })?;
+
+    let mut metadata = JsonMap::new();
+    let sampling = SamplingConfig::default();
+
+    if thinking || thinking_budget.is_some() {
+        if !provider_spec.capabilities.supports_extended_thinking {
+            return Err(anyhow!(
+                "Provider '{}' does not support --thinking",
+                provider_spec.provider
+            ));
+        }
+
+        let mut thinking_map = JsonMap::new();
+        thinking_map.insert("type".into(), JsonValue::String("enabled".into()));
+        if let Some(budget) = thinking_budget {
+            thinking_map.insert("budget_tokens".into(), JsonValue::from(budget));
+        }
+        metadata.insert("thinking".into(), JsonValue::Object(thinking_map));
+    }
+
     if interactive {
         let mut history = if let Some(path) = messages_file {
             chat::load_history_messages(&path)?
@@ -115,25 +160,25 @@ pub async fn ask_command(
         };
         chat::ensure_system_message(&mut history);
 
-        let provider_spec = ProviderCache::new()
-            .load_or_read(&provider_path)
-            .map_err(|err| {
-                anyhow!(
-                    "Failed to load provider spec {}: {}",
-                    provider_path.display(),
-                    err
-                )
-            })?;
-
-        chat::run_interactive_chat(prompt, history, &provider_path, &provider_spec, &runtime)
-            .await?;
+        chat::run_interactive_chat(
+            prompt,
+            history,
+            &metadata,
+            &provider_path,
+            &provider_spec,
+            &runtime,
+            &sampling,
+        )
+        .await?;
     } else {
         let mut messages = chat::base_system_messages();
         messages.push(Message {
             role: MessageRole::User,
             content: prompt.expect("prompt required when not interactive"),
         });
-        let response = chat::execute_messages(&messages, &provider_path, &runtime).await?;
+        let response =
+            chat::execute_messages(&messages, &provider_path, &runtime, &sampling, &metadata)
+                .await?;
         println!("{}", response.content.trim());
     }
 

@@ -3,6 +3,7 @@ use crate::io::parse_to_json_value;
 use crate::runtime;
 use anyhow::{anyhow, Context, Result};
 use colored::Colorize;
+use serde_json::{Map as JsonMap, Value as JsonValue};
 use specado_core::{
     execute, Message, MessageRole, PromptSpec, ProviderSpec, ResponseConfig, SamplingConfig,
     StrictMode, UniformResponse,
@@ -74,16 +75,23 @@ pub fn load_history_messages(path: &Path) -> Result<Vec<Message>> {
     ))
 }
 
-pub fn build_prompt_spec(messages: &[Message]) -> PromptSpec {
+pub fn build_prompt_spec(
+    messages: &[Message],
+    sampling: &SamplingConfig,
+    metadata: &JsonMap<String, JsonValue>,
+) -> PromptSpec {
     PromptSpec {
         version: "1".to_string(),
         messages: messages.to_vec(),
-        sampling: SamplingConfig::default(),
+        sampling: sampling.clone(),
         response: ResponseConfig::default(),
         tools: Vec::new(),
         tool_choice: None,
         strict_mode: StrictMode::Warn,
-        metadata: Default::default(),
+        metadata: metadata
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect(),
     }
 }
 
@@ -91,6 +99,8 @@ pub async fn execute_messages(
     messages: &[Message],
     provider_path: &Path,
     runtime_options: &RuntimeOptions,
+    sampling: &SamplingConfig,
+    metadata: &JsonMap<String, JsonValue>,
 ) -> Result<UniformResponse> {
     let provider_str = provider_path
         .to_str()
@@ -100,7 +110,7 @@ pub async fn execute_messages(
     let audit_context = runtime::build_audit_context(runtime_options)?;
 
     let response = execute(
-        build_prompt_spec(messages),
+        build_prompt_spec(messages, sampling, metadata),
         provider_str,
         #[cfg(feature = "audit-logging")]
         audit_context,
@@ -143,9 +153,11 @@ pub fn warn_if_context_near_limit(messages: &[Message], provider: &ProviderSpec)
 pub async fn run_interactive_chat(
     initial_prompt: Option<String>,
     mut messages: Vec<Message>,
+    metadata: &JsonMap<String, JsonValue>,
     provider_path: &Path,
     provider_spec: &ProviderSpec,
     runtime_options: &RuntimeOptions,
+    sampling: &SamplingConfig,
 ) -> Result<()> {
     println!(
         "{} Type ':exit' or ':quit' (or press Ctrl+C) to end the session.",
@@ -163,7 +175,15 @@ pub async fn run_interactive_chat(
                 content: initial,
             });
             warn_if_context_near_limit(&messages, provider_spec);
-            match execute_messages(&messages, provider_path, runtime_options).await {
+            match execute_messages(
+                &messages,
+                provider_path,
+                runtime_options,
+                sampling,
+                metadata,
+            )
+            .await
+            {
                 Ok(response) => {
                     let content = response.content.clone();
                     println!("{}", content.trim());
@@ -224,7 +244,15 @@ pub async fn run_interactive_chat(
 
         warn_if_context_near_limit(&messages, provider_spec);
 
-        match execute_messages(&messages, provider_path, runtime_options).await {
+        match execute_messages(
+            &messages,
+            provider_path,
+            runtime_options,
+            sampling,
+            metadata,
+        )
+        .await
+        {
             Ok(response) => {
                 let content = response.content.clone();
                 println!("{}", content.trim());

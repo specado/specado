@@ -398,6 +398,74 @@ fn completions_generate_scripts() {
 }
 
 #[test]
+fn ask_thinking_injects_metadata_for_supported_provider() {
+    let dir = TempDir::new().expect("temp dir");
+
+    let server = MockServer::start();
+    let token_env = "SPECADO_THINKING_TOKEN";
+
+    let mock = server.mock(|when, then| {
+        when.method(POST)
+            .path("/messages")
+            .header("authorization", "Bearer thinking-secret")
+            .body_contains("\"thinking\":{\"type\":\"enabled\"");
+        then.status(200)
+            .header("content-type", "application/json")
+            .json_body(json!({
+                "data": {
+                    "content": "anthropic response",
+                    "finish_reason": "stop"
+                }
+            }));
+    });
+
+    let provider_path = write_file(
+        &dir,
+        "anthropic.yaml",
+        anthropic_provider_yaml(&server.url("/messages"), token_env).as_str(),
+    );
+
+    let mut cmd = Command::cargo_bin("specado").expect("binary");
+    cmd.env("NO_COLOR", "1")
+        .env(token_env, "thinking-secret")
+        .arg("ask")
+        .arg("--provider")
+        .arg(&provider_path)
+        .arg("--thinking")
+        .arg("Plan the day");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("anthropic response"));
+
+    mock.assert_hits(1);
+}
+
+#[test]
+fn ask_thinking_rejects_when_provider_lacks_capability() {
+    let dir = TempDir::new().expect("temp dir");
+    let server = MockServer::start();
+
+    let provider_path = write_file(
+        &dir,
+        "provider.yaml",
+        sample_provider_yaml(&server.url("/chat"), "SPECADO_NO_THINKING").as_str(),
+    );
+
+    let mut cmd = Command::cargo_bin("specado").expect("binary");
+    cmd.env("NO_COLOR", "1")
+        .arg("ask")
+        .arg("--provider")
+        .arg(&provider_path)
+        .arg("--thinking")
+        .arg("Hello");
+
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("does not support --thinking"));
+}
+
+#[test]
 fn ask_interactive_uses_messages_file_history() {
     let dir = TempDir::new().expect("temp dir");
 
@@ -493,4 +561,51 @@ fn ask_interactive_rejects_invalid_messages_file() {
         .stderr(predicate::str::contains("Messages file"));
 
     mock.assert_hits(0);
+}
+
+fn anthropic_provider_yaml(url: &str, token_env: &str) -> String {
+    format!(
+        r#"provider: anthropic
+interface: conversational.generate
+contract_version: "1.0.0"
+
+auth:
+  type: bearer
+  token_env: {token_env}
+
+models:
+  - id: claude-sonnet
+
+endpoints:
+  chat:
+    method: POST
+    url: {url}
+    headers:
+      content-type: application/json
+
+mappings:
+  request:
+    - from: $.metadata.thinking.type
+      to: $.thinking.type
+    - from: $.metadata.thinking.budget_tokens
+      to: $.thinking.budget_tokens
+    - from: $.messages
+      to: $.messages
+  response:
+    - from: $.data.content
+      to: content
+    - from: $.data.finish_reason
+      to: finish_reason
+
+capabilities:
+  supports_extended_thinking: true
+
+constraints:
+  supports:
+    json_mode: false
+    tools: true
+"#,
+        url = url,
+        token_env = token_env
+    )
 }
