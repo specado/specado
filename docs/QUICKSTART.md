@@ -19,11 +19,22 @@ This guide walks through using Specado from the command line, Python, and Node.j
 ```
 
 ## 2. CLI walkthrough
-The CLI lives in `crates/specado-cli` and exposes `validate`, `preview`, and `run` subcommands. The examples below reference the sample prompt and provider specs added under `examples/`.
+The CLI lives in `crates/specado-cli` and exposes `ask`, `validate`, `preview`, and `run` subcommands. The examples below reference the sample prompt and provider specs added under `examples/`.
 
 ```sh
 # build the CLI binary
 cargo build -p specado-cli
+
+# single-turn question with the default provider/model
+OPENAI_API_KEY=sk-your-key \
+./target/debug/specado ask "What is Specado?"
+
+# target a specific provider/model from the catalog
+OPENAI_API_KEY=sk-your-key \
+./target/debug/specado ask \
+  "Explain the neutral interface taxonomy" \
+  --provider openai \
+  --model gpt-5
 
 # validate a provider or prompt spec
 ./target/debug/specado validate --spec crates/specado-providers/providers/openai/gpt-5/base.yaml

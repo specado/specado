@@ -86,16 +86,14 @@ fn merge_values(base: &mut JsonValue, overlay: &JsonValue) {
 }
 
 fn load_overlays(spec_path: &Path) -> Result<Vec<OverlaySpec>> {
-    let overlays_dir = spec_path
-        .ancestors()
-        .find_map(|ancestor| {
-            let candidate = ancestor.join("overlays");
-            if candidate.is_dir() {
-                Some(candidate)
-            } else {
-                None
-            }
-        });
+    let overlays_dir = spec_path.ancestors().find_map(|ancestor| {
+        let candidate = ancestor.join("overlays");
+        if candidate.is_dir() {
+            Some(candidate)
+        } else {
+            None
+        }
+    });
 
     let overlays_dir = match overlays_dir {
         Some(dir) => dir,
@@ -284,7 +282,7 @@ impl ProviderCache {
         let mut visited = HashSet::new();
         let merged_value = load_spec_value(&canonical, &mut visited)?;
         let overlays = load_overlays(&canonical)?;
-    let merged_value = merge_overlays(merged_value, overlays)?;
+        let merged_value = merge_overlays(merged_value, overlays)?;
         let mut spec: ProviderSpec = serde_json::from_value(merged_value)
             .map_err(|e| Error::Config(format!("Failed to parse provider spec: {}", e)))?;
         spec.inherits = None;
