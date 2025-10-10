@@ -377,3 +377,101 @@ fn ask_interactive_chat_session_handles_multiple_turns() {
 
     mock.assert_hits(2);
 }
+
+#[test]
+fn ask_interactive_uses_messages_file_history() {
+    let dir = TempDir::new().expect("temp dir");
+
+    let server = MockServer::start();
+    let token_env = "SPECADO_HISTORY_TOKEN";
+    let provider_path = write_file(
+        &dir,
+        "provider.yaml",
+        sample_provider_yaml(&server.url("/chat"), token_env).as_str(),
+    );
+
+    let history_path = write_file(
+        &dir,
+        "history.json",
+        &serde_json::to_string_pretty(&json!({
+            "messages": [
+                {"role": "system", "content": "You are tracking a project."},
+                {"role": "user", "content": "Earlier question context"},
+                {"role": "assistant", "content": "Previous assistant response"}
+            ]
+        }))
+        .unwrap(),
+    );
+
+    let mock = server.mock(|when, then| {
+        when.method(POST)
+            .path("/chat")
+            .header("authorization", "Bearer history-secret")
+            .body_contains("Earlier question context")
+            .body_contains("Previous assistant response")
+            .body_contains("Bring me up to speed");
+        then.status(200)
+            .header("content-type", "application/json")
+            .json_body(json!({
+                "data": {
+                    "content": "Continuing from history",
+                    "finish_reason": "stop"
+                }
+            }));
+    });
+
+    let mut cmd = Command::cargo_bin("specado").expect("binary");
+    cmd.env("NO_COLOR", "1")
+        .env(token_env, "history-secret")
+        .arg("ask")
+        .arg("--interactive")
+        .arg("--provider")
+        .arg(&provider_path)
+        .arg("--messages-file")
+        .arg(&history_path)
+        .arg("Bring me up to speed")
+        .write_stdin(":exit\n");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Continuing from history"));
+
+    mock.assert_hits(1);
+}
+
+#[test]
+fn ask_interactive_rejects_invalid_messages_file() {
+    let dir = TempDir::new().expect("temp dir");
+
+    let invalid_path = write_file(&dir, "invalid.yaml", "not: messages");
+
+    let server = MockServer::start();
+    let token_env = "SPECADO_INVALID_TOKEN";
+    let mock = server.mock(|when, then| {
+        when.method(POST).path("/chat");
+        then.status(200).body("{}");
+    });
+
+    let provider_path = write_file(
+        &dir,
+        "provider.yaml",
+        sample_provider_yaml(&server.url("/chat"), token_env).as_str(),
+    );
+
+    let mut cmd = Command::cargo_bin("specado").expect("binary");
+    cmd.env("NO_COLOR", "1")
+        .env(token_env, "invalid-secret")
+        .arg("ask")
+        .arg("--interactive")
+        .arg("--provider")
+        .arg(&provider_path)
+        .arg("--messages-file")
+        .arg(&invalid_path)
+        .write_stdin(":exit\n");
+
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("Messages file"));
+
+    mock.assert_hits(0);
+}

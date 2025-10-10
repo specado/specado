@@ -43,6 +43,9 @@ enum Commands {
         /// Start an interactive chat session that preserves history
         #[arg(long, alias = "chat")]
         interactive: bool,
+        /// Load prior conversation history from a PromptSpec or messages file
+        #[arg(long = "messages-file", value_name = "PATH", requires = "interactive")]
+        messages_file: Option<PathBuf>,
         #[command(flatten)]
         runtime: RuntimeOptions,
     },
@@ -81,8 +84,9 @@ async fn main() {
             provider,
             model,
             interactive,
+            messages_file,
             runtime,
-        } => ask_command(prompt, provider, model, interactive, runtime).await,
+        } => ask_command(prompt, provider, model, interactive, messages_file, runtime).await,
         Commands::Validate { spec } => validate_command(spec).await,
         Commands::Preview {
             prompt,
@@ -133,6 +137,7 @@ async fn ask_command(
     provider_flag: Option<String>,
     model_flag: Option<String>,
     interactive: bool,
+    messages_file: Option<PathBuf>,
     runtime: RuntimeOptions,
 ) -> Result<()> {
     if !interactive && prompt.as_ref().map(|p| p.trim().is_empty()).unwrap_or(true) {
@@ -147,6 +152,13 @@ async fn ask_command(
     apply_hot_reload_config(&runtime, &provider_path);
 
     if interactive {
+        let mut history = if let Some(path) = messages_file {
+            load_history_messages(&path)?
+        } else {
+            Vec::new()
+        };
+        ensure_system_message(&mut history);
+
         let provider_spec = ProviderCache::new()
             .load_or_read(&provider_path)
             .map_err(|err| {
@@ -156,7 +168,7 @@ async fn ask_command(
                     err
                 )
             })?;
-        run_interactive_chat(prompt, &provider_path, &provider_spec, &runtime).await?;
+        run_interactive_chat(prompt, history, &provider_path, &provider_spec, &runtime).await?;
     } else {
         let mut messages = base_system_messages();
         messages.push(Message {
@@ -572,6 +584,60 @@ fn base_system_messages() -> Vec<Message> {
     }]
 }
 
+fn ensure_system_message(messages: &mut Vec<Message>) {
+    let has_system = messages
+        .iter()
+        .any(|message| matches!(message.role, MessageRole::System));
+    if !has_system {
+        messages.insert(
+            0,
+            Message {
+                role: MessageRole::System,
+                content: "You are a helpful assistant.".to_string(),
+            },
+        );
+    }
+}
+
+fn load_history_messages(path: &Path) -> Result<Vec<Message>> {
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("Failed to read messages file: {}", path.display()))?;
+
+    if content.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let value = parse_to_json_value(&content, path)?;
+
+    if let Some(messages_value) = value.get("messages") {
+        let messages: Vec<Message> =
+            serde_json::from_value(messages_value.clone()).map_err(|err| {
+                anyhow!(
+                    "Failed to parse 'messages' array in {}: {}",
+                    path.display(),
+                    err
+                )
+            })?;
+        return Ok(messages);
+    }
+
+    if value.is_array() {
+        let messages: Vec<Message> = serde_json::from_value(value).map_err(|err| {
+            anyhow!(
+                "Failed to parse messages array in {}: {}",
+                path.display(),
+                err
+            )
+        })?;
+        return Ok(messages);
+    }
+
+    Err(anyhow!(
+        "Messages file {} must be a PromptSpec with a 'messages' array or an array of messages.",
+        path.display()
+    ))
+}
+
 fn build_prompt_spec(messages: &[Message]) -> PromptSpec {
     PromptSpec {
         version: "1".to_string(),
@@ -640,6 +706,7 @@ fn warn_if_context_near_limit(messages: &[Message], provider: &ProviderSpec) {
 
 async fn run_interactive_chat(
     initial_prompt: Option<String>,
+    mut messages: Vec<Message>,
     provider_path: &Path,
     provider_spec: &ProviderSpec,
     runtime: &RuntimeOptions,
@@ -649,7 +716,9 @@ async fn run_interactive_chat(
         "Starting interactive chat.".cyan()
     );
 
-    let mut messages = base_system_messages();
+    if !messages.is_empty() {
+        warn_if_context_near_limit(&messages, provider_spec);
+    }
 
     if let Some(initial) = initial_prompt {
         if !initial.trim().is_empty() {
