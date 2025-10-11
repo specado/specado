@@ -1,14 +1,16 @@
 use crate::chat;
-use crate::cli::{CompletionShell, RuntimeOptions};
+use crate::cli::{CompletionShell, ReasonEffort, RuntimeOptions};
 use crate::io::{load_prompt_spec, load_provider_spec, parse_to_json_value};
 use crate::resolver::resolve_provider_path;
 use crate::runtime;
 use anyhow::{anyhow, Context, Result};
 use clap::CommandFactory;
 use colored::Colorize;
+use serde_json::{Map as JsonMap, Value as JsonValue};
 use specado_core::hot_reload::ProviderCache;
 use specado_core::{
     execute, translate as core_translate, LossinessLevel, LossinessReport, Message, MessageRole,
+    SamplingConfig,
 };
 use specado_schemas::get_validator;
 use std::path::PathBuf;
@@ -88,14 +90,32 @@ pub async fn run_command(
     Ok(())
 }
 
+pub struct AskOptions {
+    pub interactive: bool,
+    pub messages_file: Option<PathBuf>,
+    pub reason: bool,
+    pub reason_effort: Option<ReasonEffort>,
+    pub reason_budget: Option<u32>,
+    pub reason_seed: Option<i64>,
+    pub runtime: RuntimeOptions,
+}
+
 pub async fn ask_command(
     prompt: Option<String>,
     provider_flag: Option<String>,
     model_flag: Option<String>,
-    interactive: bool,
-    messages_file: Option<PathBuf>,
-    runtime: RuntimeOptions,
+    options: AskOptions,
 ) -> Result<()> {
+    let AskOptions {
+        interactive,
+        messages_file,
+        reason,
+        reason_effort,
+        reason_budget,
+        reason_seed,
+        runtime,
+    } = options;
+
     if !interactive && prompt.as_ref().map(|p| p.trim().is_empty()).unwrap_or(true) {
         return Err(anyhow!(
             "Prompt argument is required unless --interactive is provided."
@@ -107,6 +127,94 @@ pub async fn ask_command(
     #[cfg(feature = "hot-reload")]
     runtime::apply_hot_reload_config(&runtime, &provider_path);
 
+    let provider_spec = ProviderCache::new()
+        .load_or_read(&provider_path)
+        .map_err(|err| {
+            anyhow!(
+                "Failed to load provider spec {}: {}",
+                provider_path.display(),
+                err
+            )
+        })?;
+
+    let mut metadata = JsonMap::new();
+    let mut sampling = SamplingConfig::default();
+
+    if reason || reason_effort.is_some() || reason_budget.is_some() || reason_seed.is_some() {
+        let controls = provider_spec
+            .capabilities
+            .reasoning_controls
+            .iter()
+            .map(|control| control.to_ascii_lowercase())
+            .collect::<Vec<_>>();
+
+        if !controls.is_empty() {
+            let supports_effort = controls.iter().any(|c| c == "effort");
+            if reason_effort.is_some() && !supports_effort {
+                return Err(anyhow!(
+                    "Provider '{}' does not expose reasoning effort control required by --reason-effort",
+                    provider_spec.provider
+                ));
+            }
+
+            let effort = reason_effort
+                .or(if reason {
+                    Some(ReasonEffort::Medium)
+                } else {
+                    None
+                })
+                .unwrap_or(ReasonEffort::Medium);
+
+            let mut reasoning_map = JsonMap::new();
+            reasoning_map.insert(
+                "effort".into(),
+                JsonValue::String(effort.as_str().to_string()),
+            );
+            if let Some(budget) = reason_budget {
+                reasoning_map.insert("budget_tokens".into(), JsonValue::from(budget));
+            }
+            metadata.insert("reasoning".into(), JsonValue::Object(reasoning_map));
+        } else if provider_spec.capabilities.supports_extended_thinking {
+            if reason_effort.is_some() {
+                return Err(anyhow!(
+                    "Provider '{}' maps --reason to thinking mode and does not support --reason-effort",
+                    provider_spec.provider
+                ));
+            }
+
+            let thinking_obj = metadata
+                .entry("thinking".to_string())
+                .or_insert_with(|| JsonValue::Object(JsonMap::new()));
+
+            if !thinking_obj.is_object() {
+                *thinking_obj = JsonValue::Object(JsonMap::new());
+            }
+
+            if let Some(map) = thinking_obj.as_object_mut() {
+                map.entry("type".to_string())
+                    .or_insert_with(|| JsonValue::String("enabled".into()));
+                if let Some(budget) = reason_budget {
+                    map.insert("budget_tokens".to_string(), JsonValue::from(budget));
+                }
+            }
+        } else {
+            return Err(anyhow!(
+                "Provider '{}' does not support reasoning or extended thinking capabilities",
+                provider_spec.provider
+            ));
+        }
+    }
+
+    if let Some(seed_value) = reason_seed {
+        if !provider_spec.capabilities.supports_seed {
+            return Err(anyhow!(
+                "Provider '{}' does not support deterministic seeding",
+                provider_spec.provider
+            ));
+        }
+        sampling.seed = Some(seed_value);
+    }
+
     if interactive {
         let mut history = if let Some(path) = messages_file {
             chat::load_history_messages(&path)?
@@ -115,25 +223,25 @@ pub async fn ask_command(
         };
         chat::ensure_system_message(&mut history);
 
-        let provider_spec = ProviderCache::new()
-            .load_or_read(&provider_path)
-            .map_err(|err| {
-                anyhow!(
-                    "Failed to load provider spec {}: {}",
-                    provider_path.display(),
-                    err
-                )
-            })?;
-
-        chat::run_interactive_chat(prompt, history, &provider_path, &provider_spec, &runtime)
-            .await?;
+        chat::run_interactive_chat(
+            prompt,
+            history,
+            &metadata,
+            &provider_path,
+            &provider_spec,
+            &runtime,
+            &sampling,
+        )
+        .await?;
     } else {
         let mut messages = chat::base_system_messages();
         messages.push(Message {
             role: MessageRole::User,
             content: prompt.expect("prompt required when not interactive"),
         });
-        let response = chat::execute_messages(&messages, &provider_path, &runtime).await?;
+        let response =
+            chat::execute_messages(&messages, &provider_path, &runtime, &sampling, &metadata)
+                .await?;
         println!("{}", response.content.trim());
     }
 

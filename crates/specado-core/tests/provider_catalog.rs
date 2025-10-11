@@ -26,7 +26,7 @@ fn sample_prompt() -> PromptSpec {
     let mut metadata: HashMap<String, serde_json::Value> = HashMap::new();
     metadata.insert("openai_model".into(), json!("gpt-5"));
     metadata.insert("openai_max_output_tokens".into(), json!(200));
-    metadata.insert("openai_reasoning_effort".into(), json!("minimal"));
+    metadata.insert("openai_reasoning_effort".into(), json!("low"));
     metadata.insert("openai_text_verbosity".into(), json!("low"));
     metadata.insert(
         "anthropic_model".into(),
@@ -80,7 +80,7 @@ fn openai_catalog_validates_and_translates() {
         .any(|entry| entry.code == LossinessCode::Unsupported));
     assert_eq!(translated["model"], json!("gpt-5"));
     assert_eq!(translated["max_output_tokens"], json!(200));
-    assert_eq!(translated["reasoning"]["effort"], json!("minimal"));
+    assert_eq!(translated["reasoning"]["effort"], json!("low"));
     assert_eq!(translated["text"]["verbosity"], json!("low"));
     assert_eq!(translated["instructions"], json!("You are helpful."));
     assert_eq!(translated["input"][0]["content"][0]["text"], json!("Hello"));

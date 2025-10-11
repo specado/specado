@@ -27,6 +27,18 @@ pub enum Commands {
         /// Load prior conversation history from a PromptSpec or messages file
         #[arg(long = "messages-file", value_name = "PATH", requires = "interactive")]
         messages_file: Option<PathBuf>,
+        /// Enable provider-neutral reasoning mode (maps to vendor capabilities)
+        #[arg(long)]
+        reason: bool,
+        /// Set reasoning effort when --reason is enabled
+        #[arg(long = "reason-effort", requires = "reason", value_enum)]
+        reason_effort: Option<ReasonEffort>,
+        /// Override the reasoning budget (tokens) when supported
+        #[arg(long = "reason-budget", requires = "reason", value_name = "TOKENS")]
+        reason_budget: Option<u32>,
+        /// Set a deterministic seed when supported by the provider
+        #[arg(long = "reason-seed", requires = "reason")]
+        reason_seed: Option<i64>,
         #[command(flatten)]
         runtime: RuntimeOptions,
     },
@@ -118,6 +130,23 @@ impl CompletionShell {
             CompletionShell::Fish => clap_complete::Shell::Fish,
             CompletionShell::Powershell => clap_complete::Shell::PowerShell,
             CompletionShell::Elvish => clap_complete::Shell::Elvish,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+pub enum ReasonEffort {
+    Low,
+    Medium,
+    High,
+}
+
+impl ReasonEffort {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReasonEffort::Low => "low",
+            ReasonEffort::Medium => "medium",
+            ReasonEffort::High => "high",
         }
     }
 }

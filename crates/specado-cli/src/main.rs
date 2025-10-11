@@ -21,10 +21,27 @@ async fn main() {
             model,
             interactive,
             messages_file,
+            reason,
+            reason_effort,
+            reason_budget,
+            reason_seed,
             runtime,
         } => {
-            commands::ask_command(prompt, provider, model, interactive, messages_file, runtime)
-                .await
+            commands::ask_command(
+                prompt,
+                provider,
+                model,
+                commands::AskOptions {
+                    interactive,
+                    messages_file,
+                    reason,
+                    reason_effort,
+                    reason_budget,
+                    reason_seed,
+                    runtime,
+                },
+            )
+            .await
         }
         Commands::Validate { spec } => commands::validate_command(spec).await,
         Commands::Preview {
