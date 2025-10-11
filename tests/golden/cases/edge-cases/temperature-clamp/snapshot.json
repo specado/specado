@@ -1,0 +1,48 @@
+{
+  "provider_payload": {
+    "max_tokens": 256,
+    "messages": [
+      {
+        "content": [
+          {
+            "text": "Respond with high-temperature creativity.",
+            "type": "text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "model": "claude-3-opus-20240229",
+    "system": "Keep answers short.",
+    "temperature": 1.0
+  },
+  "lossiness": {
+    "is_lossy": true,
+    "strict_mode": "Warn",
+    "entries": [
+      {
+        "code": "Clamp",
+        "level": "warn",
+        "path": "$.sampling.temperature",
+        "reason": "Value 2.5 above maximum 1",
+        "suggested_fix": "Use value <= 1",
+        "details": {
+          "clamped_to": 1.0,
+          "requested": 2.5
+        }
+      },
+      {
+        "code": "Relocate",
+        "level": "info",
+        "path": "messages[0]",
+        "reason": "System message relocated to provider-specific location",
+        "suggested_fix": null,
+        "details": {
+          "from": "$.messages[?(@.role=='system')].content",
+          "to": "$.system"
+        }
+      }
+    ],
+    "omissions": []
+  }
+}

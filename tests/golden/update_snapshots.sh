@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Placeholder snapshot refresh script for Issue #50.
-# Replace the commands below once golden tests land.
-
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-echo "TODO: add cargo test invocation once golden snapshot tests exist" >&2
+echo "Regenerating golden snapshots with UPDATE_GOLDEN=1..." >&2
+UPDATE_GOLDEN=1 cargo test -p specado-core --test golden

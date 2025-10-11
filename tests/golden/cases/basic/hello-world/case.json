@@ -1,0 +1,16 @@
+{
+  "provider": "openai/gpt-5/base.yaml",
+  "prompt": {
+    "version": "1",
+    "messages": [
+      {"role": "user", "content": "Hello, world!"}
+    ],
+    "metadata": {
+      "openai_model": "gpt-5",
+      "openai_max_output_tokens": 256,
+      "openai_reasoning_effort": "low",
+      "openai_text_verbosity": "low"
+    }
+  },
+  "description": "Basic single-message prompt for the OpenAI Responses adapter."
+}

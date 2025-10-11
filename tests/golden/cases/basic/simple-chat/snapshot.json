@@ -1,0 +1,31 @@
+{
+  "provider_payload": {
+    "input": [
+      {
+        "content": [
+          {
+            "text": "What is 2 + 2?",
+            "type": "input_text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "instructions": "You are a helpful assistant.",
+    "max_output_tokens": 384,
+    "model": "gpt-5",
+    "reasoning": {
+      "budget_tokens": 2048,
+      "effort": "medium"
+    },
+    "text": {
+      "verbosity": "low"
+    }
+  },
+  "lossiness": {
+    "is_lossy": false,
+    "strict_mode": "Warn",
+    "entries": [],
+    "omissions": []
+  }
+}

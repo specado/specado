@@ -1,0 +1,31 @@
+{
+  "provider_payload": {
+    "input": [
+      {
+        "content": [
+          {
+            "text": "Return a greeting with fields 'message' and 'language'.",
+            "type": "input_text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "instructions": "Format your answers as JSON objects.",
+    "max_output_tokens": 640,
+    "model": "gpt-5",
+    "reasoning": {
+      "budget_tokens": 1024,
+      "effort": "high"
+    },
+    "text": {
+      "verbosity": "low"
+    }
+  },
+  "lossiness": {
+    "is_lossy": false,
+    "strict_mode": "Warn",
+    "entries": [],
+    "omissions": []
+  }
+}

@@ -1,23 +1,26 @@
-# Golden Snapshot Scaffolding
+# Golden Snapshot Suite
 
-Golden snapshots capture canonical translations and responses so that regressions are easy to spot during CI. This directory holds fixtures produced by `specado-core` integration tests.
+Golden snapshots capture canonical translations so regressions surface immediately in CI. All comparisons trace back to the legacy corpus located at `../specado-newest-legacy/golden-corpus/`.
 
 ## Layout
-- `provider_preview.openai.json` &mdash; Example translation output for the OpenAI provider using `examples/prompts/basic_chat.json`.
-- `update_snapshots.sh` &mdash; Helper script that documents how to regenerate snapshots once the automated tests are wired up.
+- `cases/<category>/<name>/case.json` — Prompt input plus provider spec reference.
+- `cases/<category>/<name>/snapshot.json` — Expected provider payload and full lossiness report.
+- `update_snapshots.sh` — Helper script that refreshes every snapshot in one pass.
 
 ## Authoring guidelines
-1. Write or update the corresponding test in `tests/golden.rs` (to be added) so it emits deterministic output.
-2. Run the helper script in this folder to regenerate fixtures.
-3. Review diffs carefully; golden files are committed to source control and should only change when behaviour intentionally shifts.
-4. Reference the owning GitHub issue (e.g., Issue #50) when updating snapshots so reviewers understand the motivation.
+1. Model new cases after the legacy fixtures in `../specado-newest-legacy/golden-corpus/`, adapting prompts to the new `PromptSpec` and provider metadata keys.
+2. Keep prompts deterministic (no timestamps, random data, or network calls). Rely on provider metadata rather than mutating provider specs.
+3. Run the update script after editing a case so `snapshot.json` stays in sync.
+4. Review diffs carefully; golden files change only when behaviour intentionally shifts and the owning issue explains the delta.
 
-## Regenerating snapshots
-When the golden tests exist, regenerate assets like so:
+## Running the suite
+```sh
+cargo test -p specado-core --test golden
+```
+
+## Updating snapshots
 ```sh
 ./tests/golden/update_snapshots.sh
 ```
 
-The script is currently a placeholder but outlines the expected commands (`cargo test -- --update-snapshots`). Expand it as tests are implemented.
-
-_Last updated for Issue #50 (Docs, Tests, Benches, Examples Scaffolding)._ 
+_Last updated for Issue #109 (test: migrate golden corpus)._ 
