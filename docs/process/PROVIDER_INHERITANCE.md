@@ -1,6 +1,6 @@
 # Provider Inheritance Guide
 
-This document explains how Specado models provider APIs using declarative inheritance. Use it as a checklist when adding new models or API surfaces.
+This document explains how Specado models provider APIs using declarative inheritance. Use it as a checklist when adding new models or API surfaces. For the full YAML schema, metadata expectations, and validation workflow, pair this guide with `docs/PROVIDER_SPEC.md`.
 
 ## Directory layout
 

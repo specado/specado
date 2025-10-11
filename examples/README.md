@@ -11,4 +11,6 @@ This directory contains runnable samples that mirror the quickstart in `docs/QUI
 ## Usage
 Follow the instructions in the quickstart to build the CLI, Python extension, and Node module. Each script accepts optional flags to point at different specs, enable audit logging, or turn on watch plumbing.
 
+When adapting a sample for a new provider or model, consult `docs/PROVIDER_SPEC.md` for the spec format and metadata keys that need to be supplied in the prompt.
+
 These samples are intentionally lightweight; add new fixtures alongside them when demonstrating additional providers or prompt types.
