@@ -95,7 +95,7 @@ OPENAI_API_KEY=sk-your-key \
 The helper script `examples/cli_preview.sh` wraps the preview command and documents the expected environment when you need a quick smoke test.
 
 > **Model metadata & overlays**
-> The sample prompt `examples/prompts/basic_chat.json` includes metadata that targets OpenAI's GPT-5 Responses API (`openai_model`, reasoning effort, verbosity, max output tokens) and Anthropic's Claude Sonnet 4.5 (`anthropic_model`, thinking configuration, and max tokens). Tweak these fields to match the models and limits available to your account. The provider specs declare neutral interfaces (see `docs/process/INTERFACE_TAXONOMY.md`), while per-adapter defaults live in `overlays/`. See `docs/process/PROVIDER_INHERITANCE.md` for the full field reference.
+> The sample prompt `examples/prompts/basic_chat.json` includes metadata that targets OpenAI's GPT-5 Responses API (`openai_model`, reasoning effort, verbosity, max output tokens) and Anthropic's Claude Sonnet 4.5 (`anthropic_model`, thinking configuration, and max tokens). Tweak these fields to match the models and limits available to your account. The provider specs declare neutral interfaces (see `docs/process/INTERFACE_TAXONOMY.md`), while per-adapter defaults live in `overlays/`. Refer to `docs/PROVIDER_SPEC.md` for the full YAML schema and authoring guidelines, and `docs/process/PROVIDER_INHERITANCE.md` for inheritance patterns.
 
 When chatting interactively, Specado preserves the full conversation history and warns as you approach the provider’s context window. Use `:exit`, `:quit`, or `Ctrl+C` to leave the session at any time. You can preload history with `--messages-file <path>` using either a full PromptSpec document or a JSON/YAML array of messages:
 

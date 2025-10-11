@@ -18,5 +18,5 @@ unsupported_parameters:
   - "$.sampling.logit_bias"
   - "$.sampling.logprobs"
   - "$.sampling.n"
-  - "$.response_format"
+  - "$.response[?(@.format != 'text')].format"
   - "$.seed"
