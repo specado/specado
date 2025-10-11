@@ -1,0 +1,29 @@
+{
+  "version": "1",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a deliberate staff engineer who reasons step by step before sharing concise recommendations."
+    },
+    {
+      "role": "user",
+      "content": "Suggest three quick rituals that keep a remote engineering squad aligned without adding busywork."
+    }
+  ],
+  "sampling": {
+    "temperature": 0.3,
+    "top_p": 0.85,
+    "seed": 1337
+  },
+  "strict_mode": "Warn",
+  "metadata": {
+    "openai_model": "gpt-5",
+    "openai_max_output_tokens": 512,
+    "reasoning": {
+      "effort": "medium",
+      "budget_tokens": 1200
+    },
+    "openai_reasoning_effort": "medium",
+    "openai_text_verbosity": "low"
+  }
+}

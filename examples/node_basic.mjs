@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Minimal Specado Node example for Issue #50.
+// Specado Node demo showcasing reasoning (OpenAI) and thinking (Anthropic).
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -9,12 +9,28 @@ import specado from '../crates/specado-node/index.js';
 
 const { Client } = specado;
 
+const SCENARIOS = {
+  'openai-reasoning': {
+    description: 'GPT-5 reasoning controls',
+    provider: 'crates/specado-providers/providers/openai/gpt-5/base.yaml',
+    prompt: 'examples/prompts/openai_reasoning.json',
+    apiKey: 'OPENAI_API_KEY',
+  },
+  'anthropic-thinking': {
+    description: 'Claude Sonnet thinking mode',
+    provider: 'crates/specado-providers/providers/anthropic/claude-4.5/sonnet.yaml',
+    prompt: 'examples/prompts/anthropic_thinking.json',
+    apiKey: 'ANTHROPIC_API_KEY',
+  },
+};
+
 function printUsage() {
   console.log(`Usage: node examples/node_basic.mjs [options]
 
 Options:
-  --provider <path>   Provider spec (default: crates/specado-providers/providers/openai/gpt-5/base.yaml)
-  --prompt <path>     Prompt spec JSON/YAML (default: examples/prompts/basic_chat.json)
+  --scenario <name>   Demo to run (default: openai-reasoning)
+  --provider <path>   Provider spec (override scenario default)
+  --prompt <path>     Prompt spec JSON/YAML (override scenario default)
   --watch             Enable experimental watch plumbing
   --audit             Forward audit logs to stdout
   --redact <value>    Additional audit redaction pattern (repeatable)
@@ -24,8 +40,9 @@ Options:
 
 function parseArgs(argv) {
   const options = {
-    provider: 'crates/specado-providers/providers/openai/gpt-5/base.yaml',
-    prompt: 'examples/prompts/basic_chat.json',
+    scenario: 'openai-reasoning',
+    provider: undefined,
+    prompt: undefined,
     watch: false,
     audit: false,
     redact: [],
@@ -34,6 +51,9 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     switch (arg) {
+      case '--scenario':
+        options.scenario = argv[++i] ?? options.scenario;
+        break;
       case '--provider':
         options.provider = argv[++i] ?? options.provider;
         break;
@@ -84,17 +104,26 @@ async function loadPrompt(filePath) {
   return JSON.parse(contents);
 }
 
-function warnIfNoApiKey() {
-  if (!process.env.OPENAI_API_KEY) {
-    console.warn('warning: OPENAI_API_KEY is not set. The provider call will likely fail.');
+function warnIfNoApiKey(varName) {
+  if (!varName) return;
+  if (!process.env[varName]) {
+    console.warn(`warning: ${varName} is not set. The provider call will likely fail.`);
   }
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const promptPayload = await loadPrompt(args.prompt);
+  const scenarioName = SCENARIOS[args.scenario] ? args.scenario : 'openai-reasoning';
+  if (scenarioName !== args.scenario) {
+    console.warn(`Unknown scenario '${args.scenario}', defaulting to openai-reasoning.`);
+  }
+  const scenario = SCENARIOS[scenarioName];
 
-  warnIfNoApiKey();
+  const providerPath = args.provider ?? scenario.provider;
+  const promptPath = args.prompt ?? scenario.prompt;
+  const promptPayload = await loadPrompt(promptPath);
+
+  warnIfNoApiKey(scenario.apiKey);
 
   const clientOptions = {};
   if (args.watch) {
@@ -104,9 +133,13 @@ async function main() {
     clientOptions.audit = { target: 'stdout', redact: args.redact.filter(Boolean) };
   }
 
-  const client = new Client(args.provider, Object.keys(clientOptions).length ? clientOptions : undefined);
+  const client = new Client(providerPath, Object.keys(clientOptions).length ? clientOptions : undefined);
   const response = await client.complete(promptPayload);
   console.log(JSON.stringify(response, null, 2));
+
+  console.error(
+    `\nCompleted scenario '${scenarioName}' (${scenario.description}) using provider ${providerPath} and prompt ${promptPath}`,
+  );
 }
 
 main().catch((error) => {
