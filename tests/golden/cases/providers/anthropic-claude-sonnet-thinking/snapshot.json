@@ -1,0 +1,53 @@
+{
+  "provider_payload": {
+    "max_tokens": 704,
+    "messages": [
+      {
+        "content": [
+          {
+            "text": "Explain recursion using a simple example.",
+            "type": "text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "model": "claude-sonnet-4-5-20250929",
+    "system": "Provide structured explanations with concise summaries.",
+    "temperature": 1.0,
+    "thinking": {
+      "budget_tokens": 640,
+      "type": "enabled"
+    }
+  },
+  "lossiness": {
+    "is_lossy": true,
+    "strict_mode": "Warn",
+    "entries": [
+      {
+        "code": "Unsupported",
+        "level": "warn",
+        "path": "$.sampling.temperature",
+        "reason": "Parameter '$.sampling.temperature' is unsupported by this provider",
+        "suggested_fix": "Remove the parameter or choose a provider that supports it",
+        "details": {
+          "examples": [
+            0.7
+          ]
+        }
+      },
+      {
+        "code": "Relocate",
+        "level": "info",
+        "path": "messages[0]",
+        "reason": "System message relocated to provider-specific location",
+        "suggested_fix": null,
+        "details": {
+          "from": "$.messages[?(@.role=='system')].content",
+          "to": "$.system"
+        }
+      }
+    ],
+    "omissions": []
+  }
+}

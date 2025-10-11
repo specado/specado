@@ -1,0 +1,26 @@
+{
+  "provider": "openai/gpt-5/base.yaml",
+  "prompt": {
+    "version": "1",
+    "messages": [
+      {"role": "system", "content": "Format your answers as JSON objects."},
+      {"role": "user", "content": "Return a greeting with fields 'message' and 'language'."}
+    ],
+    "sampling": {
+      "temperature": 0.0
+    },
+    "response": {
+      "format": "json"
+    },
+    "metadata": {
+      "openai_model": "gpt-5",
+      "openai_max_output_tokens": 640,
+      "openai_text_verbosity": "low",
+      "reasoning": {
+        "effort": "high",
+        "budget_tokens": 1024
+      }
+    }
+  },
+  "description": "JSON mode prompt translated for OpenAI Responses with reasoning controls."
+}

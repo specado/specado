@@ -1,0 +1,20 @@
+{
+  "provider": "openai/gpt-5/base.yaml",
+  "prompt": {
+    "version": "1",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "What is 2 + 2?"}
+    ],
+    "metadata": {
+      "openai_model": "gpt-5",
+      "openai_max_output_tokens": 384,
+      "openai_text_verbosity": "low",
+      "reasoning": {
+        "effort": "medium",
+        "budget_tokens": 2048
+      }
+    }
+  },
+  "description": "System + user conversation translated for the OpenAI Responses API."
+}

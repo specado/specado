@@ -1,0 +1,29 @@
+{
+  "provider_payload": {
+    "input": [
+      {
+        "content": [
+          {
+            "text": "Hello, world!",
+            "type": "input_text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "max_output_tokens": 256,
+    "model": "gpt-5",
+    "reasoning": {
+      "effort": "low"
+    },
+    "text": {
+      "verbosity": "low"
+    }
+  },
+  "lossiness": {
+    "is_lossy": false,
+    "strict_mode": "Warn",
+    "entries": [],
+    "omissions": []
+  }
+}

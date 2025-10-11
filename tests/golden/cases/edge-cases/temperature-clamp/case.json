@@ -1,0 +1,19 @@
+{
+  "provider": "anthropic/claude-3/opus.yaml",
+  "prompt": {
+    "version": "1",
+    "messages": [
+      {"role": "system", "content": "Keep answers short."},
+      {"role": "user", "content": "Respond with high-temperature creativity."}
+    ],
+    "sampling": {
+      "temperature": 2.5,
+      "top_p": 0.9
+    },
+    "metadata": {
+      "anthropic_model": "claude-3-opus-20240229",
+      "anthropic_max_tokens": 256
+    }
+  },
+  "description": "Temperature exceeds provider clamp range and should be reduced to 1.0."
+}

@@ -1,0 +1,43 @@
+{
+  "provider_payload": {
+    "input": [
+      {
+        "content": [
+          {
+            "text": "Write a whimsical story about a robot baker.",
+            "type": "input_text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "max_output_tokens": 512,
+    "model": "gpt-5",
+    "reasoning": {
+      "effort": "low"
+    },
+    "seed": 1337,
+    "text": {
+      "verbosity": "balanced"
+    }
+  },
+  "lossiness": {
+    "is_lossy": true,
+    "strict_mode": "Warn",
+    "entries": [
+      {
+        "code": "Unsupported",
+        "level": "warn",
+        "path": "$.sampling.frequency_penalty",
+        "reason": "Parameter '$.sampling.frequency_penalty' is unsupported by this provider",
+        "suggested_fix": "Remove the parameter or choose a provider that supports it",
+        "details": {
+          "examples": [
+            0.5
+          ]
+        }
+      }
+    ],
+    "omissions": []
+  }
+}

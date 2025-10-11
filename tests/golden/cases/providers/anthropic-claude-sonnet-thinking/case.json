@@ -1,0 +1,20 @@
+{
+  "provider": "anthropic/claude-4.5/sonnet.yaml",
+  "prompt": {
+    "version": "1",
+    "messages": [
+      {"role": "system", "content": "Provide structured explanations with concise summaries."},
+      {"role": "user", "content": "Explain recursion using a simple example."}
+    ],
+    "sampling": {
+      "temperature": 0.7
+    },
+    "metadata": {
+      "anthropic_model": "claude-sonnet-4-5-20250929",
+      "anthropic_max_tokens": 512,
+      "anthropic_thinking_type": "enabled",
+      "anthropic_thinking_budget": 640
+    }
+  },
+  "description": "Claude Sonnet with thinking enabled; budget forces max_tokens uplift and reports unsupported sampling."
+}
