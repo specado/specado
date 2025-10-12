@@ -111,7 +111,7 @@ pub async fn execute(
             let body_value = if body_text.trim().is_empty() {
                 Value::Null
             } else {
-                serde_json::from_str(&body_text).unwrap_or_else(|_| Value::String(body_text))
+                serde_json::from_str(&body_text).unwrap_or(Value::String(body_text))
             };
             ctx.record_error(
                 Some(&translated),
