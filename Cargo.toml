@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0-alpha.15"
+version = "0.2.0-alpha.16"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/specado/specado"
