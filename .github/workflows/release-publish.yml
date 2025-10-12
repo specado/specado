@@ -23,6 +23,11 @@ on:
         description: Name of the artifact bundle generated during packaging
         required: true
         type: string
+      skip_release:
+        description: Whether publishing should be skipped
+        required: false
+        type: string
+        default: "false"
 
 env:
   CARGO_TERM_COLOR: always
@@ -35,6 +40,7 @@ jobs:
   validate_secrets:
     name: Validate release secrets
     runs-on: ubuntu-latest
+    if: ${{ inputs.skip_release != 'true' }}
     steps:
       - name: Check required tokens
         env:
@@ -70,6 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: validate_secrets
     environment: release
+    if: ${{ inputs.skip_release != 'true' }}
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -106,6 +113,7 @@ jobs:
     needs:
       - validate_secrets
       - publish_testpypi
+    if: ${{ inputs.skip_release != 'true' }}
     environment: release
     steps:
       - name: Download artifacts
@@ -141,6 +149,7 @@ jobs:
     needs:
       - validate_secrets
       - publish_testpypi
+    if: ${{ inputs.skip_release != 'true' }}
     environment: release
     steps:
       - name: Checkout code
@@ -185,7 +194,7 @@ jobs:
       - publish_testpypi
       - publish_npm
       - publish_crates
-    if: ${{ inputs.is_prerelease == false }}
+    if: ${{ inputs.skip_release != 'true' && inputs.is_prerelease == false }}
     environment: release
     steps:
       - name: Download artifacts
@@ -225,7 +234,7 @@ jobs:
       - publish_npm
       - publish_crates
       - publish_pypi
-    if: ${{ inputs.is_prerelease == false }}
+    if: ${{ inputs.skip_release != 'true' && inputs.is_prerelease == false }}
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -312,7 +321,7 @@ jobs:
       - publish_pypi
       - verify_release
     if: |
-      always() &&
+      inputs.skip_release != 'true' &&
       needs.publish_testpypi.result == 'success' &&
       needs.publish_npm.result == 'success' &&
       needs.publish_crates.result == 'success' &&

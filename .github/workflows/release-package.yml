@@ -7,6 +7,11 @@ on:
         description: Version string derived from the release tag
         required: true
         type: string
+      skip_release:
+        description: Whether to skip packaging
+        required: false
+        type: string
+        default: "false"
     outputs:
       artifact_name:
         description: Name of the uploaded artifact bundle
@@ -19,6 +24,7 @@ env:
 jobs:
   package:
     runs-on: ubuntu-latest
+    if: ${{ inputs.skip_release != 'true' }}
     outputs:
       artifact_name: ${{ steps.outputs.outputs.artifact_name }}
     steps:
