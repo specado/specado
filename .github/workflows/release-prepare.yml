@@ -1,0 +1,42 @@
+name: Release Prepare
+
+on:
+  workflow_call:
+    outputs:
+      version:
+        description: Release version derived from the tag
+        value: ${{ jobs.prepare.outputs.version }}
+      tag:
+        description: Tag name without refs prefix
+        value: ${{ jobs.prepare.outputs.tag }}
+      is_prerelease:
+        description: Whether the version includes a prerelease suffix
+        value: ${{ jobs.prepare.outputs.is_prerelease }}
+      npm_dist_tag:
+        description: npm dist-tag to use for this release
+        value: ${{ jobs.prepare.outputs.npm_dist_tag }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+      npm_dist_tag: ${{ steps.meta.outputs.npm_dist_tag }}
+    steps:
+      - name: Compute release metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *-* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "npm_dist_tag=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
+          fi

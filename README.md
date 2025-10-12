@@ -172,7 +172,44 @@ The `examples/` directory contains a set of runnable examples that demonstrate t
 
 ## Contributing
 
-Contributions are welcome! Please see the [GitHub Tracking Guidelines](docs/process/GITHUB_TRACKING.md) for information on our development process.
+Contributions are welcome! This project uses automated releases based on [Conventional Commits](https://conventionalcommits.org/).
+
+### Development Process
+
+1. **Fork and Clone** the repository
+2. **Create a Feature Branch**: `git checkout -b feature/your-feature-name`
+3. **Make Changes** and ensure tests pass: `cargo test --workspace`
+4. **Commit with Conventional Format**:
+   ```bash
+   # For new features
+   git commit -m "feat: add new model support"
+
+   # For bug fixes
+   git commit -m "fix: handle empty API responses"
+
+   # For breaking changes
+   git commit -m "feat!: redesign authentication API
+
+   BREAKING CHANGE: The auth config format has changed"
+   ```
+5. **Push and Create PR** to the `main` branch
+
+### Automated Releases
+
+When your PR is merged to `main`:
+- ✅ **Automatic Versioning**: Based on your commit messages
+- ✅ **GitHub Release**: Created automatically
+- ✅ **Multi-Platform Publishing**: npm, PyPI, and crates.io updated simultaneously
+- ✅ **Changelog**: Generated automatically
+
+### Commit Message Guidelines
+
+Please follow [Conventional Commits](docs/process/CONVENTIONAL_COMMITS.md) format:
+- `feat:` for new features (minor version bump)
+- `fix:` for bug fixes (patch version bump)
+- `feat!:` or `BREAKING CHANGE:` for breaking changes (major version bump)
+
+See [GitHub Tracking Guidelines](docs/process/GITHUB_TRACKING.md) for detailed process information.
 
 ## License
 
