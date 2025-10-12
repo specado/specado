@@ -1,0 +1,416 @@
+name: Release Publish
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Release version string
+        required: true
+        type: string
+      tag:
+        description: Git tag without refs prefix
+        required: true
+        type: string
+      is_prerelease:
+        description: Whether the version is a prerelease
+        required: true
+        type: boolean
+      npm_dist_tag:
+        description: npm dist-tag to publish under
+        required: true
+        type: string
+      artifact_name:
+        description: Name of the artifact bundle generated during packaging
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CRATE_PUBLISH_DELAY: 45
+  VERIFICATION_RETRY_DELAY: 30
+  VERIFICATION_MAX_ATTEMPTS: 5
+
+jobs:
+  validate_secrets:
+    name: Validate release secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required tokens
+        env:
+          TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          IS_PRERELEASE: ${{ inputs.is_prerelease }}
+        run: |
+          set -euo pipefail
+          missing=()
+          if [ -z "${TEST_PYPI_TOKEN}" ]; then
+            missing+=("TEST_PYPI_TOKEN")
+          fi
+          if [ -z "${NPM_TOKEN}" ]; then
+            missing+=("NPM_TOKEN")
+          fi
+          if [ -z "${CRATES_IO_TOKEN}" ]; then
+            missing+=("CRATES_IO_TOKEN")
+          fi
+          if [ "${IS_PRERELEASE}" != "true" ] && [ -z "${PYPI_TOKEN}" ]; then
+            missing+=("PYPI_TOKEN (required for production releases)")
+          fi
+          if [ "${#missing[@]}" -ne 0 ]; then
+            for key in "${missing[@]}"; do
+              echo "::error::Missing required secret: ${key}"
+            done
+            exit 1
+          fi
+
+  publish_testpypi:
+    name: Publish to Test PyPI
+    runs-on: ubuntu-latest
+    needs: validate_secrets
+    environment: release
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: artifacts
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
+
+      - name: Publish to Test PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}
+          TWINE_NON_INTERACTIVE: 1
+        run: |
+          set -euo pipefail
+          python -m twine upload \
+            --repository-url https://test.pypi.org/legacy/ \
+            --disable-progress-bar \
+            --skip-existing \
+            artifacts/python/*
+
+  publish_npm:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs:
+      - validate_secrets
+      - publish_testpypi
+    environment: release
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: artifacts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish npm tarball
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(artifacts/npm/*.tgz)
+          if [[ ${#files[@]} -ne 1 ]]; then
+            echo "Expected exactly one npm tarball, found ${#files[@]}" >&2
+            ls -l artifacts/npm
+            exit 1
+          fi
+          npm publish "${files[0]}" --tag "$NPM_DIST_TAG"
+
+  publish_crates:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    needs:
+      - validate_secrets
+      - publish_testpypi
+    environment: release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify crate versions
+        env:
+          TAG_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          python scripts/check_crate_versions.py "${TAG_VERSION}"
+
+      - name: Publish crates sequentially
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          set -euo pipefail
+          CRATES=(specado-core specado-schemas specado-providers specado-cli)
+          for crate in "${CRATES[@]}"; do
+            echo "::group::Publishing ${crate}"
+            cargo publish --package "${crate}" --locked
+            echo "::endgroup::"
+            if [[ "${crate}" != "specado-cli" ]]; then
+              echo "Waiting for crate index propagation..."
+              sleep "${CRATE_PUBLISH_DELAY}"
+            fi
+          done
+
+  publish_pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs:
+      - validate_secrets
+      - publish_testpypi
+      - publish_npm
+      - publish_crates
+    if: ${{ inputs.is_prerelease == false }}
+    environment: release
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: artifacts
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+          TWINE_NON_INTERACTIVE: 1
+        run: |
+          set -euo pipefail
+          python -m twine upload \
+            --disable-progress-bar \
+            --skip-existing \
+            artifacts/python/*
+
+  verify_release:
+    name: Verify published artifacts
+    runs-on: ubuntu-latest
+    needs:
+      - validate_secrets
+      - publish_testpypi
+      - publish_npm
+      - publish_crates
+      - publish_pypi
+    if: ${{ inputs.is_prerelease == false }}
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify npm package
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 "${VERIFICATION_MAX_ATTEMPTS}"); do
+            if npm view specado@"$VERSION" version >/dev/null 2>&1; then
+              break
+            fi
+            if [[ $attempt -eq ${VERIFICATION_MAX_ATTEMPTS} ]]; then
+              echo "npm package not available after retries" >&2
+              exit 1
+            fi
+            echo "npm package not yet available (attempt ${attempt}); retrying in ${VERIFICATION_RETRY_DELAY}s..."
+            sleep "${VERIFICATION_RETRY_DELAY}"
+          done
+          mkdir verify-npm
+          cd verify-npm
+          npm init -y >/dev/null
+          npm install specado@"$VERSION" >/dev/null
+          npx --yes specado --help >/dev/null
+
+      - name: Verify PyPI package
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          python -m venv verify-py
+          source verify-py/bin/activate
+          python -m pip install --upgrade pip
+          for attempt in $(seq 1 "${VERIFICATION_MAX_ATTEMPTS}"); do
+            if python -m pip install "specado==${VERSION}"; then
+              break
+            fi
+            if [[ $attempt -eq ${VERIFICATION_MAX_ATTEMPTS} ]]; then
+              echo "PyPI package not available after retries" >&2
+              exit 1
+            fi
+            echo "PyPI package not yet available (attempt ${attempt}); retrying in ${VERIFICATION_RETRY_DELAY}s..."
+            sleep "${VERIFICATION_RETRY_DELAY}"
+          done
+          python -c "import specado; print(specado.__version__)"
+
+      - name: Verify crates.io package
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 "${VERIFICATION_MAX_ATTEMPTS}"); do
+            if cargo install specado-cli --version "$VERSION" --locked --root "$PWD/verify-cargo" --force; then
+              break
+            fi
+            if [[ $attempt -eq ${VERIFICATION_MAX_ATTEMPTS} ]]; then
+              echo "crates.io package not available after retries" >&2
+              exit 1
+            fi
+            echo "crates.io package not yet available (attempt ${attempt}); retrying in ${VERIFICATION_RETRY_DELAY}s..."
+            sleep "${VERIFICATION_RETRY_DELAY}"
+          done
+          "$PWD/verify-cargo/bin/specado" --help >/dev/null
+
+  github_release:
+    name: Publish GitHub release
+    runs-on: ubuntu-latest
+    needs:
+      - validate_secrets
+      - publish_testpypi
+      - publish_npm
+      - publish_crates
+      - publish_pypi
+      - verify_release
+    if: |
+      always() &&
+      needs.publish_testpypi.result == 'success' &&
+      needs.publish_npm.result == 'success' &&
+      needs.publish_crates.result == 'success' &&
+      (needs.publish_pypi.result == 'success' || needs.publish_pypi.result == 'skipped') &&
+      (needs.verify_release.result == 'success' || needs.verify_release.result == 'skipped')
+    steps:
+      - name: Create or update GitHub Release
+        uses: actions/github-script@v7
+        env:
+          VERSION: ${{ inputs.version }}
+          TAG: ${{ inputs.tag }}
+          IS_PRERELEASE: ${{ inputs.is_prerelease }}
+          NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+        with:
+          script: |
+            const version = process.env.VERSION;
+            const tag = process.env.TAG;
+            const prerelease = process.env.IS_PRERELEASE === 'true';
+            const npmTag = process.env.NPM_DIST_TAG;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pythonInstall = prerelease
+              ? `pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple specado==${version}`
+              : `pip install specado==${version}`;
+            const bodyLines = [
+              '## Installation',
+              '',
+              `**npm (${npmTag} dist-tag)**`,
+              '```bash',
+              `npm install specado@${version}`,
+              '```',
+              '',
+              `**Python${prerelease ? ' (Test PyPI)' : ''}**`,
+              '```bash',
+              pythonInstall,
+              '```',
+              '',
+              '**Rust**',
+              '```toml',
+              `specado = "${version}"`,
+              '```',
+              '',
+              'Artifacts for this tag (npm tarball, Python wheels/sdist, CLI tarball, and SHA256 manifest) are attached to the workflow run and available from the respective registries.'
+            ];
+            const body = bodyLines.join('\n');
+
+            async function createOrUpdateRelease() {
+              try {
+                const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+                await github.rest.repos.updateRelease({
+                  owner,
+                  repo,
+                  release_id: release.data.id,
+                  tag_name: tag,
+                  name: prerelease ? `Pre-release ${tag}` : `Release ${tag}`,
+                  body,
+                  prerelease
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  await github.rest.repos.createRelease({
+                    owner,
+                    repo,
+                    tag_name: tag,
+                    name: prerelease ? `Pre-release ${tag}` : `Release ${tag}`,
+                    body,
+                    prerelease
+                  });
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+            await createOrUpdateRelease();
+
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: artifacts
+
+      - name: Upload release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=()
+          if [[ -f artifacts/SHA256SUMS ]]; then
+            assets+=("artifacts/SHA256SUMS")
+          fi
+          for file in artifacts/cli/*.tar.gz; do
+            assets+=("$file")
+          done
+          if [[ ${#assets[@]} -eq 0 ]]; then
+            echo "No release assets to upload."
+            exit 0
+          fi
+          gh release upload "$TAG" "${assets[@]}" --clobber
