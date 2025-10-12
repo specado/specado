@@ -301,11 +301,29 @@ jobs:
         run: |
           set -euo pipefail
           CRATES=(specado-core specado-schemas specado-providers specado-cli)
+          publishable=()
           for crate in "${CRATES[@]}"; do
+            manifest="crates/${crate}/Cargo.toml"
+            if [[ ! -f "${manifest}" ]]; then
+              echo "Skipping ${crate}: manifest ${manifest} not found."
+              continue
+            fi
+            if grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*false' "${manifest}" || \
+               grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*\[[[:space:]]*\]' "${manifest}"; then
+              echo "Skipping ${crate}: publish=false in Cargo.toml"
+              continue
+            fi
+            publishable+=("${crate}")
+          done
+          if [[ ${#publishable[@]} -eq 0 ]]; then
+            echo "No crates configured for publication; skipping crates.io publish."
+            exit 0
+          fi
+          for crate in "${publishable[@]}"; do
             echo "::group::Publishing ${crate}"
             cargo publish --package "${crate}" --locked
             echo "::endgroup::"
-            if [[ "${crate}" != "specado-cli" ]]; then
+            if [[ "${crate}" != "${publishable[-1]}" ]]; then
               echo "Waiting for crate index propagation..."
               sleep 45
             fi
