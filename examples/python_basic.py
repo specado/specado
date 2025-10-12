@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Minimal Specado Python example for Issue #50.
+"""Specado Python demo covering reasoning (OpenAI) and thinking (Anthropic).
 
-The script loads the sample prompt in ``examples/prompts/basic_chat.json`` and executes
-it against the provider spec supplied on the command line. Build the native extension
-via ``maturin develop -m crates/specado-py/Cargo.toml`` before running this file.
+Build the native extension first via ``maturin develop -m crates/specado-py/Cargo.toml``.
+By default the script points at the richer demo prompts that ship with ``examples/``.
+Use ``--scenario`` to switch between GPT-5 reasoning and Claude Sonnet thinking flows.
 """
 
 from __future__ import annotations
@@ -25,6 +25,22 @@ from specado import Message as PromptMessage
 from specado.compat.openai import OpenAI
 
 
+SCENARIOS = {
+    "openai-reasoning": {
+        "provider": "crates/specado-providers/providers/openai/gpt-5/base.yaml",
+        "prompt": "examples/prompts/openai_reasoning.json",
+        "api_key": "OPENAI_API_KEY",
+        "description": "GPT-5 reasoning controls",
+    },
+    "anthropic-thinking": {
+        "provider": "crates/specado-providers/providers/anthropic/claude-4.5/sonnet.yaml",
+        "prompt": "examples/prompts/anthropic_thinking.json",
+        "api_key": "ANTHROPIC_API_KEY",
+        "description": "Claude Sonnet thinking mode",
+    },
+}
+
+
 def load_prompt(path: pathlib.Path) -> Dict[str, Any]:
     data = path.read_text()
     suffix = path.suffix.lower()
@@ -40,12 +56,13 @@ def load_prompt(path: pathlib.Path) -> Dict[str, Any]:
     return json.loads(data)
 
 
-def ensure_api_key() -> None:
-    if "OPENAI_API_KEY" not in os.environ:
-        print(
-            "warning: OPENAI_API_KEY is not set. The provider call will likely fail.",
-            file=sys.stderr,
-        )
+def ensure_api_key(var_name: str) -> None:
+    if var_name in os.environ:
+        return
+    print(
+        f"warning: {var_name} is not set. The provider call will likely fail.",
+        file=sys.stderr,
+    )
 
 
 def run_native_client(args: argparse.Namespace, prompt_payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -61,10 +78,12 @@ def run_native_client(args: argparse.Namespace, prompt_payload: Dict[str, Any]) 
 def run_openai_compat(args: argparse.Namespace, prompt_payload: Dict[str, Any]) -> Dict[str, Any]:
     client = OpenAI(args.provider)
     prompt = PromptSpec(
+        version=prompt_payload.get("version", "1"),
         messages=[
             PromptMessage(role=message["role"], content=message["content"])
             for message in prompt_payload["messages"]
-        ]
+        ],
+        strict_mode=prompt_payload.get("strict_mode", "Warn"),
     )
     completion = client.chat.completions.create(
         model=prompt_payload.get("model", "gpt-5"),
@@ -82,12 +101,15 @@ def run_openai_compat(args: argparse.Namespace, prompt_payload: Dict[str, Any]) 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the Specado Python example")
+    parser = argparse.ArgumentParser(description="Run the Specado Python demo")
     parser.add_argument(
-        "--provider",
-        default="crates/specado-providers/providers/openai/gpt-5/base.yaml",
+        "--scenario",
+        choices=sorted(SCENARIOS),
+        default="openai-reasoning",
+        help="Select which demo prompt to execute",
     )
-    parser.add_argument("--prompt", default="examples/prompts/basic_chat.json")
+    parser.add_argument("--provider")
+    parser.add_argument("--prompt")
     parser.add_argument("--watch", action="store_true", help="Enable experimental watch plumbing")
     parser.add_argument("--audit", action="store_true", help="Send audit logs to stdout")
     parser.add_argument(
@@ -102,17 +124,32 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    prompt_path = pathlib.Path(args.prompt)
+    scenario = SCENARIOS[args.scenario]
+    provider_path = args.provider or scenario["provider"]
+    prompt_path_value = args.prompt or scenario["prompt"]
+
+    args.provider = provider_path
+    args.prompt = prompt_path_value
+
+    prompt_path = pathlib.Path(prompt_path_value)
     prompt_payload = load_prompt(prompt_path)
 
-    ensure_api_key()
+    ensure_api_key(scenario["api_key"])
 
     if args.openai_compat:
+        if args.scenario != "openai-reasoning":
+            raise SystemExit("OpenAI compatibility mode only works with the GPT-5 scenario.")
         response = run_openai_compat(args, prompt_payload)
     else:
         response = run_native_client(args, prompt_payload)
 
     print(json.dumps(response, indent=2))
+
+
+    print(
+        f"\nCompleted scenario '{args.scenario}' ({scenario['description']}) using provider {provider_path} and prompt {prompt_path}",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":

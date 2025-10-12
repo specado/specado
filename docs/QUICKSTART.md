@@ -92,7 +92,7 @@ OPENAI_API_KEY=sk-your-key \
   --provider crates/specado-providers/providers/openai/gpt-5/base.yaml
 ```
 
-The helper script `examples/cli_preview.sh` wraps the preview command and documents the expected environment when you need a quick smoke test.
+The helper script `examples/cli_preview.sh` wraps the preview command and documents the expected environment when you need a quick smoke test. For a richer walkthrough, `examples/cli_demo.sh` previews and (when API keys are present) runs the reasoning/thinking prompts that also power the Python and Node demos.
 
 > **Model metadata & overlays**
 > The sample prompt `examples/prompts/basic_chat.json` includes metadata that targets OpenAI's GPT-5 Responses API (`openai_model`, reasoning effort, verbosity, max output tokens) and Anthropic's Claude Sonnet 4.5 (`anthropic_model`, thinking configuration, and max tokens). Tweak these fields to match the models and limits available to your account. The provider specs declare neutral interfaces (see `docs/process/INTERFACE_TAXONOMY.md`), while per-adapter defaults live in `overlays/`. Refer to `docs/PROVIDER_SPEC.md` for the full YAML schema and authoring guidelines, and `docs/process/PROVIDER_INHERITANCE.md` for inheritance patterns.
