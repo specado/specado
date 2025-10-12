@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - 'v*.*.*'
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -25,29 +24,25 @@ jobs:
   test:
     needs: prepare
     uses: ./.github/workflows/release-test.yml
-    with:
-      skip_release: ${{ needs.prepare.outputs.skip_release }}
 
   package:
     needs:
       - prepare
       - test
-    if: ${{ needs.test.result == 'success' }}
     uses: ./.github/workflows/release-package.yml
+    if: ${{ needs.prepare.result == 'success' }}
     with:
       version: ${{ needs.prepare.outputs.version || '' }}
-      skip_release: ${{ needs.prepare.outputs.skip_release }}
 
   publish:
     needs:
       - prepare
       - package
-    if: ${{ needs.package.result == 'success' }}
     uses: ./.github/workflows/release-publish.yml
+    if: ${{ needs.prepare.result == 'success' && needs.package.result == 'success' }}
     with:
       version: ${{ needs.prepare.outputs.version || '' }}
       tag: ${{ needs.prepare.outputs.tag || '' }}
       is_prerelease: ${{ (needs.prepare.outputs.is_prerelease || 'false') == 'true' }}
       npm_dist_tag: ${{ needs.prepare.outputs.npm_dist_tag || 'latest' }}
       artifact_name: ${{ needs.package.outputs.artifact_name || '' }}
-      skip_release: ${{ needs.prepare.outputs.skip_release }}

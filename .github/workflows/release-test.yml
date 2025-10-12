@@ -2,12 +2,6 @@ name: Release Test
 
 on:
   workflow_call:
-    inputs:
-      skip_release:
-        description: Whether to skip this job
-        required: false
-        type: string
-        default: "false"
 
 env:
   CARGO_TERM_COLOR: always
@@ -16,7 +10,6 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    if: ${{ inputs.skip_release != 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
