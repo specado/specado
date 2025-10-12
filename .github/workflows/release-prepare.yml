@@ -15,6 +15,9 @@ on:
       npm_dist_tag:
         description: npm dist-tag to use for this release
         value: ${{ jobs.prepare.outputs.npm_dist_tag }}
+      skip_release:
+        description: Whether downstream jobs should be skipped
+        value: ${{ jobs.prepare.outputs.skip_release }}
 
 jobs:
   prepare:
@@ -24,19 +27,31 @@ jobs:
       tag: ${{ steps.meta.outputs.tag }}
       is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
       npm_dist_tag: ${{ steps.meta.outputs.npm_dist_tag }}
+      skip_release: ${{ steps.meta.outputs.skip_release }}
     steps:
       - name: Compute release metadata
         id: meta
         run: |
           set -euo pipefail
-          TAG="${GITHUB_REF#refs/tags/}"
-          VERSION="${TAG#v}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if [[ "$VERSION" == *-* ]]; then
-            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
-            echo "npm_dist_tag=beta" >> "$GITHUB_OUTPUT"
+          REF="${GITHUB_REF}"
+          if [[ "$REF" == refs/tags/v* ]]; then
+            TAG="${REF#refs/tags/}"
+            VERSION="${TAG#v}"
+            echo "skip_release=false" >> "$GITHUB_OUTPUT"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            if [[ "$VERSION" == *-* ]]; then
+              echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+              echo "npm_dist_tag=beta" >> "$GITHUB_OUTPUT"
+            else
+              echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+              echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
+            fi
           else
+            echo "skip_release=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$REF" >> "$GITHUB_OUTPUT"
+            echo "version=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
             echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "Non-tag invocation detected; downstream release jobs will be skipped."
           fi

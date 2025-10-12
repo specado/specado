@@ -19,20 +19,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  guard:
-    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip non-tag invocations
-        run: echo 'Release workflow only runs for v* tags.'
-
   prepare:
-    if: startsWith(github.ref, "refs/tags/v")
     uses: ./.github/workflows/release-prepare.yml
 
   test:
-    if: startsWith(github.ref, "refs/tags/v")
     needs: prepare
+    if: ${{ needs.prepare.outputs.skip_release != 'true' }}
     uses: ./.github/workflows/release-test.yml
 
   package:
@@ -40,7 +32,7 @@ jobs:
       - prepare
       - test
     uses: ./.github/workflows/release-package.yml
-    if: ${{ needs.prepare.result == 'success' }}
+    if: ${{ needs.prepare.outputs.skip_release != 'true' && needs.test.result == 'success' }}
     with:
       version: ${{ needs.prepare.outputs.version || '' }}
 
@@ -49,7 +41,7 @@ jobs:
       - prepare
       - package
     uses: ./.github/workflows/release-publish.yml
-    if: ${{ needs.prepare.result == 'success' && needs.package.result == 'success' }}
+    if: ${{ needs.prepare.outputs.skip_release != 'true' && needs.package.result == 'success' }}
     with:
       version: ${{ needs.prepare.outputs.version || '' }}
       tag: ${{ needs.prepare.outputs.tag || '' }}
