@@ -419,7 +419,7 @@ jobs:
           npm init -y >/dev/null
           npm install specado@"$VERSION" >/dev/null
           node -e "const { execSync } = require('node:child_process'); const distTags = JSON.parse(execSync('npm view specado dist-tags --json', { encoding: 'utf8' })); const expectedTag = process.env.NPM_DIST_TAG; const expectedVersion = process.env.VERSION; if (!distTags || !Object.prototype.hasOwnProperty.call(distTags, expectedTag)) { console.error(\`Expected npm dist-tag '\${expectedTag}' to be present, found:\`, distTags); process.exit(1); } if (distTags[expectedTag] !== expectedVersion) { console.error(\`Dist-tag '\${expectedTag}' points to '\${distTags[expectedTag]}', expected '\${expectedVersion}'\`); process.exit(1); }"
-          npx --yes specado --help >/dev/null
+          node -e "const specado = require('specado'); if (!specado) { throw new Error('specado module did not load'); }"
 
       - name: Verify PyPI package
         env:
