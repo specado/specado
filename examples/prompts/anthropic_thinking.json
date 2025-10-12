@@ -13,12 +13,12 @@
   "strict_mode": "Warn",
   "metadata": {
     "anthropic_model": "claude-sonnet-4-5-20250929",
-    "anthropic_max_tokens": 512,
+    "anthropic_max_tokens": 1024,
     "thinking": {
       "type": "enabled",
-      "budget_tokens": 640
+      "budget_tokens": 1024
     },
     "anthropic_thinking_type": "enabled",
-    "anthropic_thinking_budget": 640
+    "anthropic_thinking_budget": 1024
   }
 }

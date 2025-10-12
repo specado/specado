@@ -52,7 +52,7 @@ pub async fn execute(
         Err(err) => {
             #[cfg(feature = "audit-logging")]
             if let Some(ctx) = audit.as_mut() {
-                ctx.record_error(None, &err);
+                ctx.record_error(None, &err, None);
             }
             return Err(err);
         }
@@ -66,7 +66,7 @@ pub async fn execute(
     if prompt.strict_mode == StrictMode::Strict && lossiness.is_lossy {
         #[cfg(feature = "audit-logging")]
         if let Some(ctx) = audit.as_mut() {
-            ctx.record_error(Some(&translated), &Error::StrictModeViolation);
+            ctx.record_error(Some(&translated), &Error::StrictModeViolation, None);
         }
         return Err(Error::StrictModeViolation);
     }
@@ -96,7 +96,7 @@ pub async fn execute(
             let error = Error::Http(err);
             #[cfg(feature = "audit-logging")]
             if let Some(ctx) = audit.as_mut() {
-                ctx.record_error(Some(&translated), &error);
+                ctx.record_error(Some(&translated), &error, None);
             }
             return Err(error);
         }
@@ -107,13 +107,28 @@ pub async fn execute(
         let kind = map_status_to_provider_error(status);
         #[cfg(feature = "audit-logging")]
         if let Some(ctx) = audit.as_mut() {
+            let body_text = response.text().await.unwrap_or_default();
+            let body_value = if body_text.trim().is_empty() {
+                Value::Null
+            } else {
+                serde_json::from_str(&body_text).unwrap_or_else(|_| Value::String(body_text))
+            };
             ctx.record_error(
                 Some(&translated),
                 &Error::Provider {
                     provider: provider_spec.provider.clone(),
                     kind: kind.clone(),
                 },
+                Some(&body_value),
             );
+            return Err(Error::Provider {
+                provider: provider_spec.provider.clone(),
+                kind,
+            });
+        }
+        #[cfg(not(feature = "audit-logging"))]
+        {
+            let _ = response.text().await;
         }
         return Err(Error::Provider {
             provider: provider_spec.provider.clone(),

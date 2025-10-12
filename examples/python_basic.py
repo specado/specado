@@ -41,6 +41,49 @@ SCENARIOS = {
 }
 
 
+def config_env_path() -> pathlib.Path:
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA")
+        if base is None:
+            base = pathlib.Path.home() / "AppData" / "Roaming"
+        else:
+            base = pathlib.Path(base)
+        return base / "specado" / ".env"
+
+    if sys.platform == "darwin":
+        return pathlib.Path.home() / "Library" / "Application Support" / "specado" / ".env"
+
+    base = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", pathlib.Path.home() / ".config"))
+    return base / "specado" / ".env"
+
+
+def load_env_file(path: pathlib.Path, override: bool) -> None:
+    try:
+        data = path.read_text().splitlines()
+    except FileNotFoundError:
+        return
+    except OSError as exc:  # pragma: no cover - best effort logging
+        print(f"warning: unable to read {path}: {exc}", file=sys.stderr)
+        return
+
+    for raw_line in data:
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+        if override or key not in os.environ:
+            os.environ[key] = value
+
+
+def load_env() -> None:
+    load_env_file(config_env_path(), override=False)
+    load_env_file(pathlib.Path(".env"), override=True)
+
+
 def load_prompt(path: pathlib.Path) -> Dict[str, Any]:
     data = path.read_text()
     suffix = path.suffix.lower()
@@ -101,6 +144,7 @@ def run_openai_compat(args: argparse.Namespace, prompt_payload: Dict[str, Any]) 
 
 
 def main() -> None:
+    load_env()
     parser = argparse.ArgumentParser(description="Run the Specado Python demo")
     parser.add_argument(
         "--scenario",

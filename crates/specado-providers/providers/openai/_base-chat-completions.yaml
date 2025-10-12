@@ -15,12 +15,16 @@ endpoints:
 
 mappings:
   request:
+    - from: "$.metadata.openai_model"
+      to: "$.model"
     - from: "$.messages"
       to: "$.messages"
     - from: "$.sampling.temperature"
       to: "$.temperature"
     - from: "$.sampling.top_p"
       to: "$.top_p"
+    - from: "$.metadata.openai_max_output_tokens"
+      to: "$.max_tokens"
   response:
     - from: "$.choices[0].message.content"
       to: "content"

@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use serde_json::Value as JsonValue;
-use specado_core::{PromptSpec, ProviderSpec};
+use specado_core::PromptSpec;
 use std::fs;
 use std::path::Path;
 
@@ -29,18 +29,6 @@ pub fn load_prompt_spec(path: &Path) -> Result<PromptSpec> {
         Ok(spec) => Ok(spec),
         Err(json_err) => serde_yaml::from_str(&content).map_err(|yaml_err| {
             anyhow!("Failed to parse prompt spec as JSON ({json_err}) or YAML ({yaml_err})")
-        }),
-    }
-}
-
-pub fn load_provider_spec(path: &Path) -> Result<ProviderSpec> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read provider spec: {}", path.display()))?;
-
-    match serde_yaml::from_str(&content) {
-        Ok(spec) => Ok(spec),
-        Err(yaml_err) => serde_json::from_str(&content).map_err(|json_err| {
-            anyhow!("Failed to parse provider spec as YAML ({yaml_err}) or JSON ({json_err})")
         }),
     }
 }

@@ -1,51 +1,53 @@
-# Examples Overview
+# Examples
 
-This directory contains runnable samples that mirror the quickstart in `docs/QUICKSTART.md` and support Issue #50 (Docs, Tests, Benches, Examples Scaffolding).
+This directory contains a set of examples to help you get started with Specado.
 
-## Assets
-- `prompts/basic_chat.json` — Minimal chat prompt shared by all examples.
-- `prompts/openai_reasoning.json` — GPT-5 prompt that exercises reasoning controls.
-- `prompts/anthropic_thinking.json` — Claude Sonnet prompt with thinking enabled.
-- `cli_preview.sh` — Minimal wrapper around `specado preview` for ad-hoc checks.
-- `cli_demo.sh` — Runs the reasoning/thinking prompts via `specado preview`/`run`.
-- `python_basic.py` — Python demo supporting `--scenario {openai-reasoning,anthropic-thinking}` plus OpenAI compatibility mode.
-- `node_basic.mjs` — Node.js demo with the same scenarios and optional audit/watch toggles.
+Before running these examples, please make sure you have followed the installation instructions in the main [README.md](../README.md). Specado looks for API keys in `~/.config/specado/.env` on Linux, `~/Library/Application Support/specado/.env` on macOS, and `%AppData%\specado\.env` on Windows before falling back to a local `.env`; create one of those files if you don't want to export variables manually (`mkdir -p ~/.config/specado` on Linux, `mkdir -p "$HOME/Library/Application Support/specado"` on macOS).
 
-## Usage
-Follow the instructions in the quickstart to build the CLI, Python extension, and Node module. Each script accepts optional flags to point at different specs, enable audit logging, or turn on watch plumbing.
+## CLI Demo
 
-### CLI
+The `cli_demo.sh` script demonstrates how to use the `specado` CLI to interact with the advanced features of different providers.
 
-Ensure the CLI binary is built (`cargo build -p specado-cli`). Then:
+### Usage
+
+The script relies on the same environment loading rules (global config, local `.env`, or exported variables). Set up at least one of those locations with `OPENAI_API_KEY` and `ANTHROPIC_API_KEY`.
 
 ```sh
 ./examples/cli_demo.sh
 ```
 
-The script previews both demo prompts and executes live calls when `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` are present. Set `SPECADO_BIN` to point at a custom binary if you prefer not to use `cargo run`.
+## Python Example
 
-### Python
+The `python_basic.py` script shows how to use the Specado Python library.
 
-After `maturin develop -m crates/specado-py/Cargo.toml`, invoke:
+### Usage
 
 ```sh
+# Run the OpenAI reasoning demo
 python examples/python_basic.py --scenario openai-reasoning
+
+# Run the Anthropic thinking demo
 python examples/python_basic.py --scenario anthropic-thinking
 ```
 
-Add `--openai-compat` on the first command to exercise the compatibility shim.
+## Node.js Example
 
-### Node.js
+The `node_basic.mjs` script shows how to use the Specado Node.js library.
 
-Build the napi module (`(cd crates/specado-node && npm install && npm run build)`) and run:
+### Usage
 
 ```sh
+# Run the OpenAI reasoning demo
 node examples/node_basic.mjs --scenario openai-reasoning
+
+# Run the Anthropic thinking demo
 node examples/node_basic.mjs --scenario anthropic-thinking
 ```
 
-Use `--audit` or `--watch` to toggle optional features.
+## Prompts
 
-When adapting a sample for a new provider or model, consult `docs/PROVIDER_SPEC.md` for the spec format and metadata keys that need to be supplied in the prompt.
+This directory also contains the JSON prompt files that are used by the examples:
 
-These samples are intentionally lightweight; add new fixtures alongside them when demonstrating additional providers or prompt types.
+*   `prompts/basic_chat.json`: A minimal chat prompt.
+*   `prompts/openai_reasoning.json`: A prompt that demonstrates OpenAI's reasoning controls.
+*   `prompts/anthropic_thinking.json`: A prompt that demonstrates Anthropic's thinking mode.

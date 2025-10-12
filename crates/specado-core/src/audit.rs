@@ -120,6 +120,7 @@ impl AuditContext {
             latency_ms,
             status: AuditStatus::Success,
             error_kind: None,
+            error_message: None,
             lossiness: Some(lossiness.clone()),
             request_redacted: request,
             response_excerpt: Some(response_excerpt),
@@ -132,7 +133,12 @@ impl AuditContext {
         }
     }
 
-    pub fn record_error(&mut self, translated_request: Option<&Value>, error: &Error) {
+    pub fn record_error(
+        &mut self,
+        translated_request: Option<&Value>,
+        error: &Error,
+        response_excerpt: Option<&Value>,
+    ) {
         if !self.config.is_enabled() {
             return;
         }
@@ -149,9 +155,10 @@ impl AuditContext {
             latency_ms,
             status: AuditStatus::Error,
             error_kind: Some(error_to_kind(error)),
+            error_message: Some(error.to_string()),
             lossiness: None,
             request_redacted: request,
-            response_excerpt: None,
+            response_excerpt: response_excerpt.cloned(),
         };
 
         if let Some(logger) = self.logger.as_mut() {
@@ -276,6 +283,8 @@ struct AuditEvent {
     #[serde(skip_serializing_if = "Option::is_none")]
     error_kind: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    error_message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     lossiness: Option<LossinessReport>,
     request_redacted: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -283,8 +292,8 @@ struct AuditEvent {
 }
 
 const DEFAULT_REDACTION: &[&str] = &[
-    "(?i)authorization",
-    "(?i)token",
+    "(?i)^authorization$",
+    "(?i)^bearer$",
     "(?i)secret",
     "(?i)api[-_]?key",
 ];
@@ -374,6 +383,6 @@ mod tests {
     #[test]
     fn audit_context_records_error_without_panic() {
         let mut ctx = AuditContext::new(AuditConfig::disabled());
-        ctx.record_error(None, &Error::StrictModeViolation);
+        ctx.record_error(None, &Error::StrictModeViolation, None);
     }
 }
