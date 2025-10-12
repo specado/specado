@@ -2,6 +2,8 @@
 // Specado Node demo showcasing reasoning (OpenAI) and thinking (Anthropic).
 
 import { readFile } from 'node:fs/promises';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -111,7 +113,44 @@ function warnIfNoApiKey(varName) {
   }
 }
 
+function configEnvPath() {
+  if (process.platform === 'win32') {
+    const base = process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming');
+    return base ? path.join(base, 'specado', '.env') : null;
+  }
+  const base = process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config');
+  return path.join(base, 'specado', '.env');
+}
+
+function loadEnvFile(filePath, { override }) {
+  if (!filePath) return;
+  try {
+    const data = fs.readFileSync(filePath, 'utf8');
+    for (const rawLine of data.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#') || !line.includes('=')) continue;
+      const idx = line.indexOf('=');
+      const key = line.slice(0, idx).trim();
+      const value = line.slice(idx + 1).trim();
+      if (!key) continue;
+      if (override || !(key in process.env)) {
+        process.env[key] = value;
+      }
+    }
+  } catch (error) {
+    if (error && error.code !== 'ENOENT') {
+      console.warn(`warning: failed to read ${filePath}: ${error.message ?? error}`);
+    }
+  }
+}
+
+function loadEnv() {
+  loadEnvFile(configEnvPath(), { override: false });
+  loadEnvFile(path.resolve('.env'), { override: true });
+}
+
 async function main() {
+  loadEnv();
   const args = parseArgs(process.argv.slice(2));
   const scenarioName = SCENARIOS[args.scenario] ? args.scenario : 'openai-reasoning';
   if (scenarioName !== args.scenario) {

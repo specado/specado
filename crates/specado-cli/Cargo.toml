@@ -24,6 +24,8 @@ serde_yaml.workspace = true
 specado-core = { workspace = true, features = ["hot-reload", "audit-logging"] }
 specado-schemas.workspace = true
 tokio.workspace = true
+dirs = "5.0"
+dotenvy = "0.15"
 
 [dev-dependencies]
 assert_cmd = "2.0"

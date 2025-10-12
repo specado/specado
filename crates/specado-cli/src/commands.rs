@@ -1,6 +1,6 @@
 use crate::chat;
 use crate::cli::{CompletionShell, ReasonEffort, RuntimeOptions};
-use crate::io::{load_prompt_spec, load_provider_spec, parse_to_json_value};
+use crate::io::{load_prompt_spec, parse_to_json_value};
 use crate::resolver::resolve_provider_path;
 use crate::runtime;
 use anyhow::{anyhow, Context, Result};
@@ -50,7 +50,15 @@ pub async fn preview_command(
     runtime::apply_hot_reload_config(&runtime, &provider_path);
 
     let prompt = load_prompt_spec(&prompt_path)?;
-    let provider = load_provider_spec(&provider_path)?;
+    let provider = ProviderCache::new()
+        .load_or_read(&provider_path)
+        .map_err(|err| {
+            anyhow!(
+                "Failed to load provider spec {}: {}",
+                provider_path.display(),
+                err
+            )
+        })?;
 
     let (translated, lossiness) = core_translate(&prompt, &provider)?;
 

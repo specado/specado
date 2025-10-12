@@ -32,9 +32,11 @@ mappings:
     - from: "$.messages"
       to: "$.messages"
   response:
-    - from: "$.output[?(@.type=='message')].content[0].text"
+    - from: "$.output_text[0]"
       to: "content"
-    - from: "$.output[?(@.type=='message')].status"
+    - from: "$.output[?(@.type=='message')].content[*].text"
+      to: "content"
+    - from: "$.output[?(@.type=='message')].stop_reason"
       to: "finish_reason"
 
 constraints:

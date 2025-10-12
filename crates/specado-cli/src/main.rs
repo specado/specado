@@ -8,10 +8,41 @@ mod runtime;
 use crate::cli::{Cli, Commands};
 use clap::Parser;
 use colored::Colorize;
+use std::path::PathBuf;
 use std::process;
+
+fn load_env() {
+    let mut errors = Vec::new();
+
+    if let Some(global) = config_env_path() {
+        if global.exists() {
+            if let Err(err) = dotenvy::from_path(&global) {
+                errors.push(format!("Failed to load {}: {}", global.display(), err));
+            }
+        }
+    }
+
+    if let Err(err) = dotenvy::dotenv_override() {
+        if !matches!(err, dotenvy::Error::Io(ref io_err) if io_err.kind() == std::io::ErrorKind::NotFound)
+        {
+            errors.push(format!("Failed to load .env: {}", err));
+        }
+    }
+
+    if !errors.is_empty() {
+        for error in errors {
+            eprintln!("{} {}", "warning:".yellow().bold(), error);
+        }
+    }
+}
+
+fn config_env_path() -> Option<PathBuf> {
+    dirs::config_dir().map(|dir| dir.join("specado").join(".env"))
+}
 
 #[tokio::main]
 async fn main() {
+    load_env();
     let cli = Cli::parse();
 
     let result = match cli.command {

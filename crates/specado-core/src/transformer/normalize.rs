@@ -26,7 +26,19 @@ pub fn normalize(raw: Value, provider: &ProviderSpec) -> Result<UniformResponse>
         match mapping.to.as_str() {
             "content" => {
                 if let Some(text) = value.as_str() {
-                    content = text.to_string();
+                    if !text.is_empty() {
+                        content = text.to_string();
+                    }
+                } else if let Some(array) = value.as_array() {
+                    let joined = array
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .filter(|s| !s.is_empty())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    if !joined.is_empty() {
+                        content = joined;
+                    }
                 }
             }
             "finish_reason" => {
@@ -138,6 +150,29 @@ mod tests {
         assert_eq!(response.content, "Hello");
         assert_eq!(response.finish_reason, FinishReason::Stop);
         assert_eq!(response.model, "gpt-4o");
+    }
+
+    #[test]
+    fn joins_array_content() {
+        let raw = json!({
+            "choices": [
+                {
+                    "message": {
+                        "content": [
+                            {"text": "Hello"},
+                            {"text": "world"}
+                        ]
+                    },
+                    "finish_reason": "stop"
+                }
+            ]
+        });
+
+        let mut provider = provider();
+        provider.mappings.response[0].from = "$.choices[0].message.content[*].text".into();
+
+        let response = normalize(raw, &provider).expect("normalize");
+        assert_eq!(response.content, "Hello world");
     }
 
     #[test]
