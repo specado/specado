@@ -1,5 +1,6 @@
 name: Release
-on:
+
+on:
   push:
     tags:
       - 'v*.*.*'
@@ -25,19 +26,31 @@ jobs:
       tag: ${{ steps.meta.outputs.tag }}
       is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
       npm_dist_tag: ${{ steps.meta.outputs.npm_dist_tag }}
+      run_release: ${{ steps.meta.outputs.run_release }}
     steps:
       - name: Compute release metadata
         id: meta
         run: |
           set -euo pipefail
-          TAG="${GITHUB_REF#refs/tags/}"
-          VERSION="${TAG#v}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if [[ "$VERSION" == *-* ]]; then
-            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
-            echo "npm_dist_tag=beta" >> "$GITHUB_OUTPUT"
+          REF="${GITHUB_REF}"
+          if [[ "$REF" == refs/tags/v* ]]; then
+            TAG="${REF#refs/tags/}"
+            VERSION="${TAG#v}"
+            echo "run_release=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            if [[ "$VERSION" == *-* ]]; then
+              echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+              echo "npm_dist_tag=beta" >> "$GITHUB_OUTPUT"
+            else
+              echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+              echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
+            fi
           else
+            SHORT_SHA="${GITHUB_SHA:0:7}"
+            echo "run_release=false" >> "$GITHUB_OUTPUT"
+            echo "tag=$REF" >> "$GITHUB_OUTPUT"
+            echo "version=$SHORT_SHA" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
             echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
           fi
@@ -46,6 +59,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     needs: prepare
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -123,6 +137,7 @@ PY
     needs:
       - prepare
       - test
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -194,6 +209,7 @@ PY
     needs:
       - prepare
       - package
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -231,6 +247,7 @@ PY
     needs:
       - prepare
       - package
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -266,6 +283,7 @@ PY
     needs:
       - prepare
       - package
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -298,7 +316,7 @@ PY
       - publish_testpypi
       - publish_npm
       - publish_crates
-    if: ${{ needs.prepare.outputs.is_prerelease == 'false' }}
+    if: ${{ needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.is_prerelease == 'false' }}
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -337,7 +355,7 @@ PY
       - publish_npm
       - publish_crates
       - publish_pypi
-    if: ${{ needs.prepare.outputs.is_prerelease == 'false' }}
+    if: ${{ needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.is_prerelease == 'false' }}
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -423,6 +441,7 @@ PY
       - publish_crates
       - publish_pypi
       - verify_release
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
     steps:
       - name: Create or update GitHub Release
         uses: actions/github-script@v7
