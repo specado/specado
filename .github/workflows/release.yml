@@ -84,6 +84,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install maturin twine pytest
 
+      - name: Create Python virtualenv for tests
+        run: python -m venv .venv
+
       - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
@@ -117,10 +120,16 @@ jobs:
           python -c "import sys, specado; from pathlib import Path; pkg_path = Path(specado.__file__).parent; native = list(pkg_path.glob('_native*.so')); print('Installed package path:', pkg_path); print('Native binaries:', native); sys.exit(0 if native else (print('specado wheel missing native extension', file=sys.stderr) or 1))"
 
       - name: Install python package from source for tests
-        run: maturin develop -m crates/specado-py/Cargo.toml --release
+        run: |
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install maturin
+          maturin develop -m crates/specado-py/Cargo.toml --release
 
       - name: Run Python tests
-        run: python -m pytest python/tests/ -v
+        run: |
+          source .venv/bin/activate
+          python -m pytest python/tests/ -v
 
   package:
     name: Package artifacts
