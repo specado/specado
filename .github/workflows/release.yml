@@ -474,8 +474,21 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: 'https://registry.npmjs.org'
+      - name: Check if npm version already exists
+        id: npm_version_check
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          if npm view specado@"$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "specado@$VERSION already published; skipping npm publish step."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Publish to npm
+        if: steps.npm_version_check.outputs.exists != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_DIST_TAG: ${{ needs.prepare.outputs.npm_dist_tag }}
@@ -489,6 +502,9 @@ jobs:
             exit 1
           fi
           npm publish "${files[0]}" --tag "$NPM_DIST_TAG"
+      - name: Confirm npm publish skipped
+        if: steps.npm_version_check.outputs.exists == 'true'
+        run: echo "npm publish skipped because version already exists."
 
   publish_crates:
     name: Publish to crates.io
