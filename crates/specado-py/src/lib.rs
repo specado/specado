@@ -8,7 +8,10 @@ use pyo3::wrap_pyfunction;
 use pythonize::{depythonize, pythonize};
 #[cfg(feature = "audit-logging")]
 use specado::audit::{AuditConfig, AuditContext};
-use specado::{execute, translate as core_translate, PromptSpec, ProviderSpec, UniformResponse};
+use specado::{
+    execute, translate as core_translate, ExecuteOptions, PromptSpec, ProviderSpec, UniformResponse,
+};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::runtime::{Builder, Runtime};
 
@@ -24,7 +27,9 @@ static RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
 
 #[pyclass]
 struct Client {
-    provider_path: String,
+    provider: String,
+    model: Option<String>,
+    providers_dir: Option<PathBuf>,
     _watch_enabled: bool,
     #[cfg(feature = "audit-logging")]
     audit_config: Option<AuditConfig>,
@@ -33,13 +38,16 @@ struct Client {
 #[pymethods]
 impl Client {
     #[new]
-    #[pyo3(signature = (provider_path, watch=None, audit_config=None))]
+    #[pyo3(signature = (provider, *, model=None, providers_dir=None, watch=None, audit_config=None))]
     fn new(
-        provider_path: String,
+        provider: String,
+        model: Option<String>,
+        providers_dir: Option<String>,
         watch: Option<bool>,
         audit_config: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let watch_enabled = watch.unwrap_or(false);
+        let providers_dir = providers_dir.map(PathBuf::from);
 
         #[cfg(feature = "audit-logging")]
         let audit_config = if let Some(cfg) = audit_config {
@@ -52,7 +60,9 @@ impl Client {
         };
 
         Ok(Self {
-            provider_path,
+            provider,
+            model,
+            providers_dir,
             _watch_enabled: watch_enabled,
             #[cfg(feature = "audit-logging")]
             audit_config,
@@ -64,7 +74,15 @@ impl Client {
         let prompt_json = depythonize::<serde_json::Value>(prompt)?;
         let prompt_spec: PromptSpec = serde_json::from_value(prompt_json)
             .map_err(|e| PyValueError::new_err(format!("Invalid prompt spec: {e}")))?;
-        let provider_path = self.provider_path.clone();
+        let provider = self.provider.clone();
+
+        let mut options = ExecuteOptions::default();
+        if let Some(model) = self.model.as_ref() {
+            options.model = Some(model.clone());
+        }
+        if let Some(dir) = self.providers_dir.as_ref() {
+            options.providers_dir = Some(dir.clone());
+        }
 
         #[cfg(feature = "audit-logging")]
         let audit_context = self.audit_config.clone().map(AuditContext::new);
@@ -75,7 +93,8 @@ impl Client {
                 runtime.block_on(async {
                     execute(
                         prompt_spec,
-                        &provider_path,
+                        &provider,
+                        options,
                         #[cfg(feature = "audit-logging")]
                         audit_context,
                     )

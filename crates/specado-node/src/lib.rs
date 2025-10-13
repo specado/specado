@@ -5,12 +5,14 @@ use napi_derive::napi;
 use serde::Deserialize;
 #[cfg(feature = "audit-logging")]
 use specado::audit::{AuditConfig, AuditContext, AuditTarget};
-use specado::{execute, PromptSpec, UniformResponse};
+use specado::{execute, ExecuteOptions, PromptSpec, UniformResponse};
 use std::path::PathBuf;
 
 #[napi]
 pub struct Client {
-    provider_path: String,
+    provider: String,
+    model: Option<String>,
+    providers_dir: Option<PathBuf>,
     _watch_enabled: bool,
     #[cfg(feature = "audit-logging")]
     audit_config: Option<AuditConfig>,
@@ -19,7 +21,7 @@ pub struct Client {
 #[napi]
 impl Client {
     #[napi(constructor)]
-    pub fn new(provider_path: String, options: Option<serde_json::Value>) -> Result<Self> {
+    pub fn new(provider: String, options: Option<serde_json::Value>) -> Result<Self> {
         let parsed: NodeClientOptions = options
             .map(|value| {
                 serde_json::from_value(value).map_err(|e| Error::from_reason(e.to_string()))
@@ -28,6 +30,8 @@ impl Client {
             .unwrap_or_default();
 
         let watch_enabled = parsed.watch.as_ref().map(|opt| opt.enable).unwrap_or(false);
+        let model = parsed.model.clone();
+        let providers_dir = parsed.providers_dir.as_ref().map(PathBuf::from);
 
         #[cfg(feature = "audit-logging")]
         let audit_config = if let Some(audit) = parsed.audit.as_ref() {
@@ -37,7 +41,9 @@ impl Client {
         };
 
         Ok(Self {
-            provider_path,
+            provider,
+            model,
+            providers_dir,
             _watch_enabled: watch_enabled,
             #[cfg(feature = "audit-logging")]
             audit_config,
@@ -52,9 +58,18 @@ impl Client {
         #[cfg(feature = "audit-logging")]
         let audit_context = self.audit_config.clone().map(AuditContext::new);
 
+        let mut options = ExecuteOptions::default();
+        if let Some(model) = self.model.as_ref() {
+            options.model = Some(model.clone());
+        }
+        if let Some(dir) = self.providers_dir.as_ref() {
+            options.providers_dir = Some(dir.clone());
+        }
+
         let response: UniformResponse = execute(
             prompt_spec,
-            &self.provider_path,
+            &self.provider,
+            options,
             #[cfg(feature = "audit-logging")]
             audit_context,
         )
@@ -70,6 +85,8 @@ impl Client {
 #[serde(default, rename_all = "camelCase")]
 struct NodeClientOptions {
     watch: Option<NodeWatchOptions>,
+    model: Option<String>,
+    providers_dir: Option<String>,
     audit: Option<NodeAuditOptions>,
 }
 

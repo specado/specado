@@ -7,7 +7,8 @@
     "index.js",
     "index.d.ts",
     "*.node",
-    "npm/**"
+    "npm/**",
+    "providers/**"
   ],
   "napi": {
     "name": "specado",
@@ -23,7 +24,9 @@
   "scripts": {
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
-    "prepublishOnly": "napi prepublish -t npm",
+    "bundle:providers": "node ./scripts/copy-providers.mjs",
+    "clean:providers": "node ./scripts/clean-providers.mjs",
+    "prepublishOnly": "npm run bundle:providers && napi prepublish -t npm && npm run clean:providers",
     "test": "node --test"
   },
   "dependencies": {

@@ -9,8 +9,8 @@ use colored::Colorize;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use specado::hot_reload::ProviderCache;
 use specado::{
-    execute, translate as core_translate, LossinessLevel, LossinessReport, Message, MessageRole,
-    SamplingConfig,
+    execute_from_path, translate as core_translate, LossinessLevel, LossinessReport, Message,
+    MessageRole, SamplingConfig,
 };
 use specado_schemas::get_validator;
 use std::path::PathBuf;
@@ -83,11 +83,9 @@ pub async fn run_command(
     let audit_context = runtime::build_audit_context(&runtime)?;
 
     let prompt = load_prompt_spec(&prompt_path)?;
-    let response = execute(
+    let response = execute_from_path(
         prompt,
-        provider_path
-            .to_str()
-            .ok_or_else(|| anyhow!("Provider path contains invalid UTF-8"))?,
+        &provider_path,
         #[cfg(feature = "audit-logging")]
         audit_context,
     )
