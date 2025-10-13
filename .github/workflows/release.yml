@@ -202,3 +202,5 @@ jobs:
       is_prerelease: ${{ needs.prepare.outputs.is_prerelease }}
       npm_dist_tag: ${{ needs.prepare.outputs.npm_dist_tag }}
       specado_pkg: ${{ needs.prepare.outputs.specado_pkg }}
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
