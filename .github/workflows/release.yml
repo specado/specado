@@ -62,20 +62,38 @@ jobs:
             echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-          for DIR in specado-schemas specado-core specado specado-cli; do
-            MANIFEST="crates/${DIR}/Cargo.toml"
-            if [[ ! -f "$MANIFEST" ]]; then
-              echo "warn: manifest $MANIFEST not found" >&2
-              continue
-            fi
-            PKG=$(sed -n 's/^name = "\(.*\)"/\1/p' "$MANIFEST" | head -n1)
-            if [[ -z "$PKG" ]]; then
-              echo "warn: unable to determine package name for $MANIFEST" >&2
-              continue
-            fi
-            KEY="${DIR//-/_}_pkg"
-            echo "${KEY}=${PKG}" >> "$GITHUB_OUTPUT"
-          done
+          python - <<'PY'
+import pathlib
+import sys
+
+try:
+    import tomllib  # Python 3.11+
+except ImportError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore
+
+root = pathlib.Path(__file__).resolve().parent.parent
+workspace = tomllib.loads((root / "Cargo.toml").read_text())
+workspace_deps = workspace.get("workspace", {}).get("dependencies", {})
+
+targets = ("specado-schemas", "specado-core", "specado", "specado-cli")
+for crate in targets:
+    pkg = None
+    dep = workspace_deps.get(crate)
+    if isinstance(dep, dict):
+        pkg = dep.get("package")
+
+    manifest = root / "crates" / crate / "Cargo.toml"
+    if not pkg and manifest.exists():
+        data = tomllib.loads(manifest.read_text())
+        pkg = data.get("package", {}).get("name")
+
+    if not pkg:
+        pkg = crate
+
+    key = crate.replace("-", "_") + "_pkg"
+    print(f"{key}={pkg}")
+PY
+| while IFS= read -r line; do echo "$line" >> "$GITHUB_OUTPUT"; done
 
   test:
     name: Test
