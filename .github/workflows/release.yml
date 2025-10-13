@@ -35,6 +35,9 @@ jobs:
       specado_pkg: ${{ steps.meta.outputs.specado_pkg }}
       specado_cli_pkg: ${{ steps.meta.outputs.specado_cli_pkg }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Compute release metadata
         id: meta
         run: |
@@ -62,37 +65,7 @@ jobs:
             echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-          python <<'PY'
-import pathlib
-import os
-
-try:
-    import tomllib  # Python 3.11+
-except ImportError:  # pragma: no cover
-    import tomli as tomllib  # type: ignore
-
-root = pathlib.Path(__file__).resolve().parent.parent
-workspace = tomllib.loads((root / "Cargo.toml").read_text())
-workspace_deps = workspace.get("workspace", {}).get("dependencies", {})
-
-for crate in ("specado-schemas", "specado-core", "specado", "specado-cli"):
-    pkg = None
-    dep = workspace_deps.get(crate)
-    if isinstance(dep, dict):
-        pkg = dep.get("package")
-
-    manifest = root / "crates" / crate / "Cargo.toml"
-    if pkg is None and manifest.exists():
-        data = tomllib.loads(manifest.read_text())
-        pkg = data.get("package", {}).get("name")
-
-    if pkg is None:
-        pkg = crate
-
-    key = crate.replace("-", "_") + "_pkg"
-    with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
-        fh.write(f"{key}={pkg}\n")
-PY
+          python scripts/emit_crate_packages.py
 
   test:
     name: Test
