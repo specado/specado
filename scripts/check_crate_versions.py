@@ -13,6 +13,7 @@ CRATES = (
     "specado-core",
     "specado-schemas",
     "specado-providers",
+    "specado",
     "specado-cli",
 )
 

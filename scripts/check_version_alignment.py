@@ -21,6 +21,18 @@ def main(expected_version: str) -> int:
         errors.append(
             f"Cargo workspace version {workspace_version} != {expected_version}"
         )
+    workspace_deps = workspace["workspace"].get("dependencies", {})
+    for crate in ("specado-core", "specado-schemas", "specado"):
+        spec = workspace_deps.get(crate)
+        if not spec:
+            errors.append(f"Missing workspace dependency entry for {crate}")
+            continue
+        version = spec.get("version")
+        expected_pin = f"={expected_version}"
+        if version != expected_pin:
+            errors.append(
+                f"workspace dependency {crate} version {version} != {expected_pin}"
+            )
 
     node_pkg = json.loads(
         (root / "crates" / "specado-node" / "package.json").read_text()
@@ -30,6 +42,12 @@ def main(expected_version: str) -> int:
         errors.append(
             f"specado-node package.json version {node_version} != {expected_version}"
         )
+    optional = node_pkg.get("optionalDependencies", {})
+    for name, value in sorted(optional.items()):
+        if name.startswith("specado-") and value != expected_version:
+            errors.append(
+                f"specado-node optional dependency {name} version {value} != {expected_version}"
+            )
 
     pyproject = tomllib.loads((root / "pyproject.toml").read_text())
     python_version = pyproject["project"]["version"]
