@@ -2,7 +2,7 @@
   <img src="docs/assets/specado-logo.svg" alt="Specado logo" width="260" />
 </p>
 
-<p align="center"><strong>From Fragile Scripts to Bulletproof Specs</strong></p>
+<h2 align="center">From Fragile Scripts to Bulletproof Specs</h2>
 
 <p align="center">
   <a href="https://github.com/specado/specado/actions/workflows/ci.yml">
@@ -107,13 +107,13 @@ See `specado --help` for the full matrix of flags (`--messages-file`, `--reason`
 
 | Field | Required | Purpose |
 | --- | --- | --- |
-| `version` | ✅ | Schema version (currently `"1"`). |
-| `messages[]` | ✅ | Ordered turns (`system` / `user` / `assistant`). |
-| `sampling` | ⏱️ | Deterministic knobs (`temperature`, `top_p`, `seed`, …). |
-| `response` | 🎯 | Output contract (`text`, `json`, or `json_schema`). |
-| `tools` / `tool_choice` | 🔧 | Provider-agnostic tool definitions and selection. |
-| `strict_mode` | 🛡️ | `Warn` (default), `Strict`, or `Coerce` mismatch behaviour. |
-| `metadata` | 🗂️ | Free-form hints for adapters (routing, tracing, etc.). |
+| `version` | Required | Schema version (currently `"1"`). |
+| `messages[]` | Required | Ordered turns (`system` / `user` / `assistant`). |
+| `sampling` | Optional | Deterministic knobs (`temperature`, `top_p`, `seed`, …). |
+| `response` | Optional | Output contract (`text`, `json`, or `json_schema`). |
+| `tools` / `tool_choice` | Optional | Provider-agnostic tool definitions and selection. |
+| `strict_mode` | Optional | `Warn` (default), `Strict`, or `Coerce` mismatch behaviour. |
+| `metadata` | Optional | Free-form hints for adapters (routing, tracing, etc.). |
 
 Authoritative references live in [`crates/specado-core/src/types/prompt.rs`](crates/specado-core/src/types/prompt.rs) and [`crates/specado-schemas/schemas/prompt-spec.v1.schema.json`](crates/specado-schemas/schemas/prompt-spec.v1.schema.json).
 

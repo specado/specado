@@ -21,4 +21,3 @@ python-source = "python"
 module-name = "specado._native"
 manifest-path = "crates/specado-py/Cargo.toml"
 features = ["pyo3/extension-module"]
-data = { "specado/providers" = "crates/specado-providers/providers" }

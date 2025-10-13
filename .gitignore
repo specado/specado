@@ -21,3 +21,4 @@ node_modules/
 
 # Generated provider bundles for packaging
 crates/specado-node/providers/
+python/specado/providers/
