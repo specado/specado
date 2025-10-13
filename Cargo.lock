@@ -2622,6 +2622,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "specado"
+version = "0.2.0-alpha.19"
+dependencies = [
+ "specado-core",
+]
+
+[[package]]
 name = "specado-cli"
 version = "0.2.0-alpha.19"
 dependencies = [
@@ -2636,7 +2643,7 @@ dependencies = [
  "predicates",
  "serde_json",
  "serde_yaml",
- "specado-core",
+ "specado",
  "specado-schemas",
  "tempfile",
  "tokio",
@@ -2674,7 +2681,7 @@ dependencies = [
  "napi-derive",
  "serde",
  "serde_json",
- "specado-core",
+ "specado",
  "tokio",
 ]
 
@@ -2691,7 +2698,7 @@ dependencies = [
  "pyo3-build-config",
  "pythonize",
  "serde_json",
- "specado-core",
+ "specado",
  "tokio",
 ]
 

@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use serde_json::Value as JsonValue;
-use specado_core::PromptSpec;
+use specado::PromptSpec;
 use std::fs;
 use std::path::Path;
 

@@ -7,15 +7,15 @@ publish = false
 
 [features]
 default = ["hot-reload", "audit-logging"]
-hot-reload = ["specado-core/hot-reload"]
-audit-logging = ["specado-core/audit-logging"]
+hot-reload = ["specado/hot-reload"]
+audit-logging = ["specado/audit-logging"]
 
 [lib]
 name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]
-specado-core = { workspace = true, features = ["hot-reload", "audit-logging"] }
+specado = { workspace = true, features = ["hot-reload", "audit-logging"] }
 pyo3 = { version = "0.22.6", features = ["extension-module", "abi3-py39"] }
 tokio.workspace = true
 serde_json.workspace = true

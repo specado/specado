@@ -4,7 +4,7 @@ use crate::runtime;
 use anyhow::{anyhow, Context, Result};
 use colored::Colorize;
 use serde_json::{Map as JsonMap, Value as JsonValue};
-use specado_core::{
+use specado::{
     execute, Message, MessageRole, PromptSpec, ProviderSpec, ResponseConfig, SamplingConfig,
     StrictMode, UniformResponse,
 };

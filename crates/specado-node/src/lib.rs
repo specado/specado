@@ -4,8 +4,8 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde::Deserialize;
 #[cfg(feature = "audit-logging")]
-use specado_core::audit::{AuditConfig, AuditContext, AuditTarget};
-use specado_core::{execute, PromptSpec, UniformResponse};
+use specado::audit::{AuditConfig, AuditContext, AuditTarget};
+use specado::{execute, PromptSpec, UniformResponse};
 use std::path::PathBuf;
 
 #[napi]

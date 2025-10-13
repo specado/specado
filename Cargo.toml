@@ -4,6 +4,7 @@ members = [
     "crates/specado-core",
     "crates/specado-schemas",
     "crates/specado-providers",
+    "crates/specado",
     "crates/specado-cli",
     "crates/specado-py",
     "crates/specado-node",
@@ -37,8 +38,9 @@ httpmock = "0.7"
 tempfile = "3.10"
 pythonize = "0.22.0"
 pyo3 = { version = "0.22.6", features = ["extension-module", "abi3-py39"] }
-specado-core = { path = "crates/specado-core" }
+specado-core = { path = "crates/specado-core", default-features = false }
 specado-schemas = { path = "crates/specado-schemas" }
+specado = { path = "crates/specado" }
 
 [profile.release]
 lto = true

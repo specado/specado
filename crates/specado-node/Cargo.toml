@@ -7,14 +7,14 @@ publish = false
 
 [features]
 default = ["hot-reload", "audit-logging"]
-hot-reload = ["specado-core/hot-reload"]
-audit-logging = ["specado-core/audit-logging"]
+hot-reload = ["specado/hot-reload"]
+audit-logging = ["specado/audit-logging"]
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-specado-core = { workspace = true, features = ["hot-reload", "audit-logging"] }
+specado = { workspace = true, features = ["hot-reload", "audit-logging"] }
 napi = { version = "2.16.11", features = ["async", "serde-json", "tokio_rt"] }
 napi-derive = "2.16.8"
 tokio.workspace = true

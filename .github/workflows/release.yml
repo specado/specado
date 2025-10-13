@@ -407,7 +407,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
           set -euo pipefail
-          CRATES=(specado-core specado-schemas specado-providers specado-cli)
+          CRATES=(specado specado-cli)
           publishable=()
           for crate in "${CRATES[@]}"; do
             manifest="crates/${crate}/Cargo.toml"
@@ -569,6 +569,36 @@ jobs:
             sleep 30
           done
           "$PWD/verify-cargo/bin/specado" --help >/dev/null
+
+      - name: Verify specado library crate
+        if: ${{ needs.publish_crates.outputs.published == 'true' }}
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          cargo new verify-lib --lib --quiet
+          cd verify-lib
+          cargo add specado@=$VERSION >/dev/null
+          cat >src/lib.rs <<'RS'
+use specado::{Message, MessageRole, PromptSpec, ResponseConfig, SamplingConfig, StrictMode};
+
+pub fn make_prompt() -> PromptSpec {
+    PromptSpec {
+        version: "1".into(),
+        messages: vec![Message {
+            role: MessageRole::System,
+            content: "hello".into(),
+        }],
+        sampling: SamplingConfig::default(),
+        response: ResponseConfig::default(),
+        tools: Vec::new(),
+        tool_choice: None,
+        strict_mode: StrictMode::Warn,
+        metadata: std::collections::HashMap::new(),
+    }
+}
+RS
+          cargo check >/dev/null
 
   github_release:
     name: Publish GitHub release

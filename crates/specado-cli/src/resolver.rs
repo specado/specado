@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use specado_core::hot_reload::ProviderCache;
+use specado::hot_reload::ProviderCache;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};

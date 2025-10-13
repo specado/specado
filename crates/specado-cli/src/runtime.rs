@@ -5,9 +5,9 @@ use std::path::Path;
 use std::time::Duration;
 
 #[cfg(feature = "audit-logging")]
-use specado_core::audit::{AuditConfig, AuditContext, AuditTarget};
+use specado::audit::{AuditConfig, AuditContext, AuditTarget};
 #[cfg(feature = "hot-reload")]
-use specado_core::hot_reload::{set_global_config, HotReloadConfig};
+use specado::hot_reload::{set_global_config, HotReloadConfig};
 
 #[cfg(feature = "hot-reload")]
 pub fn apply_hot_reload_config(options: &RuntimeOptions, provider_path: &Path) {

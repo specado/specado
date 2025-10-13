@@ -7,8 +7,8 @@ use anyhow::{anyhow, Context, Result};
 use clap::CommandFactory;
 use colored::Colorize;
 use serde_json::{Map as JsonMap, Value as JsonValue};
-use specado_core::hot_reload::ProviderCache;
-use specado_core::{
+use specado::hot_reload::ProviderCache;
+use specado::{
     execute, translate as core_translate, LossinessLevel, LossinessReport, Message, MessageRole,
     SamplingConfig,
 };

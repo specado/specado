@@ -7,10 +7,8 @@ use pyo3::types::PyDict;
 use pyo3::wrap_pyfunction;
 use pythonize::{depythonize, pythonize};
 #[cfg(feature = "audit-logging")]
-use specado_core::audit::{AuditConfig, AuditContext};
-use specado_core::{
-    execute, translate as core_translate, PromptSpec, ProviderSpec, UniformResponse,
-};
+use specado::audit::{AuditConfig, AuditContext};
+use specado::{execute, translate as core_translate, PromptSpec, ProviderSpec, UniformResponse};
 use std::sync::Arc;
 use tokio::runtime::{Builder, Runtime};
 
