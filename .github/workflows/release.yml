@@ -62,9 +62,9 @@ jobs:
             echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-          python <<'PY'
-import pathlib
+          python -c '
 import os
+import pathlib
 
 try:
     import tomllib  # Python 3.11+
@@ -74,25 +74,26 @@ except ImportError:  # pragma: no cover
 root = pathlib.Path(__file__).resolve().parent.parent
 workspace = tomllib.loads((root / "Cargo.toml").read_text())
 workspace_deps = workspace.get("workspace", {}).get("dependencies", {})
+output_path = os.environ["GITHUB_OUTPUT"]
 
-for crate in ("specado-schemas", "specado-core", "specado", "specado-cli"):
-    pkg = None
-    dep = workspace_deps.get(crate)
-    if isinstance(dep, dict):
-        pkg = dep.get("package")
+with open(output_path, "a", encoding="utf-8") as fh:
+    for crate in ("specado-schemas", "specado-core", "specado", "specado-cli"):
+        pkg = None
+        dep = workspace_deps.get(crate)
+        if isinstance(dep, dict):
+            pkg = dep.get("package")
 
-    manifest = root / "crates" / crate / "Cargo.toml"
-    if pkg is None and manifest.exists():
-        data = tomllib.loads(manifest.read_text())
-        pkg = data.get("package", {}).get("name")
+        manifest = root / "crates" / crate / "Cargo.toml"
+        if pkg is None and manifest.exists():
+            data = tomllib.loads(manifest.read_text())
+            pkg = data.get("package", {}).get("name")
 
-    if pkg is None:
-        pkg = crate
+        if pkg is None:
+            pkg = crate
 
-    key = crate.replace("-", "_") + "_pkg"
-    with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+        key = crate.replace("-", "_") + "_pkg"
         fh.write(f"{key}={pkg}\n")
-PY
+' 
 
   test:
     name: Test
