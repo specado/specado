@@ -515,7 +515,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
           set -euo pipefail
-          CRATES=(specado specado-cli)
+          CRATES=(specado-schemas specado-core specado specado-cli)
           publishable=()
           for crate in "${CRATES[@]}"; do
             manifest="crates/${crate}/Cargo.toml"
