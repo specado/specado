@@ -6,7 +6,37 @@ from typing import Any, Dict, Iterable, List, Optional
 from ._native import Client as _NativeClient
 
 __all__ = ["Client", "PromptSpec", "Message", "__version__"]
-__version__ = "0.1.0"
+
+try:  # pragma: no cover - exercised during packaging verification
+    from importlib import metadata as _metadata
+except ImportError:  # Python < 3.8 fallback via importlib_metadata
+    import importlib_metadata as _metadata  # type: ignore[assignment]
+
+def _detect_version() -> str:
+    try:
+        return _metadata.version("specado")
+    except _metadata.PackageNotFoundError:
+        from pathlib import Path
+
+        try:
+            import tomllib  # Python >= 3.11
+        except ModuleNotFoundError:  # pragma: no cover - fallback for older runtimes
+            import tomli as tomllib  # type: ignore[no-redef]
+
+        pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+        if pyproject.exists():
+            with pyproject.open("rb") as fh:
+                data = tomllib.load(fh)
+            project = data.get("project") or {}
+            version = project.get("version")
+            if isinstance(version, str):
+                return version
+        return "0.0.0"
+
+__version__ = _detect_version()
+
+del _metadata
+del _detect_version
 
 
 @dataclass
