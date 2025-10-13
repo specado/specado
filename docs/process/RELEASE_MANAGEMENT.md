@@ -263,6 +263,22 @@ echo 'specado = "0.2.0-alpha.1"' >> Cargo.toml
 cargo build
 ```
 
+### Cleaning Up PyPI / Test PyPI Releases
+
+If a pre-release needs to be retracted, use the helper script so the correct tokens
+from `~/.config/specado/.env` are loaded automatically:
+
+```bash
+# Remove versions from Test PyPI
+./scripts/remove_pypi_versions.sh testpypi 0.2.0a16 0.2.0a17
+
+# Remove versions from production PyPI
+./scripts/remove_pypi_versions.sh pypi 0.2.0a18
+```
+
+The script relies on `~/.config/specado/.pypirc` and `python -m twine`. It exits on
+the first failure so you can rerun it safely once credentials or 2FA tokens are refreshed.
+
 ### Integration Testing
 
 Run the example scripts to verify end-to-end functionality:
