@@ -532,6 +532,7 @@ jobs:
         run: |
           set -euo pipefail
           CRATES=(specado-schemas specado-core specado specado-cli)
+          USER_AGENT="specado-release-ci"
           publishable=()
           for crate in "${CRATES[@]}"; do
             manifest="crates/${crate}/Cargo.toml"
@@ -556,7 +557,7 @@ jobs:
           for idx in "${!publishable[@]}"; do
             crate="${publishable[$idx]}"
             echo "::group::Publishing ${crate}"
-            status=$(curl -s -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${crate}/${VERSION}" || echo "000")
+            status=$(curl -s -H "User-Agent: ${USER_AGENT}" -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${crate}/${VERSION}" || echo "000")
             if [[ "$status" == "200" ]]; then
               echo "${crate}@${VERSION} already published on crates.io; skipping."
               echo "::endgroup::"
