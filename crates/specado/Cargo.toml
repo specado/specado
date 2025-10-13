@@ -18,6 +18,7 @@ name = "specado"
 default = []
 hot-reload = ["specado-core/hot-reload"]
 audit-logging = ["specado-core/audit-logging"]
+cli-resolver = ["specado-core/cli-resolver"]
 
 [dependencies]
 specado-core = { workspace = true, default-features = false }

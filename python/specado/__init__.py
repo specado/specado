@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 from ._native import Client as _NativeClient
 
@@ -38,6 +39,17 @@ def _detect_version() -> str:
 
 __version__ = _detect_version()
 
+_catalog_candidates = [
+    Path(__file__).resolve().parent / "providers",
+    Path(__file__).resolve().parents[2] / "crates" / "specado-providers" / "providers",
+]
+
+_BUNDLED_PROVIDERS_DIR: Optional[Path] = None
+for _candidate in _catalog_candidates:
+    if _candidate.exists():
+        _BUNDLED_PROVIDERS_DIR = _candidate
+        break
+
 del _metadata
 del _detect_version
 
@@ -71,23 +83,41 @@ class Client:
 
     def __init__(
         self,
-        provider_path: str,
+        provider: str,
+        *,
+        model: Optional[str] = None,
+        providers_dir: Optional[Union[str, Path]] = None,
         watch: Optional[bool] = None,
         audit_config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Create a Specado client.
 
         Args:
-            provider_path: Path to the provider YAML or JSON file.
+            provider: Provider identifier (friendly name or spec path).
+            model: Optional model identifier to disambiguate multi-model providers.
+            providers_dir: Override for the provider catalog directory.
             watch: Enable experimental hot-reload plumbing (no watcher started yet).
             audit_config: Optional audit logging configuration forwarded to the core layer.
         """
 
+        if _BUNDLED_PROVIDERS_DIR and _BUNDLED_PROVIDERS_DIR.exists():
+            bundled_dir = _BUNDLED_PROVIDERS_DIR
+        else:
+            bundled_dir = None
+        providers_dir_arg: Optional[str]
+        if providers_dir is None:
+            providers_dir_arg = str(bundled_dir) if bundled_dir else None
+        else:
+            providers_dir_arg = str(Path(providers_dir))
+
         self._client = _NativeClient(
-            provider_path,
+            provider,
+            model=model,
+            providers_dir=providers_dir_arg,
             watch=watch,
             audit_config=audit_config,
         )
+        self._providers_dir = providers_dir_arg
 
     def complete(self, prompt: PromptSpec | Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(prompt, PromptSpec):

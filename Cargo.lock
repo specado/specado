@@ -2688,7 +2688,6 @@ version = "0.2.0-alpha.27"
 dependencies = [
  "once_cell",
  "pyo3",
- "pyo3-build-config",
  "pythonize",
  "serde_json",
  "specado-temp",

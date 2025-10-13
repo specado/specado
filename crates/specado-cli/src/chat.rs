@@ -5,8 +5,8 @@ use anyhow::{anyhow, Context, Result};
 use colored::Colorize;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use specado::{
-    execute, Message, MessageRole, PromptSpec, ProviderSpec, ResponseConfig, SamplingConfig,
-    StrictMode, UniformResponse,
+    execute_from_path, Message, MessageRole, PromptSpec, ProviderSpec, ResponseConfig,
+    SamplingConfig, StrictMode, UniformResponse,
 };
 use std::fs;
 use std::io::Write;
@@ -102,16 +102,12 @@ pub async fn execute_messages(
     sampling: &SamplingConfig,
     metadata: &JsonMap<String, JsonValue>,
 ) -> Result<UniformResponse> {
-    let provider_str = provider_path
-        .to_str()
-        .ok_or_else(|| anyhow!("Provider path contains invalid UTF-8"))?;
-
     #[cfg(feature = "audit-logging")]
     let audit_context = runtime::build_audit_context(runtime_options)?;
 
-    let response = execute(
+    let response = execute_from_path(
         build_prompt_spec(messages, sampling, metadata),
-        provider_str,
+        provider_path,
         #[cfg(feature = "audit-logging")]
         audit_context,
     )

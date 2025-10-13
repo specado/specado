@@ -26,7 +26,7 @@ colored.workspace = true
 clap_complete = "4.5"
 serde_json.workspace = true
 serde_yaml.workspace = true
-specado = { workspace = true, features = ["hot-reload", "audit-logging"] }
+specado = { workspace = true, features = ["hot-reload", "audit-logging", "cli-resolver"] }
 specado-schemas.workspace = true
 tokio.workspace = true
 dirs = "5.0"

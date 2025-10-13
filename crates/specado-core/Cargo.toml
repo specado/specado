@@ -18,6 +18,7 @@ name = "specado_core"
 default = []
 hot-reload = []
 audit-logging = ["uuid", "regex", "time"]
+cli-resolver = []
 
 [dependencies]
 specado-schemas.workspace = true

@@ -13,6 +13,8 @@ pub mod router;
 pub mod transformer;
 pub mod types;
 
+mod resolver;
+
 pub use adapter::{AdapterMatchRule, AdapterRegistry, AdapterSelection};
 pub use auth::{AuthError, AuthHandler, AuthScheme};
 pub use circuit_breaker::CircuitBreaker;
@@ -23,17 +25,79 @@ pub use types::*;
 
 use crate::hot_reload::global_cache;
 use crate::http::get_client;
+#[cfg(feature = "cli-resolver")]
+use crate::resolver::default_provider_path_internal;
+use crate::resolver::resolve_provider_path_internal;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::StatusCode;
 use serde_json::Value;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[cfg(feature = "audit-logging")]
 use crate::audit::AuditContext;
 
+/// Options for steering name-based provider resolution.
+#[derive(Debug, Default, Clone)]
+pub struct ExecuteOptions {
+    /// Optional model identifier used to disambiguate provider directories.
+    pub model: Option<String>,
+    /// Directory containing provider specifications to search.
+    pub providers_dir: Option<PathBuf>,
+}
+
+impl ExecuteOptions {
+    /// Construct options with no overrides (equivalent to `Default::default()`).
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Convenience helper for specifying only the model override.
+    pub fn for_model(model: impl Into<String>) -> Self {
+        Self::default().with_model(model)
+    }
+
+    pub fn with_model(mut self, model: impl Into<String>) -> Self {
+        self.model = Some(model.into());
+        self
+    }
+
+    pub fn with_providers_dir<P: Into<PathBuf>>(mut self, dir: P) -> Self {
+        self.providers_dir = Some(dir.into());
+        self
+    }
+
+    pub fn model(&self) -> Option<&str> {
+        self.model.as_deref()
+    }
+
+    pub fn providers_dir(&self) -> Option<&Path> {
+        self.providers_dir.as_deref()
+    }
+}
+
+/// Execute a prompt using a provider identified by name or path.
 pub async fn execute(
     prompt: PromptSpec,
-    provider_path: &str,
+    provider: &str,
+    options: ExecuteOptions,
+    #[cfg(feature = "audit-logging")] audit: Option<AuditContext>,
+) -> Result<UniformResponse> {
+    let provider_path =
+        resolve_provider_path_internal(Some(provider), options.model(), options.providers_dir())?;
+
+    execute_from_path(
+        prompt,
+        &provider_path,
+        #[cfg(feature = "audit-logging")]
+        audit,
+    )
+    .await
+}
+
+/// Execute a prompt using an explicit provider spec path.
+pub async fn execute_from_path(
+    prompt: PromptSpec,
+    provider_path: impl AsRef<Path>,
     #[cfg(feature = "audit-logging")] mut audit: Option<AuditContext>,
 ) -> Result<UniformResponse> {
     #[cfg(feature = "audit-logging")]
@@ -41,7 +105,9 @@ pub async fn execute(
         ctx.reset_timer();
     }
 
-    let provider_spec = match global_cache().load_or_read(Path::new(provider_path)) {
+    let provider_path = provider_path.as_ref();
+
+    let provider_spec = match global_cache().load_or_read(provider_path) {
         Ok(spec) => {
             #[cfg(feature = "audit-logging")]
             if let Some(ctx) = audit.as_mut() {
@@ -153,6 +219,20 @@ pub async fn execute(
     Ok(uniform_response)
 }
 
+#[cfg(feature = "cli-resolver")]
+pub fn resolve_provider_path(
+    provider: Option<&str>,
+    model: Option<&str>,
+    providers_dir: Option<&Path>,
+) -> Result<PathBuf> {
+    resolve_provider_path_internal(provider, model, providers_dir)
+}
+
+#[cfg(feature = "cli-resolver")]
+pub fn default_provider_path(providers_dir: Option<&Path>) -> Result<PathBuf> {
+    default_provider_path_internal(providers_dir)
+}
+
 pub fn translate(prompt: &PromptSpec, provider: &ProviderSpec) -> Result<(Value, LossinessReport)> {
     transformer::translate(prompt, provider)
 }
@@ -258,9 +338,9 @@ constraints:
         let mut tmp = NamedTempFile::new().expect("temp file");
         write!(tmp, "{}", provider_yaml(&server.url("/chat"), token_env)).expect("write spec");
 
-        let response = execute(
+        let response = execute_from_path(
             sample_prompt(),
-            tmp.path().to_str().unwrap(),
+            tmp.path(),
             #[cfg(feature = "audit-logging")]
             None,
         )
@@ -319,9 +399,9 @@ constraints:
         let mut prompt = sample_prompt();
         prompt.strict_mode = StrictMode::Strict;
 
-        let err = execute(
+        let err = execute_from_path(
             prompt,
-            tmp.path().to_str().unwrap(),
+            tmp.path(),
             #[cfg(feature = "audit-logging")]
             None,
         )
