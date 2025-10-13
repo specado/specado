@@ -1,6 +1,6 @@
 {
   "name": "specado",
-  "version": "0.2.0-alpha.21",
+  "version": "0.2.0-alpha.22",
   "main": "index.js",
   "types": "index.d.ts",
   "files": [
