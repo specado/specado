@@ -21,10 +21,13 @@ def _detect_version() -> str:
         try:
             import tomllib  # Python >= 3.11
         except ModuleNotFoundError:  # pragma: no cover - fallback for older runtimes
-            import tomli as tomllib  # type: ignore[no-redef]
+            try:
+                import tomli as tomllib  # type: ignore[no-redef]
+            except ModuleNotFoundError:
+                tomllib = None  # type: ignore[assignment]
 
         pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
-        if pyproject.exists():
+        if pyproject.exists() and tomllib is not None:
             with pyproject.open("rb") as fh:
                 data = tomllib.load(fh)
             project = data.get("project") or {}
