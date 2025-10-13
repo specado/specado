@@ -38,9 +38,9 @@ httpmock = "0.7"
 tempfile = "3.10"
 pythonize = "0.22.0"
 pyo3 = { version = "0.22.6", features = ["extension-module", "abi3-py39"] }
-specado-core = { path = "crates/specado-core", default-features = false, version = "=0.2.0-alpha.22" }
-specado-schemas = { path = "crates/specado-schemas", version = "=0.2.0-alpha.22" }
-specado = { path = "crates/specado", version = "=0.2.0-alpha.22" }
+specado-core = { path = "crates/specado-core", default-features = false, version = "=0.2.0-alpha.23" }
+specado-schemas = { path = "crates/specado-schemas", version = "=0.2.0-alpha.23" }
+specado = { path = "crates/specado", version = "=0.2.0-alpha.23" }
 
 [profile.release]
 lto = true
