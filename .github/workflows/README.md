@@ -2,20 +2,20 @@
 
 ## Overview
 
-The Specado release pipeline is composed of a thin orchestration workflow (`release.yml`) that invokes a set of reusable workflow components that live alongside it. This modular layout makes it easier to reason about the release stages, run them independently for testing, and extend the pipeline without editing a monolithic YAML file.
+The Specado release pipeline is composed of a thin orchestration workflow (`release.yml`) that invokes a set of reusable workflow components stored under `_reusable/`. This modular layout makes it easier to reason about the release stages, run them independently for testing, and extend the pipeline without editing a monolithic YAML file.
 
 ## Workflow Structure
 
 - `release.yml` &mdash; orchestrates the entire release by calling the reusable workflows below.
-- `release-test.yml` &mdash; runs the full Rust, Node.js, and Python test suites.
-- `release-build.yml` &mdash; produces platform-specific artifacts and smoke-tests the CLI.
-- `release-package.yml` &mdash; aggregates artifacts into the final distributable bundles.
-- `release-publish-testpypi.yml` &mdash; publishes to Test PyPI and verifies installation.
-- `release-publish-npm.yml` &mdash; publishes the npm package.
-- `release-publish-crates.yml` &mdash; publishes the crates.io packages (supports temporary package names).
-- `release-publish-pypi.yml` &mdash; publishes the production PyPI package.
-- `release-verify.yml` &mdash; verifies npm/PyPI/crates installs after publication.
-- `release-github.yml` &mdash; creates or updates the GitHub release and uploads assets.
+- `_reusable/test.yml` &mdash; runs the full Rust, Node.js, and Python test suites.
+- `_reusable/build.yml` &mdash; produces platform-specific artifacts and smoke-tests the CLI.
+- `_reusable/package.yml` &mdash; aggregates artifacts into the final distributable bundles.
+- `_reusable/publish-testpypi.yml` &mdash; publishes to Test PyPI and verifies installation.
+- `_reusable/publish-npm.yml` &mdash; publishes the npm package.
+- `_reusable/publish-crates.yml` &mdash; publishes the crates.io packages (supports temporary package names).
+- `_reusable/publish-pypi.yml` &mdash; publishes the production PyPI package.
+- `_reusable/verify-all-releases.yml` &mdash; verifies npm/PyPI/crates installs after publication.
+- `_reusable/github-release.yml` &mdash; creates or updates the GitHub release and uploads assets.
 
 ## Execution Flow
 
@@ -39,9 +39,9 @@ The Specado release pipeline is composed of a thin orchestration workflow (`rele
 
 ## Adding New Publish Targets
 
-1. Create `release-publish-<target>.yml` (or another descriptive `release-*.yml`) following the existing pattern (declare inputs, secrets, concurrency group).
+1. Create `_reusable/publish-<target>.yml` following the existing pattern (declare inputs, secrets, concurrency group).
 2. Add the new job to `release.yml` with appropriate dependencies and gating conditions.
-3. Extend `release-verify.yml` if post-publish verification is required.
+3. Extend `_reusable/verify-all-releases.yml` if post-publish verification is required.
 4. Update this README with the new component.
 
 ## Troubleshooting

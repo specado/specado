@@ -94,7 +94,7 @@ jobs:
     name: Run tests
     needs: prepare
     if: needs.prepare.outputs.run_release == 'true'
-    uses: ./.github/workflows/release-test.yml
+    uses: ./.github/workflows/_reusable/test.yml
 
   build:
     name: Build artifacts
@@ -102,7 +102,7 @@ jobs:
       - prepare
       - test
     if: needs.prepare.outputs.run_release == 'true'
-    uses: ./.github/workflows/release-build.yml
+    uses: ./.github/workflows/_reusable/build.yml
     with:
       version: ${{ needs.prepare.outputs.version }}
       tag: ${{ needs.prepare.outputs.tag }}
@@ -113,7 +113,7 @@ jobs:
       - prepare
       - build
     if: needs.prepare.outputs.run_release == 'true'
-    uses: ./.github/workflows/release-package.yml
+    uses: ./.github/workflows/_reusable/package.yml
     with:
       version: ${{ needs.prepare.outputs.version }}
 
@@ -123,7 +123,7 @@ jobs:
       - prepare
       - package
     if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/release-publish-testpypi.yml
+    uses: ./.github/workflows/_reusable/publish-testpypi.yml
     with:
       version: ${{ needs.prepare.outputs.version }}
     secrets:
@@ -135,7 +135,7 @@ jobs:
       - prepare
       - package
     if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/release-publish-npm.yml
+    uses: ./.github/workflows/_reusable/publish-npm.yml
     with:
       version: ${{ needs.prepare.outputs.version }}
       npm_dist_tag: ${{ needs.prepare.outputs.npm_dist_tag }}
@@ -148,7 +148,7 @@ jobs:
       - prepare
       - package
     if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/release-publish-crates.yml
+    uses: ./.github/workflows/_reusable/publish-crates.yml
     with:
       version: ${{ needs.prepare.outputs.version }}
       specado_schemas_pkg: ${{ needs.prepare.outputs.specado_schemas_pkg }}
@@ -166,7 +166,7 @@ jobs:
       - publish_npm
       - publish_crates
     if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/release-publish-pypi.yml
+    uses: ./.github/workflows/_reusable/publish-pypi.yml
     with:
       version: ${{ needs.prepare.outputs.version }}
     secrets:
@@ -180,7 +180,7 @@ jobs:
       - publish_npm
       - publish_crates
     if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/release-verify.yml
+    uses: ./.github/workflows/_reusable/verify-all-releases.yml
     with:
       version: ${{ needs.prepare.outputs.version }}
       is_prerelease: ${{ needs.prepare.outputs.is_prerelease }}
@@ -195,7 +195,7 @@ jobs:
       - prepare
       - verify_all
     if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/release-github.yml
+    uses: ./.github/workflows/_reusable/github-release.yml
     with:
       version: ${{ needs.prepare.outputs.version }}
       tag: ${{ needs.prepare.outputs.tag }}
