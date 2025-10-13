@@ -62,8 +62,9 @@ jobs:
             echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-          python <<'PY' | while IFS= read -r line; do echo "$line" >> "$GITHUB_OUTPUT"; done
+          python <<'PY'
 import pathlib
+import os
 
 try:
     import tomllib  # Python 3.11+
@@ -89,7 +90,8 @@ for crate in ("specado-schemas", "specado-core", "specado", "specado-cli"):
         pkg = crate
 
     key = crate.replace("-", "_") + "_pkg"
-    print(f"{key}={pkg}")
+    with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+        fh.write(f"{key}={pkg}\n")
 PY
 
   test:
