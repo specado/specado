@@ -1,0 +1,168 @@
+name: Build Platform Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+        description: Release version (e.g., 1.0.0)
+      tag:
+        required: true
+        type: string
+        description: Git tag (e.g., v1.0.0)
+    outputs:
+      artifacts_uploaded:
+        description: Confirms platform artifacts were built and smoke tested
+        value: ${{ jobs.smoke_test.outputs.completed }}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  build_platforms:
+    name: Build artifacts (${{ matrix.display }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            display: Linux
+            artifact_suffix: linux-x64
+            node_binary: specado.linux-x64-gnu.node
+            python_args: "--release --out dist/python --sdist"
+          - os: macos-latest
+            display: macOS
+            artifact_suffix: macos-arm64
+            node_binary: specado.darwin-arm64.node
+            python_args: "--release --out dist/python"
+          - os: windows-latest
+            display: Windows
+            artifact_suffix: windows-x64
+            node_binary: specado.win32-x64-msvc.node
+            python_args: "--release --out dist/python"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin
+
+      - name: Build CLI binary
+        run: cargo build --release --locked --manifest-path crates/specado-cli/Cargo.toml
+
+      - name: Build Node.js bindings
+        run: |
+          cd crates/specado-node
+          npm ci
+          npm run build
+
+      - name: Build Python distributions
+        run: |
+          set -euo pipefail
+          rm -rf dist/python
+          maturin build -m crates/specado-py/Cargo.toml ${{ matrix.python_args }}
+
+      - name: Collect platform artifacts
+        run: |
+          set -euo pipefail
+          OUT_DIR="build-out"
+          rm -rf "$OUT_DIR"
+          mkdir -p "$OUT_DIR/node" "$OUT_DIR/python" "$OUT_DIR/cli"
+
+          NODE_FILE=$(find crates/specado-node -maxdepth 1 -name '${{ matrix.node_binary }}' -print -quit)
+          if [[ -z "$NODE_FILE" ]]; then
+            echo "Node binary ${{ matrix.node_binary }} not found" >&2
+            exit 1
+          fi
+          cp "$NODE_FILE" "$OUT_DIR/node/"
+
+          find dist/python -maxdepth 1 -type f -name '*.whl' -exec cp {} "$OUT_DIR/python/" \;
+          find dist/python -maxdepth 1 -type f -name 'specado-*.tar.gz' -exec cp {} "$OUT_DIR/python/" \;
+
+          CLI_FILE=$(find target/release -maxdepth 1 -type f \( -name 'specado' -o -name 'specado.exe' \) -print -quit)
+          if [[ -z "$CLI_FILE" ]]; then
+            echo "CLI binary not found" >&2
+            exit 1
+          fi
+          cp "$CLI_FILE" "$OUT_DIR/cli/"
+
+      - name: Upload platform artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: specado-build-${{ matrix.artifact_suffix }}
+          path: build-out
+          if-no-files-found: error
+
+  smoke_test:
+    name: Smoke test binaries
+    needs: build_platforms
+    runs-on: ${{ matrix.os }}
+    outputs:
+      completed: ${{ steps.mark_complete.outputs.done }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: specado-build-linux-x64
+            binary_path: cli/specado
+          - os: macos-latest
+            artifact: specado-build-macos-arm64
+            binary_path: cli/specado
+          - os: windows-latest
+            artifact: specado-build-windows-x64
+            binary_path: cli/specado.exe
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: test-bin
+
+      - name: Make binary executable
+        if: runner.os != 'Windows'
+        run: chmod +x test-bin/${{ matrix.binary_path }}
+
+      - name: Test CLI binary version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version }}"
+          OUTPUT=$(test-bin/${{ matrix.binary_path }} --version)
+          echo "Binary output: $OUTPUT"
+          if [[ "$OUTPUT" != *"$VERSION"* ]]; then
+            echo "Error: Binary version does not match expected version $VERSION" >&2
+            exit 1
+          fi
+
+      - name: Test CLI binary help
+        shell: bash
+        run: |
+          test-bin/${{ matrix.binary_path }} --help >/dev/null
+
+      - name: Mark complete
+        id: mark_complete
+        run: echo "done=true" >> "$GITHUB_OUTPUT"

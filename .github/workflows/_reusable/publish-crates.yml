@@ -1,0 +1,124 @@
+name: Publish to crates.io
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+        description: Release version (e.g., 1.0.0)
+      specado_schemas_pkg:
+        required: true
+        type: string
+      specado_core_pkg:
+        required: true
+        type: string
+      specado_pkg:
+        required: true
+        type: string
+      specado_cli_pkg:
+        required: true
+        type: string
+    outputs:
+      published:
+        description: Whether any crates were published
+        value: ${{ jobs.publish_crates.outputs.published }}
+    secrets:
+      CRATES_IO_TOKEN:
+        required: true
+
+concurrency:
+  group: publish-${{ inputs.version }}-crates
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish_crates:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    environment:
+      name: crates-io
+      url: https://crates.io/crates/specado
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish crates sequentially
+        id: publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          set -euo pipefail
+          declare -A PACKAGE_NAMES
+          PACKAGE_NAMES["specado-schemas"]="${{ inputs.specado_schemas_pkg }}"
+          PACKAGE_NAMES["specado-core"]="${{ inputs.specado_core_pkg }}"
+          PACKAGE_NAMES["specado"]="${{ inputs.specado_pkg }}"
+          PACKAGE_NAMES["specado-cli"]="${{ inputs.specado_cli_pkg }}"
+
+          CRATES=(specado-schemas specado-core specado specado-cli)
+          USER_AGENT="specado-release-ci"
+          publishable=()
+          for crate in "${CRATES[@]}"; do
+            manifest="crates/${crate}/Cargo.toml"
+            pkg="${PACKAGE_NAMES[$crate]}"
+            if [[ -z "${pkg}" ]]; then
+              echo "Skipping ${crate}: missing package name mapping." >&2
+              continue
+            fi
+            if [[ ! -f "${manifest}" ]]; then
+              echo "Skipping ${crate}: manifest ${manifest} not found."
+              continue
+            fi
+            if grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*false' "${manifest}" || \
+               grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*\[[[:space:]]*\]' "${manifest}"; then
+              echo "Skipping ${crate} (${pkg}): publish=false in Cargo.toml"
+              continue
+            fi
+            publishable+=("${crate}:${pkg}")
+          done
+
+          if [[ ${#publishable[@]} -eq 0 ]]; then
+            echo "No crates configured for publication; skipping crates.io publish."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          VERSION="${{ inputs.version }}"
+          published_any=false
+          for idx in "${!publishable[@]}"; do
+            entry="${publishable[$idx]}"
+            crate="${entry%%:*}"
+            pkg="${entry##*:}"
+            manifest="crates/${crate}/Cargo.toml"
+            echo "::group::Publishing ${pkg} (source: ${crate})"
+            status=$(curl -s -H "User-Agent: ${USER_AGENT}" -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${pkg}/${VERSION}" || echo "000")
+            if [[ "$status" == "200" ]]; then
+              echo "${pkg}@${VERSION} already published on crates.io; skipping."
+              echo "::endgroup::"
+              continue
+            elif [[ "$status" != "404" ]]; then
+              echo "Failed to check ${pkg}@${VERSION} status on crates.io (HTTP ${status})." >&2
+              echo "::endgroup::"
+              exit 1
+            fi
+            cargo publish --manifest-path "${manifest}" --locked
+            echo "::endgroup::"
+            published_any=true
+            if [[ $idx -lt $((${#publishable[@]} - 1)) ]]; then
+              echo "Waiting for crate index propagation..."
+              sleep 60
+            fi
+          done
+
+          if [[ "$published_any" == "true" ]]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi

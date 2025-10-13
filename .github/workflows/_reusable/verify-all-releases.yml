@@ -1,0 +1,130 @@
+name: Verify All Published Releases
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      is_prerelease:
+        required: true
+        type: string
+      npm_dist_tag:
+        required: true
+        type: string
+      crates_published:
+        required: true
+        type: string
+      specado_pkg:
+        required: true
+        type: string
+      specado_cli_pkg:
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  verify_release:
+    name: Verify published artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify npm package
+        env:
+          VERSION: ${{ inputs.version }}
+          NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..5}; do
+            if npm view specado@"$VERSION" version >/dev/null 2>&1; then
+              break
+            fi
+            if [[ $attempt -eq 5 ]]; then
+              echo "npm package not available after retries" >&2
+              exit 1
+            fi
+            delay=$((30 * attempt))
+            echo "npm package not yet available (attempt ${attempt}); retrying in ${delay}s..."
+            sleep $delay
+          done
+          mkdir verify-npm
+          cd verify-npm
+          npm init -y >/dev/null
+          npm install specado@"$VERSION" >/dev/null
+          node -e "const { execSync } = require('node:child_process'); const distTags = JSON.parse(execSync('npm view specado dist-tags --json', { encoding: 'utf8' })); const expectedTag = process.env.NPM_DIST_TAG; const expectedVersion = process.env.VERSION; if (!distTags || !Object.prototype.hasOwnProperty.call(distTags, expectedTag)) { console.error(\`Expected npm dist-tag '\${expectedTag}' to be present, found:\`, distTags); process.exit(1); } if (distTags[expectedTag] !== expectedVersion) { console.error(\`Dist-tag '\${expectedTag}' points to '\${distTags[expectedTag]}', expected '\${expectedVersion}'\`); process.exit(1); }"
+          node -e "const specado = require('specado'); if (!specado) { throw new Error('specado module did not load'); }"
+
+      - name: Verify PyPI package
+        env:
+          VERSION: ${{ inputs.version }}
+          IS_PRERELEASE: ${{ inputs.is_prerelease }}
+        run: |
+          set -euo pipefail
+          python -m venv verify-py
+          source verify-py/bin/activate
+          python -m pip install --upgrade pip
+          for attempt in {1..5}; do
+            args=("specado==${VERSION}")
+            if [[ "${IS_PRERELEASE}" == "true" ]]; then
+              args+=("--pre")
+            fi
+            if python -m pip install "${args[@]}"; then
+              break
+            fi
+            if [[ $attempt -eq 5 ]]; then
+              echo "PyPI package not available after retries" >&2
+              exit 1
+            fi
+            delay=$((30 * attempt))
+            echo "PyPI package not yet available (attempt ${attempt}); retrying in ${delay}s..."
+            sleep $delay
+          done
+          python -c "import specado; print(specado.__version__)"
+
+      - name: Verify crates.io CLI
+        if: ${{ inputs.crates_published == 'true' }}
+        env:
+          VERSION: ${{ inputs.version }}
+          SPECADO_CLI_PKG: ${{ inputs.specado_cli_pkg }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..5}; do
+            if cargo install "$SPECADO_CLI_PKG" --version "$VERSION" --locked --root "$PWD/verify-cargo" --force; then
+              break
+            fi
+            if [[ $attempt -eq 5 ]]; then
+              echo "crates.io package not available after retries" >&2
+              exit 1
+            fi
+            delay=$((30 * attempt))
+            echo "crates.io package not yet available (attempt ${attempt}); retrying in ${delay}s..."
+            sleep $delay
+          done
+          "$PWD/verify-cargo/bin/specado" --help >/dev/null
+
+      - name: Verify specado library crate
+        if: ${{ inputs.crates_published == 'true' }}
+        env:
+          VERSION: ${{ inputs.version }}
+          SPECADO_PKG: ${{ inputs.specado_pkg }}
+        run: |
+          set -euo pipefail
+          cargo new verify-lib --lib --quiet
+          cd verify-lib
+          cargo add "${SPECADO_PKG}@=${VERSION}" >/dev/null
+          cargo check >/dev/null

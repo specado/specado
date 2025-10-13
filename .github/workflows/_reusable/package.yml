@@ -1,0 +1,102 @@
+name: Package Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+        description: Release version (e.g., 1.0.0)
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  package:
+    name: Package multi-platform artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: specado-build-*
+          path: build-artifacts
+          merge-multiple: false
+
+      - name: Prepare dist directories
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist/python dist/npm dist/cli
+
+      - name: Assemble multi-platform distributions
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version }}"
+          rm -f crates/specado-node/specado.*.node
+
+          find build-artifacts -path '*/node/*' -name 'specado.*.node' -exec cp {} crates/specado-node/ \;
+
+          if ! compgen -G "crates/specado-node/specado.*.node" > /dev/null; then
+            echo "Node bindings were not found in build artifacts" >&2
+            exit 1
+          fi
+
+          find build-artifacts -path '*/python/*' -name '*.whl' -exec cp {} dist/python/ \;
+          find build-artifacts -path '*/python/*' -name 'specado-*.tar.gz' -exec cp {} dist/python/ \;
+
+          shopt -s nullglob
+          for cli_dir in build-artifacts/specado-build-*/cli; do
+            platform=${cli_dir#build-artifacts/specado-build-}
+            platform=${platform%/cli}
+            bin=$(find "$cli_dir" -maxdepth 1 -type f -print -quit)
+            if [[ -z "$bin" ]]; then
+              echo "No CLI binary found in $cli_dir" >&2
+              exit 1
+            fi
+            filename=$(basename "$bin")
+            if [[ "$filename" == *.exe ]]; then
+              zip -j "dist/cli/specado-${VERSION}-${platform}.zip" "$bin"
+            else
+              tar czf "dist/cli/specado-${VERSION}-${platform}.tar.gz" -C "$cli_dir" "$filename"
+            fi
+          done
+          shopt -u nullglob
+
+      - name: Create npm package
+        run: |
+          set -euo pipefail
+          cd crates/specado-node
+          npm pack --pack-destination ../../dist/npm
+          TARBALL=$(ls ../../dist/npm/specado-*.tgz)
+          TMP_LIST=$(mktemp)
+          tar -tzf "$TARBALL" > "$TMP_LIST"
+          if ! grep -q '\.node$' "$TMP_LIST"; then
+            echo "Packed npm tarball does not contain native .node artifacts" >&2
+            rm -f "$TMP_LIST"
+            exit 1
+          fi
+          rm -f "$TMP_LIST"
+          rm -f specado.*.node
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          find . -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+
+      - name: Upload aggregated artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: specado-release-${{ inputs.version }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 14

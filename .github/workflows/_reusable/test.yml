@@ -1,0 +1,89 @@
+name: Test Suite
+
+on:
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  test:
+    name: Run all tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: crates/specado-node/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin twine
+
+      - name: Create Python virtualenv for tests
+        run: python -m venv .venv
+
+      - name: Install venv dependencies
+        run: |
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install maturin pytest
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run Rust tests
+        run: cargo test --workspace --locked --all-features
+
+      - name: Build Node.js bindings
+        run: |
+          cd crates/specado-node
+          npm ci
+          npm run build
+
+      - name: Run Node.js tests
+        run: |
+          cd crates/specado-node
+          npm test
+
+      - name: Build Python wheel for tests
+        run: maturin build -m crates/specado-py/Cargo.toml --release --out dist-test
+
+      - name: Install wheel under test
+        run: |
+          python -m pip install dist-test/*.whl
+          python -c "import sys, specado; from pathlib import Path; pkg_path = Path(specado.__file__).parent; native = list(pkg_path.glob('_native*.so')); print('Installed package path:', pkg_path); print('Native binaries:', native); sys.exit(0 if native else (print('specado wheel missing native extension', file=sys.stderr) or 1))"
+
+      - name: Install python package from source for tests
+        run: |
+          source .venv/bin/activate
+          maturin develop -m crates/specado-py/Cargo.toml --release
+
+      - name: Run Python tests
+        run: |
+          source .venv/bin/activate
+          python -m pytest python/tests/ -v
