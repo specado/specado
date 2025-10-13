@@ -1,6 +1,6 @@
 {
   "name": "specado",
-  "version": "0.2.0-alpha.27",
+  "version": "0.2.0",
   "main": "index.js",
   "types": "index.d.ts",
   "files": [
@@ -39,11 +39,11 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "specado-win32-x64-msvc": "0.2.0-alpha.27",
-    "specado-darwin-x64": "0.2.0-alpha.27",
-    "specado-linux-x64-gnu": "0.2.0-alpha.27",
-    "specado-darwin-arm64": "0.2.0-alpha.27",
-    "specado-linux-arm64-gnu": "0.2.0-alpha.27",
-    "specado-linux-x64-musl": "0.2.0-alpha.27"
+    "specado-win32-x64-msvc": "0.2.0",
+    "specado-darwin-x64": "0.2.0",
+    "specado-linux-x64-gnu": "0.2.0",
+    "specado-darwin-arm64": "0.2.0",
+    "specado-linux-arm64-gnu": "0.2.0",
+    "specado-linux-x64-musl": "0.2.0"
   }
 }

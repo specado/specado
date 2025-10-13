@@ -125,7 +125,7 @@ The constructor accepts either a friendly provider name or a spec path. Optional
 
 ```toml
 [dependencies]
-specado = "0.2.0-alpha.27"
+specado = "0.2.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
