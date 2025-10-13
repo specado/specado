@@ -62,9 +62,8 @@ jobs:
             echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-          python - <<'PY'
+          python <<'PY' | while IFS= read -r line; do echo "$line" >> "$GITHUB_OUTPUT"; done
 import pathlib
-import sys
 
 try:
     import tomllib  # Python 3.11+
@@ -75,25 +74,23 @@ root = pathlib.Path(__file__).resolve().parent.parent
 workspace = tomllib.loads((root / "Cargo.toml").read_text())
 workspace_deps = workspace.get("workspace", {}).get("dependencies", {})
 
-targets = ("specado-schemas", "specado-core", "specado", "specado-cli")
-for crate in targets:
+for crate in ("specado-schemas", "specado-core", "specado", "specado-cli"):
     pkg = None
     dep = workspace_deps.get(crate)
     if isinstance(dep, dict):
         pkg = dep.get("package")
 
     manifest = root / "crates" / crate / "Cargo.toml"
-    if not pkg and manifest.exists():
+    if pkg is None and manifest.exists():
         data = tomllib.loads(manifest.read_text())
         pkg = data.get("package", {}).get("name")
 
-    if not pkg:
+    if pkg is None:
         pkg = crate
 
     key = crate.replace("-", "_") + "_pkg"
     print(f"{key}={pkg}")
 PY
-| while IFS= read -r line; do echo "$line" >> "$GITHUB_OUTPUT"; done
 
   test:
     name: Test
