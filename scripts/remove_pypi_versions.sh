@@ -58,12 +58,16 @@ if ! python -m twine --version >/dev/null 2>&1; then
   exit 1
 fi
 
+reason=${YANK_REASON:-"Superseded prerelease"}
+
 for version in "$@"; do
-  echo "Removing $package==$version from $repo..."
-  python -m twine remove -r "$repo" "$package" "$version" --non-interactive || {
-    echo "Failed to remove $package==$version from $repo" >&2
+  echo "Yanking $package==$version from $repo..."
+  python -m twine yank -r "$repo" "$package" "$version" \
+    --non-interactive \
+    --reason "$reason" || {
+    echo "Failed to yank $package==$version from $repo" >&2
     exit 1
   }
 done
 
-echo "Done."
+echo "Done yanking versions."

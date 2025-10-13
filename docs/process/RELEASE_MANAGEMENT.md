@@ -265,8 +265,9 @@ cargo build
 
 ### Cleaning Up PyPI / Test PyPI Releases
 
-If a pre-release needs to be retracted, use the helper script so the correct tokens
-from `~/.config/specado/.env` are loaded automatically:
+If a pre-release needs to be retracted, use the helper script to *yank* the release
+while leaving its files for historical reference. Tokens from
+`~/.config/specado/.env` are loaded automatically:
 
 ```bash
 # Remove versions from Test PyPI
@@ -278,6 +279,7 @@ from `~/.config/specado/.env` are loaded automatically:
 
 The script relies on `~/.config/specado/.pypirc` and `python -m twine`. It exits on
 the first failure so you can rerun it safely once credentials or 2FA tokens are refreshed.
+Set `YANK_REASON="some message"` to customize the yank reason.
 
 ### Integration Testing
 
