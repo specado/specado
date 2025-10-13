@@ -352,10 +352,14 @@ jobs:
           cd crates/specado-node
           npm pack --pack-destination ../../dist/npm
           TARBALL=$(ls ../../dist/npm/specado-*.tgz)
-          if ! tar -tzf "$TARBALL" | grep -q '\.node$'; then
+          TMP_LIST=$(mktemp)
+          tar -tzf "$TARBALL" > "$TMP_LIST"
+          if ! grep -q '\.node$' "$TMP_LIST"; then
             echo "Packed npm tarball does not contain native .node artifacts" >&2
+            rm -f "$TMP_LIST"
             exit 1
           fi
+          rm -f "$TMP_LIST"
           rm -f specado.*.node
 
       - name: Generate checksums
