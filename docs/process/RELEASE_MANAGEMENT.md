@@ -271,10 +271,10 @@ while leaving its files for historical reference. Tokens from
 
 ```bash
 # Remove versions from Test PyPI
-./scripts/remove_pypi_versions.sh testpypi 0.2.0a16 0.2.0a17
+PYTHON=$(pyenv which python) ./scripts/remove_pypi_versions.sh testpypi 0.2.0a16 0.2.0a17
 
 # Remove versions from production PyPI
-./scripts/remove_pypi_versions.sh pypi 0.2.0a18
+PYTHON=$(pyenv which python) ./scripts/remove_pypi_versions.sh pypi 0.2.0a18
 ```
 
 The script relies on `~/.config/specado/.pypirc` and `python -m twine`. It exits on

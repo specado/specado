@@ -24,6 +24,8 @@ if [[ $# -lt 2 ]]; then
   exit 1
 fi
 
+PYTHON_BIN=${PYTHON:-python}
+
 registry=$1
 shift
 package=${PACKAGE:-specado}
@@ -53,7 +55,7 @@ fi
 
 export PYPI_RCFILE=${PYPI_RCFILE:-$HOME/.config/specado/.pypirc}
 
-if ! python -m twine --version >/dev/null 2>&1; then
+if ! "$PYTHON_BIN" -m twine --version >/dev/null 2>&1; then
   echo "twine is required (install via 'python -m pip install --upgrade twine')." >&2
   exit 1
 fi
@@ -62,7 +64,7 @@ reason=${YANK_REASON:-"Superseded prerelease"}
 
 for version in "$@"; do
   echo "Yanking $package==$version from $repo..."
-  python -m twine yank -r "$repo" "$package" "$version" \
+  "$PYTHON_BIN" -m twine yank -r "$repo" "$package" "$version" \
     --non-interactive \
     --reason "$reason" || {
     echo "Failed to yank $package==$version from $repo" >&2
