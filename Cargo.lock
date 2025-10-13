@@ -2623,7 +2623,7 @@ dependencies = [
 
 [[package]]
 name = "specado-cli-temp"
-version = "0.2.0-alpha.27"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2644,7 +2644,7 @@ dependencies = [
 
 [[package]]
 name = "specado-core-temp"
-version = "0.2.0-alpha.27"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "criterion",
@@ -2667,7 +2667,7 @@ dependencies = [
 
 [[package]]
 name = "specado-node"
-version = "0.2.0-alpha.27"
+version = "0.2.0"
 dependencies = [
  "napi",
  "napi-build",
@@ -2680,11 +2680,11 @@ dependencies = [
 
 [[package]]
 name = "specado-providers"
-version = "0.2.0-alpha.27"
+version = "0.2.0"
 
 [[package]]
 name = "specado-py"
-version = "0.2.0-alpha.27"
+version = "0.2.0"
 dependencies = [
  "once_cell",
  "pyo3",
@@ -2696,7 +2696,7 @@ dependencies = [
 
 [[package]]
 name = "specado-schemas-temp"
-version = "0.2.0-alpha.27"
+version = "0.2.0"
 dependencies = [
  "jsonschema",
  "once_cell",
@@ -2706,7 +2706,7 @@ dependencies = [
 
 [[package]]
 name = "specado-temp"
-version = "0.2.0-alpha.27"
+version = "0.2.0"
 dependencies = [
  "specado-core-temp",
 ]

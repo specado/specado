@@ -11,7 +11,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0-alpha.27"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/specado/specado"
@@ -38,9 +38,9 @@ httpmock = "0.7"
 tempfile = "3.10"
 pythonize = "0.22.0"
 pyo3 = { version = "0.22.6", features = ["extension-module", "abi3-py39"] }
-specado-core = { path = "crates/specado-core", package = "specado-core-temp", default-features = false, version = "=0.2.0-alpha.27" }
-specado-schemas = { path = "crates/specado-schemas", package = "specado-schemas-temp", version = "=0.2.0-alpha.27" }
-specado = { path = "crates/specado", package = "specado-temp", version = "=0.2.0-alpha.27" }
+specado-core = { path = "crates/specado-core", package = "specado-core-temp", default-features = false, version = "=0.2.0" }
+specado-schemas = { path = "crates/specado-schemas", package = "specado-schemas-temp", version = "=0.2.0" }
+specado = { path = "crates/specado", package = "specado-temp", version = "=0.2.0" }
 
 [profile.release]
 lto = true
