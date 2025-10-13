@@ -5,7 +5,11 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-publish = false
+description = "Provider and prompt schema validation helpers for Specado."
+readme = "../../README.md"
+keywords = ["ai", "llm", "schema"]
+categories = ["api-bindings", "data-structures"]
+publish = true
 
 [dependencies]
 serde_json.workspace = true
