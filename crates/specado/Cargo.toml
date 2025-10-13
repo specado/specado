@@ -1,5 +1,5 @@
 [package]
-name = "specado"
+name = "specado-temp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,6 +10,9 @@ readme = "README.md"
 keywords = ["ai", "llm", "sdk"]
 categories = ["api-bindings", "command-line-utilities"]
 publish = true
+
+[lib]
+name = "specado"
 
 [features]
 default = []

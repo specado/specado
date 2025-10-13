@@ -1,5 +1,5 @@
 [package]
-name = "specado-core"
+name = "specado-core-temp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,6 +10,9 @@ readme = "README.md"
 keywords = ["ai", "llm", "sdk"]
 categories = ["api-bindings", "network-programming"]
 publish = true
+
+[lib]
+name = "specado_core"
 
 [features]
 default = []

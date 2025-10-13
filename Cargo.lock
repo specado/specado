@@ -2622,14 +2622,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "specado"
-version = "0.2.0-alpha.25"
-dependencies = [
- "specado-core",
-]
-
-[[package]]
-name = "specado-cli"
+name = "specado-cli-temp"
 version = "0.2.0-alpha.25"
 dependencies = [
  "anyhow",
@@ -2643,14 +2636,14 @@ dependencies = [
  "predicates",
  "serde_json",
  "serde_yaml",
- "specado",
- "specado-schemas",
+ "specado-schemas-temp",
+ "specado-temp",
  "tempfile",
  "tokio",
 ]
 
 [[package]]
-name = "specado-core"
+name = "specado-core-temp"
 version = "0.2.0-alpha.25"
 dependencies = [
  "async-trait",
@@ -2663,7 +2656,7 @@ dependencies = [
  "serde_json",
  "serde_json_path",
  "serde_yaml",
- "specado-schemas",
+ "specado-schemas-temp",
  "tempfile",
  "thiserror 2.0.17",
  "time",
@@ -2681,7 +2674,7 @@ dependencies = [
  "napi-derive",
  "serde",
  "serde_json",
- "specado",
+ "specado-temp",
  "tokio",
 ]
 
@@ -2698,18 +2691,25 @@ dependencies = [
  "pyo3-build-config",
  "pythonize",
  "serde_json",
- "specado",
+ "specado-temp",
  "tokio",
 ]
 
 [[package]]
-name = "specado-schemas"
+name = "specado-schemas-temp"
 version = "0.2.0-alpha.25"
 dependencies = [
  "jsonschema",
  "once_cell",
  "serde_json",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "specado-temp"
+version = "0.2.0-alpha.25"
+dependencies = [
+ "specado-core-temp",
 ]
 
 [[package]]

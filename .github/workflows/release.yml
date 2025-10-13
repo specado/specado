@@ -30,6 +30,10 @@ jobs:
       is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
       npm_dist_tag: ${{ steps.meta.outputs.npm_dist_tag }}
       run_release: ${{ steps.meta.outputs.run_release }}
+      specado_schemas_pkg: ${{ steps.meta.outputs.specado_schemas_pkg }}
+      specado_core_pkg: ${{ steps.meta.outputs.specado_core_pkg }}
+      specado_pkg: ${{ steps.meta.outputs.specado_pkg }}
+      specado_cli_pkg: ${{ steps.meta.outputs.specado_cli_pkg }}
     steps:
       - name: Compute release metadata
         id: meta
@@ -57,6 +61,28 @@ jobs:
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
             echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
           fi
+
+          PYTHON=python3
+          for DIR in specado-schemas specado-core specado specado-cli; do
+            PKG=$("$PYTHON" - "$DIR" <<'PY'
+import pathlib
+import sys
+
+try:
+    import tomllib  # Python 3.11+
+except ImportError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore
+
+root = pathlib.Path(__file__).resolve().parent.parent
+manifest = root / "crates" / sys.argv[1] / "Cargo.toml"
+with manifest.open("rb") as fh:
+    data = tomllib.load(fh)
+print(data["package"]["name"])
+PY
+)
+            KEY="${DIR//-/_}_pkg"
+            echo "${KEY}=${PKG}" >> "$GITHUB_OUTPUT"
+          done
 
   test:
     name: Test
@@ -190,7 +216,7 @@ jobs:
           pip install maturin
 
       - name: Build CLI binary
-        run: cargo build --release --locked --package specado-cli
+        run: cargo build --release --locked --manifest-path crates/specado-cli/Cargo.toml
 
       - name: Build Node.js bindings
         run: |
@@ -533,19 +559,30 @@ jobs:
           set -euo pipefail
           CRATES=(specado-schemas specado-core specado specado-cli)
           USER_AGENT="specado-release-ci"
+          declare -A PACKAGE_NAMES
+          PACKAGE_NAMES["specado-schemas"]="${{ needs.prepare.outputs.specado_schemas_pkg }}"
+          PACKAGE_NAMES["specado-core"]="${{ needs.prepare.outputs.specado_core_pkg }}"
+          PACKAGE_NAMES["specado"]="${{ needs.prepare.outputs.specado_pkg }}"
+          PACKAGE_NAMES["specado-cli"]="${{ needs.prepare.outputs.specado_cli_pkg }}"
+
           publishable=()
           for crate in "${CRATES[@]}"; do
             manifest="crates/${crate}/Cargo.toml"
+            pkg="${PACKAGE_NAMES[$crate]}"
+            if [[ -z "${pkg}" ]]; then
+              echo "Skipping ${crate}: missing package name mapping." >&2
+              continue
+            fi
             if [[ ! -f "${manifest}" ]]; then
               echo "Skipping ${crate}: manifest ${manifest} not found."
               continue
             fi
             if grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*false' "${manifest}" || \
                grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*\[[[:space:]]*\]' "${manifest}"; then
-              echo "Skipping ${crate}: publish=false in Cargo.toml"
+              echo "Skipping ${crate} (${pkg}): publish=false in Cargo.toml"
               continue
             fi
-            publishable+=("${crate}")
+            publishable+=("${crate}:${pkg}")
           done
           if [[ ${#publishable[@]} -eq 0 ]]; then
             echo "No crates configured for publication; skipping crates.io publish."
@@ -555,19 +592,22 @@ jobs:
           VERSION="${{ needs.prepare.outputs.version }}"
           published_any=false
           for idx in "${!publishable[@]}"; do
-            crate="${publishable[$idx]}"
-            echo "::group::Publishing ${crate}"
-            status=$(curl -s -H "User-Agent: ${USER_AGENT}" -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${crate}/${VERSION}" || echo "000")
+            entry="${publishable[$idx]}"
+            crate="${entry%%:*}"
+            pkg="${entry##*:}"
+            manifest="crates/${crate}/Cargo.toml"
+            echo "::group::Publishing ${pkg} (source: ${crate})"
+            status=$(curl -s -H "User-Agent: ${USER_AGENT}" -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${pkg}/${VERSION}" || echo "000")
             if [[ "$status" == "200" ]]; then
-              echo "${crate}@${VERSION} already published on crates.io; skipping."
+              echo "${pkg}@${VERSION} already published on crates.io; skipping."
               echo "::endgroup::"
               continue
             elif [[ "$status" != "404" ]]; then
-              echo "Failed to check ${crate}@${VERSION} status on crates.io (HTTP ${status})." >&2
+              echo "Failed to check ${pkg}@${VERSION} status on crates.io (HTTP ${status})." >&2
               echo "::endgroup::"
               exit 1
             fi
-            cargo publish --package "${crate}" --locked
+            cargo publish --manifest-path "${manifest}" --locked
             echo "::endgroup::"
             published_any=true
             if [[ $idx -lt $((${#publishable[@]} - 1)) ]]; then
@@ -702,10 +742,11 @@ jobs:
         if: ${{ needs.publish_crates.outputs.published == 'true' }}
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
+          SPECADO_CLI_PKG: ${{ needs.prepare.outputs.specado_cli_pkg }}
         run: |
           set -euo pipefail
           for attempt in {1..5}; do
-            if cargo install specado-cli --version "$VERSION" --locked --root "$PWD/verify-cargo" --force; then
+            if cargo install "$SPECADO_CLI_PKG" --version "$VERSION" --locked --root "$PWD/verify-cargo" --force; then
               break
             fi
             if [[ $attempt -eq 5 ]]; then
@@ -722,11 +763,12 @@ jobs:
         if: ${{ needs.publish_crates.outputs.published == 'true' }}
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
+          SPECADO_PKG: ${{ needs.prepare.outputs.specado_pkg }}
         run: |
           set -euo pipefail
           cargo new verify-lib --lib --quiet
           cd verify-lib
-          cargo add specado@=$VERSION >/dev/null
+          cargo add "${SPECADO_PKG}@=${VERSION}" >/dev/null
           cargo check >/dev/null
 
   github_release:
@@ -751,12 +793,14 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
           IS_PRERELEASE: ${{ needs.prepare.outputs.is_prerelease }}
           NPM_DIST_TAG: ${{ needs.prepare.outputs.npm_dist_tag }}
+          SPECADO_PKG: ${{ needs.prepare.outputs.specado_pkg }}
         with:
           script: |
             const version = process.env.VERSION;
             const tag = process.env.TAG;
             const prerelease = process.env.IS_PRERELEASE === 'true';
             const npmTag = process.env.NPM_DIST_TAG;
+            const rustPkg = process.env.SPECADO_PKG;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const pythonInstall = prerelease
@@ -777,7 +821,7 @@ jobs:
               '',
               '**Rust**',
               '```toml',
-              `specado = "${version}"`,
+              `${rustPkg} = "${version}"`,
               '```',
               '',
               'Artifacts for this tag (npm tarball, Python wheels/sdist, CLI tarball, and SHA256 manifest) are attached to the workflow run and available from the respective registries.'

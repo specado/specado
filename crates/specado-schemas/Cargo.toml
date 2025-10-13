@@ -1,5 +1,5 @@
 [package]
-name = "specado-schemas"
+name = "specado-schemas-temp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,6 +10,9 @@ readme = "README.md"
 keywords = ["ai", "llm", "schema"]
 categories = ["api-bindings", "data-structures"]
 publish = true
+
+[lib]
+name = "specado_schemas"
 
 [dependencies]
 serde_json.workspace = true
