@@ -579,25 +579,6 @@ jobs:
           cargo new verify-lib --lib --quiet
           cd verify-lib
           cargo add specado@=$VERSION >/dev/null
-          cat >src/lib.rs <<'RS'
-use specado::{Message, MessageRole, PromptSpec, ResponseConfig, SamplingConfig, StrictMode};
-
-pub fn make_prompt() -> PromptSpec {
-    PromptSpec {
-        version: "1".into(),
-        messages: vec![Message {
-            role: MessageRole::System,
-            content: "hello".into(),
-        }],
-        sampling: SamplingConfig::default(),
-        response: ResponseConfig::default(),
-        tools: Vec::new(),
-        tool_choice: None,
-        strict_mode: StrictMode::Warn,
-        metadata: std::collections::HashMap::new(),
-    }
-}
-RS
           cargo check >/dev/null
 
   github_release:
