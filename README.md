@@ -1,216 +1,272 @@
-# Specado
+<p align="center">
+  <img src="docs/assets/specado-logo.svg" alt="Specado logo" width="260" />
+</p>
 
-Specado is a spec-driven orchestration layer that unifies prompt execution across multiple LLM providers. It provides a single, consistent interface for interacting with a wide range of language models, and allows you to define and customize providers and models using simple YAML specifications.
+<p align="center"><strong>From Fragile Scripts to Bulletproof Specs</strong></p>
 
-## Key Features
+<p align="center">
+  <a href="https://github.com/specado/specado/actions/workflows/ci.yml">
+    <img alt="CI status" src="https://github.com/specado/specado/actions/workflows/ci.yml/badge.svg">
+  </a>
+  <a href="https://github.com/specado/specado/blob/master/LICENSE">
+    <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-0A0A0A?label=license">
+  </a>
+  <img alt="Crates.io" src="https://img.shields.io/badge/cargo-0.2.0--alpha.27-3B82F6?logo=rust">
+  <img alt="npm" src="https://img.shields.io/badge/npm-0.2.0--alpha.27-CB3837?logo=npm">
+  <img alt="PyPI" src="https://img.shields.io/badge/pypi-0.2.0--alpha.27-3776AB?logo=pypi">
+</p>
 
-*   **Unified Interface**: A single, consistent API for interacting with multiple LLM providers, including OpenAI and Anthropic.
-*   **Spec-Driven Configuration**: Define and customize providers, models, and parameter mappings using simple, powerful YAML files. See the [Provider Spec Guide](docs/PROVIDER_SPEC.md) for more details.
-*   **Powerful CLI**: A user-friendly command-line interface with a rich set of features, including:
-    *   Single-turn queries with the `ask` command.
-    *   Interactive chat sessions with history.
-    *   Support for advanced provider features like OpenAI "reasoning" and Anthropic "thinking" modes.
-    *   Shell completion for Bash, Zsh, Fish, and more.
-*   **Python and Node.js Libraries**: Integrate Specado into your own applications with our easy-to-use Python and Node.js libraries.
-*   **Provider-Agnostic Design**: The core of Specado is provider-agnostic, allowing you to easily add new providers and models.
+---
+
+Specado replaces fragile prompt scripts with a spec-first workflow. Define your prompt, sampling knobs, and provider routing once in a `spec.yaml`, validate it, and run that same spec from the CLI, Python, Node.js, or Rust. A single resolver now lives inside the core, so every surface—CLI or binding—shares the same behaviour without re-implementing name → provider-path logic.
+
+## Supported surfaces
+
+| Surface | Package | What you get |
+| --- | --- | --- |
+| CLI | `specado-cli-temp` | `ask`, `validate`, `preview`, `run`, and shell completions. |
+| Python | `specado` | Bundled providers, `Client.complete`, async interoperability. |
+| Node.js | `specado` | Native N-API client with TypeScript definitions. |
+| Rust | `specado` | Hybrid API (`execute`, `execute_from_path`, `ExecuteOptions`). |
+
+> The provider catalog ships with every package. Override it only when you need custom specs.
 
 ## Installation
 
-_(Detailed installation instructions for different platforms will be added here once the project is packaged for distribution. For now, you will need to build from source.)_
+- **CLI**
+  ```bash
+  cargo install specado-cli-temp
+  ```
+- **Python**
+  ```bash
+  pip install specado
+  ```
+- **Node.js**
+  ```bash
+  npm install specado
+  ```
+- **Rust core**
+  ```toml
+  [dependencies]
+  specado = "0.2.0-alpha.27"
+  tokio = { version = "1", features = ["full"] }
+  ```
 
-### Building from Source
+### Credentials & provider catalogs
 
-**Prerequisites:**
+Specado never prompts for secrets. Every surface reads `SPECADO_*` variables from:
 
-*   Rust 1.75 or newer
-*   Node.js 18+
-*   Python 3.9+
+1. `~/.config/specado/.env` (Linux), `~/Library/Application Support/specado/.env` (macOS), or `%AppData%\specado\.env` (Windows).
+2. A project-local `.env`.
+3. The process environment.
 
-### Environment configuration
+Create the global file once and lock it down:
 
-Specado reads credentials from the following locations (in order):
-
-1. `~/.config/specado/.env` on Linux, `~/Library/Application Support/specado/.env` on macOS, or `%AppData%\specado\.env` on Windows. Create the directory if needed (e.g. `mkdir -p ~/.config/specado && chmod 700 ~/.config/specado` on Linux, `mkdir -p "$HOME/Library/Application Support/specado"` on macOS) and restrict the file (`chmod 600 …`).
-2. A `.env` file in the current working directory.
-3. Any variables already present in the process environment.
-
-The CLI, Python demo, and Node demo all follow this loading order. Once your keys are stored in the global config file you can still override them per-repo by adding a `.env` next to your prompts, or export them manually with `export OPENAI_API_KEY=...`.
-
-```sh
-# 1. Clone the repository
-git clone https://github.com/specado/specado.git
-cd specado
-
-# 2. Build the workspace
-cargo build --workspace
+```bash
+mkdir -p ~/.config/specado
+cat <<'EOF' > ~/.config/specado/.env
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=anthropic-...
+# Point at your own catalog (optional)
+# SPECADO_PROVIDERS_DIR=/absolute/path/to/providers
+# Pin a default provider for the CLI and bindings
+# SPECADO_DEFAULT_PROVIDER=crates/specado-providers/providers/openai/gpt-5/base.yaml
+EOF
+chmod 600 ~/.config/specado/.env
 ```
 
-## CLI Usage
+- `SPECADO_PROVIDERS_DIR` lets you ship a custom provider tree. Bindings pass this path automatically when you use `providers_dir=…`.
+- `SPECADO_DEFAULT_PROVIDER` is an escape hatch when you want the CLI or bindings to fall back to a specific spec.
 
-The `specado` CLI is the primary way to interact with the system. The main binary is located at `target/debug/specado` after building from source.
+Add a `.env` next to a project if you need per-repo overrides; exported environment variables always take precedence.
 
-### `specado ask`
+## CLI at a glance
 
-The `ask` command is the main entrypoint for interacting with LLMs.
+```bash
+# Validate schema + provider capabilities
+specado validate --spec spec.yaml
 
-**Single-Turn Query:**
+# Preview translated payload + lossiness report
+specado preview --prompt spec.yaml --provider openai
 
-```sh
-./target/debug/specado ask "What is the meaning of life?"
+# Execute with friendly provider / model names
+specado ask "Qualify this inbound lead." --provider openai --model gpt-5
+
+# Interactive chat loop with history
+specado ask --interactive --provider openai
+
+# Generate shell completions
+specado completions bash > /usr/local/share/bash-completion/completions/specado
 ```
 
-**Interactive Chat:**
+See `specado --help` for the full matrix of flags (`--messages-file`, `--reason`, `--watch`, audit logging, etc.).
 
-```sh
-./target/debug/specado ask --interactive
+## Specs that travel everywhere
+
+### PromptSpec essentials
+
+| Field | Required | Purpose |
+| --- | --- | --- |
+| `version` | ✅ | Schema version (currently `"1"`). |
+| `messages[]` | ✅ | Ordered turns (`system` / `user` / `assistant`). |
+| `sampling` | ⏱️ | Deterministic knobs (`temperature`, `top_p`, `seed`, …). |
+| `response` | 🎯 | Output contract (`text`, `json`, or `json_schema`). |
+| `tools` / `tool_choice` | 🔧 | Provider-agnostic tool definitions and selection. |
+| `strict_mode` | 🛡️ | `Warn` (default), `Strict`, or `Coerce` mismatch behaviour. |
+| `metadata` | 🗂️ | Free-form hints for adapters (routing, tracing, etc.). |
+
+Authoritative references live in [`crates/specado-core/src/types/prompt.rs`](crates/specado-core/src/types/prompt.rs) and [`crates/specado-schemas/schemas/prompt-spec.v1.schema.json`](crates/specado-schemas/schemas/prompt-spec.v1.schema.json).
+
+### Provider specs
+
+Provider definitions reside in [`crates/specado-providers/providers/`](crates/specado-providers/providers/). Each provider folder contains:
+
+- `provider`, `interface`, and `contract_version`.
+- `models[]` and `capabilities` to advertise supported surfaces.
+- `auth` blocks (env-var style).
+- `endpoints` with `mappings` for prompt/response translation.
+- `constraints` (lossiness hints, unsupported parameters).
+
+Write your own provider YAML, point bindings at its parent directory, and the resolver will discover it automatically.
+
+## Using specs (and when you don’t need one)
+
+### 1. CLI workflow
+
+`spec.yaml`
+
+```yaml
+version: "1"
+metadata:
+  name: lead-qualifier
+messages:
+  - role: system
+    content: |
+      Qualify this lead.
+      Reply with QUALIFIED or NOT_QUALIFIED plus a one-line reason.
+  - role: user
+    content: "We're evaluating enterprise automation for 2,500 SDRs."
+sampling:
+  temperature: 0.6
+  seed: 23
+response:
+  format: text
+strict_mode: Warn
 ```
 
-**Flags:**
+Run it:
 
-*   `--provider <PROVIDER>`: Specify a provider to use (e.g., `openai`, `anthropic`).
-*   `--model <MODEL>`: Specify a model to use (e.g., `gpt-4o`, `claude-3.5-sonnet-20240620`).
-*   `--messages-file <PATH>`: Load a chat history from a JSON or YAML file.
-*   `--reason`: Enable advanced reasoning/thinking modes.
-
-### `specado completions`
-
-Generate shell completion scripts.
-
-```sh
-# Example for Bash
-./target/debug/specado completions bash > /usr/local/share/bash-completion/completions/specado
+```bash
+export OPENAI_API_KEY=sk-...
+specado validate --spec spec.yaml
+specado preview --prompt spec.yaml --provider openai
+specado ask "Summarize the latest lead and recommend next steps." \
+  --provider openai \
+  --model gpt-5
 ```
 
-### `specado validate`
+- The CLI respects the credential loading order described in [Credentials & provider catalogs](#credentials--provider-catalogs); export keys or place them in `.env`.
+- `specado run` accepts the absolute path to a provider spec when you want explicit control.
 
-Validate a provider or prompt spec file.
-
-```sh
-./target/debug/specado validate --spec crates/specado-providers/providers/openai/gpt-4/o.yaml
-```
-
-### `specado preview`
-
-Preview the translated payload for a given prompt and provider without making a network call.
-
-```sh
-./target/debug/specado preview --prompt examples/prompts/basic_chat.json --provider crates/specado-providers/providers/openai/gpt-4/o.yaml
-```
-
-### `specado run`
-
-Execute a prompt against a provider.
-
-```sh
-./target/debug/specado run --prompt examples/prompts/basic_chat.json --provider crates/specado-providers/providers/openai/gpt-4/o.yaml
-```
-
-## Programmatic Usage
-
-### Python
-
-**Installation:**
-
-```sh
-pip install maturin
-maturin develop -m crates/specado-py/Cargo.toml
-```
-
-**Usage:**
+### 2. Python binding
 
 ```python
-from specado import Specado
+from specado import Client, Message, PromptSpec
 
-# Initialize the client
-client = Specado()
+prompt = PromptSpec(
+    messages=[
+        Message(role="system", content="Qualify the lead in a single sentence."),
+        Message(role="user", content="We run a 500 seat contact centre and need LLM automation."),
+    ],
+    sampling={"temperature": 0.4, "seed": 7},
+)
 
-# Make a simple request
-response = client.ask("Hello, world!")
-print(response.content)
-
-# Use a custom provider spec
-custom_client = Specado(provider_spec="/path/to/my_provider.yaml")
-response = custom_client.ask("Hello from my custom provider!")
-print(response.content)
+client = Client("openai", model="gpt-5")
+result = client.complete(prompt)
+print(result["content"])
 ```
 
-### Node.js
+- Providers bundle with the wheel; override `providers_dir` for custom catalogs.
+- `complete` accepts `PromptSpec` or a raw dict that matches the schema.
 
-**Installation:**
+### 3. Node.js binding
 
-```sh
-(cd crates/specado-node && npm install && npm run build)
-```
+```ts
+import { Client } from "specado";
 
-**Usage:**
-
-```javascript
-import { Specado } from 'specado';
+const prompt = {
+  version: "1" as const,
+  messages: [
+    { role: "system", content: "Qualify the lead and return QUALIFIED or NOT_QUALIFIED." },
+    { role: "user", content: "We're shortlisting enterprise automation partners." },
+  ],
+  sampling: { temperature: 0.5, seed: 11 },
+};
 
 async function main() {
-  // Initialize the client
-  const client = new Specado();
-
-  // Make a simple request
-  const response = await client.ask("Hello, world!");
-  console.log(response.content);
-
-  // Use a custom provider spec
-  const customClient = new Specado({
-    providerSpec: "/path/to/my_provider.yaml"
-  });
-  const customResponse = await customClient.ask("Hello from my custom provider!");
-  console.log(customResponse.content);
+  const client = new Client("openai", { model: "gpt-5" });
+  const result = await client.complete(prompt);
+  console.log(result.content);
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
 ```
 
-## Examples
+### 4. Rust core – spec path vs. in-memory prompt
 
-The `examples/` directory contains a set of runnable examples that demonstrate the features of Specado. See the [Examples README](examples/README.md) for more details.
+```rust
+use specado::{
+    execute, execute_from_path, ExecuteOptions, Message, MessageRole, PromptSpec, Result, SamplingConfig,
+};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Use friendly provider + model (resolver handles discovery)
+    let prompt = PromptSpec {
+        version: "1".into(),
+        messages: vec![
+            Message { role: MessageRole::System, content: "Return QUALIFIED or NOT_QUALIFIED.".into() },
+            Message { role: MessageRole::User, content: "We have an enterprise GTM org of 2,000 reps.".into() },
+        ],
+        sampling: SamplingConfig { temperature: Some(0.5), seed: Some(13), ..Default::default() },
+        ..Default::default()
+    };
+
+    let friendly = execute(
+        prompt.clone(),
+        "openai",
+        ExecuteOptions::for_model("gpt-5"),
+        None,
+    )
+    .await?;
+    println!("Friendly resolver ⇒ {}", friendly.content);
+
+    // Run against an explicit provider spec path (no resolver step)
+    let direct = execute_from_path(
+        prompt,
+        "crates/specado-providers/providers/openai/gpt-5/base.yaml",
+        None,
+    )
+    .await?;
+    println!("Explicit path ⇒ {}", direct.content);
+
+    Ok(())
+}
+```
 
 ## Contributing
 
-Contributions are welcome! This project uses automated releases based on [Conventional Commits](https://conventionalcommits.org/).
+We love pragmatic contributions. Before opening a PR:
 
-### Development Process
+1. Check the [open issues](https://github.com/specado/specado/issues) or start a discussion.
+2. Run the suite: `cargo test --workspace`, `source python/.venv/bin/activate && python -m pytest`, `npm test`.
+3. Follow [Conventional Commits](docs/process/CONTRIBUTING.md) for commit messages.
 
-1. **Fork and Clone** the repository
-2. **Create a Feature Branch**: `git checkout -b feature/your-feature-name`
-3. **Make Changes** and ensure tests pass: `cargo test --workspace`
-4. **Commit with Conventional Format**:
-   ```bash
-   # For new features
-   git commit -m "feat: add new model support"
+Every merge triggers automated packaging across crates.io, PyPI, and npm so the CLI, bindings, and core stay in sync.
 
-   # For bug fixes
-   git commit -m "fix: handle empty API responses"
+---
 
-   # For breaking changes
-   git commit -m "feat!: redesign authentication API
-
-   BREAKING CHANGE: The auth config format has changed"
-   ```
-5. **Push and Create PR** to the `main` branch
-
-### Automated Releases
-
-When your PR is merged to `main`:
-- ✅ **Automatic Versioning**: Based on your commit messages
-- ✅ **GitHub Release**: Created automatically
-- ✅ **Multi-Platform Publishing**: npm, PyPI, and crates.io updated simultaneously
-- ✅ **Changelog**: Generated automatically
-
-### Commit Message Guidelines
-
-Please follow [Conventional Commits](docs/process/CONVENTIONAL_COMMITS.md) format:
-- `feat:` for new features (minor version bump)
-- `fix:` for bug fixes (patch version bump)
-- `feat!:` or `BREAKING CHANGE:` for breaking changes (major version bump)
-
-See [GitHub Tracking Guidelines](docs/process/GITHUB_TRACKING.md) for detailed process information.
-
-## License
-
-This project is licensed under the terms of the [LICENSE](LICENSE) file.
+Ready for more? Browse the [`docs/`](docs/) folder for provider authoring guides, golden tests, and integration patterns, or use the curated template in [`docs/README.registry.md`](docs/README.registry.md) when publishing to registries.
