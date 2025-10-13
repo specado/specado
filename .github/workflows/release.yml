@@ -4,12 +4,6 @@ on:
   push:
     tags:
       - 'v*.*.*'
-  workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Skip publishing steps (test/build/package only)'
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -36,7 +30,6 @@ jobs:
       is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
       npm_dist_tag: ${{ steps.meta.outputs.npm_dist_tag }}
       run_release: ${{ steps.meta.outputs.run_release }}
-      dry_run: ${{ steps.meta.outputs.dry_run }}
       specado_schemas_pkg: ${{ steps.meta.outputs.specado_schemas_pkg }}
       specado_core_pkg: ${{ steps.meta.outputs.specado_core_pkg }}
       specado_pkg: ${{ steps.meta.outputs.specado_pkg }}
@@ -69,12 +62,6 @@ jobs:
             echo "npm_dist_tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.dry_run }}" == "true" ]]; then
-            echo "dry_run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "dry_run=false" >> "$GITHUB_OUTPUT"
-          fi
-
           for DIR in specado-schemas specado-core specado specado-cli; do
             MANIFEST="crates/${DIR}/Cargo.toml"
             if [[ ! -f "$MANIFEST" ]]; then
@@ -91,116 +78,804 @@ jobs:
           done
 
   test:
-    name: Run tests
+    name: Test
+    runs-on: ubuntu-latest
     needs: prepare
-    if: needs.prepare.outputs.run_release == 'true'
-    uses: ./.github/workflows/_reusable/test.yml
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  build:
-    name: Build artifacts
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: crates/specado-node/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin twine
+
+      - name: Create Python virtualenv for tests
+        run: python -m venv .venv
+
+      - name: Install venv dependencies
+        run: |
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install maturin pytest
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run Rust tests
+        run: cargo test --workspace --locked --all-features
+
+      - name: Build Node.js bindings
+        run: |
+          cd crates/specado-node
+          npm ci
+          npm run build
+
+      - name: Run Node.js tests
+        run: |
+          cd crates/specado-node
+          npm test
+
+      - name: Build Python wheel for tests
+        run: maturin build -m crates/specado-py/Cargo.toml --release --out dist-test
+
+      - name: Install wheel under test
+        run: |
+          python -m pip install dist-test/*.whl
+          python -c "import sys, specado; from pathlib import Path; pkg_path = Path(specado.__file__).parent; native = list(pkg_path.glob('_native*.so')); print('Installed package path:', pkg_path); print('Native binaries:', native); sys.exit(0 if native else (print('specado wheel missing native extension', file=sys.stderr) or 1))"
+
+      - name: Install python package from source for tests
+        run: |
+          source .venv/bin/activate
+          maturin develop -m crates/specado-py/Cargo.toml --release
+
+      - name: Run Python tests
+        run: |
+          source .venv/bin/activate
+          python -m pytest python/tests/ -v
+
+  build_platforms:
+    name: Build artifacts (${{ matrix.display }})
     needs:
       - prepare
       - test
-    if: needs.prepare.outputs.run_release == 'true'
-    uses: ./.github/workflows/_reusable/build.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-      tag: ${{ needs.prepare.outputs.tag }}
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            display: Linux
+            artifact_suffix: linux-x64
+            node_binary: specado.linux-x64-gnu.node
+            python_args: "--release --out dist/python --sdist"
+          - os: macos-latest
+            display: macOS
+            artifact_suffix: macos-arm64
+            node_binary: specado.darwin-arm64.node
+            python_args: "--release --out dist/python"
+          - os: windows-latest
+            display: Windows
+            artifact_suffix: windows-x64
+            node_binary: specado.win32-x64-msvc.node
+            python_args: "--release --out dist/python"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin
+
+      - name: Build CLI binary
+        run: cargo build --release --locked --manifest-path crates/specado-cli/Cargo.toml
+
+      - name: Build Node.js bindings
+        run: |
+          cd crates/specado-node
+          npm ci
+          npm run build
+
+      - name: Build Python distributions
+        run: |
+          set -euo pipefail
+          rm -rf dist/python
+          maturin build -m crates/specado-py/Cargo.toml ${{ matrix.python_args }}
+
+      - name: Collect platform artifacts
+        run: |
+          set -euo pipefail
+          OUT_DIR="build-out"
+          rm -rf "$OUT_DIR"
+          mkdir -p "$OUT_DIR/node" "$OUT_DIR/python" "$OUT_DIR/cli"
+
+          NODE_FILE=$(find crates/specado-node -maxdepth 1 -name '${{ matrix.node_binary }}' -print -quit)
+          if [[ -z "$NODE_FILE" ]]; then
+            echo "Node binary ${{ matrix.node_binary }} not found" >&2
+            exit 1
+          fi
+          cp "$NODE_FILE" "$OUT_DIR/node/"
+
+          find dist/python -maxdepth 1 -type f -name '*.whl' -exec cp {} "$OUT_DIR/python/" \;
+          find dist/python -maxdepth 1 -type f -name '*.tar.gz' -exec cp {} "$OUT_DIR/python/" \;
+
+          CLI_FILE=$(find target/release -maxdepth 1 -type f \( -name 'specado' -o -name 'specado.exe' \) -print -quit)
+          if [[ -z "$CLI_FILE" ]]; then
+            echo "CLI binary not found" >&2
+            exit 1
+          fi
+          cp "$CLI_FILE" "$OUT_DIR/cli/"
+
+      - name: Upload platform artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: specado-build-${{ matrix.artifact_suffix }}
+          path: build-out
+
+  smoke_test:
+    name: Smoke test binaries
+    needs:
+      - prepare
+      - build_platforms
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: specado-build-linux-x64
+            binary_path: cli/specado
+          - os: macos-latest
+            artifact: specado-build-macos-arm64
+            binary_path: cli/specado
+          - os: windows-latest
+            artifact: specado-build-windows-x64
+            binary_path: cli/specado.exe
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: test-bin
+
+      - name: Make binary executable
+        if: runner.os != 'Windows'
+        run: chmod +x test-bin/${{ matrix.binary_path }}
+
+      - name: Test CLI binary version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare.outputs.version }}"
+          OUTPUT=$(test-bin/${{ matrix.binary_path }} --version)
+          echo "Binary output: $OUTPUT"
+          if [[ "$OUTPUT" != *"$VERSION"* ]]; then
+            echo "Error: Binary version does not match expected version $VERSION" >&2
+            exit 1
+          fi
+
+      - name: Test CLI binary help
+        shell: bash
+        run: |
+          test-bin/${{ matrix.binary_path }} --help >/dev/null
 
   package:
     name: Package artifacts
+    runs-on: ubuntu-latest
     needs:
       - prepare
-      - build
-    if: needs.prepare.outputs.run_release == 'true'
-    uses: ./.github/workflows/_reusable/package.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
+      - build_platforms
+      - smoke_test
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: specado-build-*
+          path: build-artifacts
+          merge-multiple: false
+
+      - name: Prepare dist directories
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist/python dist/npm dist/cli
+
+      - name: Assemble multi-platform distributions
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare.outputs.version }}"
+          rm -f crates/specado-node/specado.*.node
+
+          find build-artifacts -path '*/node/*' -name 'specado.*.node' -exec cp {} crates/specado-node/ \;
+
+          if ! compgen -G "crates/specado-node/specado.*.node" > /dev/null; then
+            echo "Node bindings were not found in build artifacts" >&2
+            exit 1
+          fi
+
+          find build-artifacts -path '*/python/*' -name '*.whl' -exec cp {} dist/python/ \;
+          find build-artifacts -path '*/python/*' -name 'specado-*.tar.gz' -exec cp {} dist/python/ \;
+
+          shopt -s nullglob
+          for cli_dir in build-artifacts/specado-build-*/cli; do
+            platform=${cli_dir#build-artifacts/specado-build-}
+            platform=${platform%/cli}
+            bin=$(find "$cli_dir" -maxdepth 1 -type f -print -quit)
+            if [[ -z "$bin" ]]; then
+              echo "No CLI binary found in $cli_dir" >&2
+              exit 1
+            fi
+            filename=$(basename "$bin")
+            if [[ "$filename" == *.exe ]]; then
+              zip -j "dist/cli/specado-${VERSION}-${platform}.zip" "$bin"
+            else
+              tar czf "dist/cli/specado-${VERSION}-${platform}.tar.gz" -C "$cli_dir" "$filename"
+            fi
+          done
+          shopt -u nullglob
+
+      - name: Create npm package
+        run: |
+          set -euo pipefail
+          cd crates/specado-node
+          npm pack --pack-destination ../../dist/npm
+          TARBALL=$(ls ../../dist/npm/specado-*.tgz)
+          TMP_LIST=$(mktemp)
+          tar -tzf "$TARBALL" > "$TMP_LIST"
+          if ! grep -q '\.node$' "$TMP_LIST"; then
+            echo "Packed npm tarball does not contain native .node artifacts" >&2
+            rm -f "$TMP_LIST"
+            exit 1
+          fi
+          rm -f "$TMP_LIST"
+          rm -f specado.*.node
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          find . -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+
+      - name: Upload aggregated artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: specado-release-${{ needs.prepare.outputs.version }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
 
   publish_testpypi:
     name: Publish to Test PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/specado/${{ needs.prepare.outputs.version }}
     needs:
       - prepare
       - package
-    if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/_reusable/publish-testpypi.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-    secrets:
-      TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: specado-release-${{ needs.prepare.outputs.version }}
+          path: artifacts
 
-  publish_npm:
-    name: Publish to npm
-    needs:
-      - prepare
-      - package
-    if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/_reusable/publish-npm.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-      npm_dist_tag: ${{ needs.prepare.outputs.npm_dist_tag }}
-    secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-  publish_crates:
-    name: Publish to crates.io
-    needs:
-      - prepare
-      - package
-    if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/_reusable/publish-crates.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-      specado_schemas_pkg: ${{ needs.prepare.outputs.specado_schemas_pkg }}
-      specado_core_pkg: ${{ needs.prepare.outputs.specado_core_pkg }}
-      specado_pkg: ${{ needs.prepare.outputs.specado_pkg }}
-      specado_cli_pkg: ${{ needs.prepare.outputs.specado_cli_pkg }}
-    secrets:
-      CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+      - name: Install twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
 
-  publish_pypi:
-    name: Publish to PyPI
+      - name: Publish to Test PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}
+          TWINE_NON_INTERACTIVE: 1
+        run: |
+          set -euo pipefail
+          python -m twine upload \
+            --repository-url https://test.pypi.org/legacy/ \
+            --disable-progress-bar \
+            --skip-existing \
+            artifacts/python/*
+
+  verify_testpypi:
+    name: Verify Test PyPI package
+    runs-on: ubuntu-latest
     needs:
       - prepare
       - publish_testpypi
-      - publish_npm
-      - publish_crates
-    if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/_reusable/publish-pypi.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-    secrets:
-      PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-  verify_all:
-    name: Verify published artifacts
+      - name: Test install from Test PyPI
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          python -m venv test-venv
+          source test-venv/bin/activate
+          pip install --upgrade pip
+          for attempt in {1..5}; do
+            if pip install --index-url https://test.pypi.org/simple/ \
+                          --extra-index-url https://pypi.org/simple \
+                          "specado==${VERSION}"; then
+              break
+            fi
+            if [[ $attempt -eq 5 ]]; then
+              echo "Test PyPI package not available after retries" >&2
+              exit 1
+            fi
+            echo "Test PyPI package not yet available (attempt ${attempt}); retrying in 30s..."
+            sleep 30
+          done
+          python -c "import specado; print('Test PyPI package version:', specado.__version__)"
+
+  publish_npm:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/specado/v/${{ needs.prepare.outputs.version }}
     needs:
       - prepare
-      - publish_pypi
+      - package
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: specado-release-${{ needs.prepare.outputs.version }}
+          path: artifacts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+      - name: Check if npm version already exists
+        id: npm_version_check
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          if npm view specado@"$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "specado@$VERSION already published; skipping npm publish step."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: steps.npm_version_check.outputs.exists != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_DIST_TAG: ${{ needs.prepare.outputs.npm_dist_tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(artifacts/npm/*.tgz)
+          if [[ ${#files[@]} -ne 1 ]]; then
+            echo "Expected exactly one npm tarball, found ${#files[@]}" >&2
+            ls -l artifacts/npm
+            exit 1
+          fi
+          npm publish "${files[0]}" --tag "$NPM_DIST_TAG"
+      - name: Confirm npm publish skipped
+        if: steps.npm_version_check.outputs.exists == 'true'
+        run: echo "npm publish skipped because version already exists."
+
+  publish_crates:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    environment:
+      name: crates-io
+      url: https://crates.io/crates/specado
+    needs:
+      - prepare
+      - package
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish crates sequentially
+        id: publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          set -euo pipefail
+          CRATES=(specado-schemas specado-core specado specado-cli)
+          USER_AGENT="specado-release-ci"
+          declare -A PACKAGE_NAMES
+          PACKAGE_NAMES["specado-schemas"]="${{ needs.prepare.outputs.specado_schemas_pkg }}"
+          PACKAGE_NAMES["specado-core"]="${{ needs.prepare.outputs.specado_core_pkg }}"
+          PACKAGE_NAMES["specado"]="${{ needs.prepare.outputs.specado_pkg }}"
+          PACKAGE_NAMES["specado-cli"]="${{ needs.prepare.outputs.specado_cli_pkg }}"
+
+          publishable=()
+          for crate in "${CRATES[@]}"; do
+            manifest="crates/${crate}/Cargo.toml"
+            pkg="${PACKAGE_NAMES[$crate]}"
+            if [[ -z "${pkg}" ]]; then
+              echo "Skipping ${crate}: missing package name mapping." >&2
+              continue
+            fi
+            if [[ ! -f "${manifest}" ]]; then
+              echo "Skipping ${crate}: manifest ${manifest} not found."
+              continue
+            fi
+            if grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*false' "${manifest}" || \
+               grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*\[[[:space:]]*\]' "${manifest}"; then
+              echo "Skipping ${crate} (${pkg}): publish=false in Cargo.toml"
+              continue
+            fi
+            publishable+=("${crate}:${pkg}")
+          done
+          if [[ ${#publishable[@]} -eq 0 ]]; then
+            echo "No crates configured for publication; skipping crates.io publish."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          VERSION="${{ needs.prepare.outputs.version }}"
+          published_any=false
+          for idx in "${!publishable[@]}"; do
+            entry="${publishable[$idx]}"
+            crate="${entry%%:*}"
+            pkg="${entry##*:}"
+            manifest="crates/${crate}/Cargo.toml"
+            echo "::group::Publishing ${pkg} (source: ${crate})"
+            status=$(curl -s -H "User-Agent: ${USER_AGENT}" -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${pkg}/${VERSION}" || echo "000")
+            if [[ "$status" == "200" ]]; then
+              echo "${pkg}@${VERSION} already published on crates.io; skipping."
+              echo "::endgroup::"
+              continue
+            elif [[ "$status" != "404" ]]; then
+              echo "Failed to check ${pkg}@${VERSION} status on crates.io (HTTP ${status})." >&2
+              echo "::endgroup::"
+              exit 1
+            fi
+            cargo publish --manifest-path "${manifest}" --locked
+            echo "::endgroup::"
+            published_any=true
+            if [[ $idx -lt $((${#publishable[@]} - 1)) ]]; then
+              echo "Waiting for crate index propagation..."
+              sleep 60
+            fi
+          done
+          if [[ "$published_any" == "true" ]]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish_pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/specado/${{ needs.prepare.outputs.version }}
+    needs:
+      - prepare
+      - verify_testpypi
       - publish_npm
       - publish_crates
-    if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/_reusable/verify-all-releases.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-      is_prerelease: ${{ needs.prepare.outputs.is_prerelease }}
-      npm_dist_tag: ${{ needs.prepare.outputs.npm_dist_tag }}
-      crates_published: ${{ needs.publish_crates.outputs.published || 'false' }}
-      specado_pkg: ${{ needs.prepare.outputs.specado_pkg }}
-      specado_cli_pkg: ${{ needs.prepare.outputs.specado_cli_pkg }}
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: specado-release-${{ needs.prepare.outputs.version }}
+          path: artifacts
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+          TWINE_NON_INTERACTIVE: 1
+        run: |
+          set -euo pipefail
+          python -m twine upload \
+            --disable-progress-bar \
+            --skip-existing \
+            artifacts/python/*
+
+  verify_release:
+    name: Verify published artifacts
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - verify_testpypi
+      - publish_npm
+      - publish_crates
+      - publish_pypi
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify npm package
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          NPM_DIST_TAG: ${{ needs.prepare.outputs.npm_dist_tag }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..5}; do
+            if npm view specado@"$VERSION" version >/dev/null 2>&1; then
+              break
+            fi
+            if [[ $attempt -eq 5 ]]; then
+              echo "npm package not available after retries" >&2
+              exit 1
+            fi
+            delay=$((30 * attempt))
+            echo "npm package not yet available (attempt ${attempt}); retrying in ${delay}s..."
+            sleep $delay
+          done
+          mkdir verify-npm
+          cd verify-npm
+          npm init -y >/dev/null
+          npm install specado@"$VERSION" >/dev/null
+          node -e "const { execSync } = require('node:child_process'); const distTags = JSON.parse(execSync('npm view specado dist-tags --json', { encoding: 'utf8' })); const expectedTag = process.env.NPM_DIST_TAG; const expectedVersion = process.env.VERSION; if (!distTags || !Object.prototype.hasOwnProperty.call(distTags, expectedTag)) { console.error(\`Expected npm dist-tag '\${expectedTag}' to be present, found:\`, distTags); process.exit(1); } if (distTags[expectedTag] !== expectedVersion) { console.error(\`Dist-tag '\${expectedTag}' points to '\${distTags[expectedTag]}', expected '\${expectedVersion}'\`); process.exit(1); }"
+          node -e "const specado = require('specado'); if (!specado) { throw new Error('specado module did not load'); }"
+
+      - name: Verify PyPI package
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          IS_PRERELEASE: ${{ needs.prepare.outputs.is_prerelease }}
+        run: |
+          set -euo pipefail
+          python -m venv verify-py
+          source verify-py/bin/activate
+          python -m pip install --upgrade pip
+          for attempt in {1..5}; do
+            args=("specado==${VERSION}")
+            if [[ "${IS_PRERELEASE}" == "true" ]]; then
+              args+=("--pre")
+            fi
+            if python -m pip install "${args[@]}"; then
+              break
+            fi
+            if [[ $attempt -eq 5 ]]; then
+              echo "PyPI package not available after retries" >&2
+              exit 1
+            fi
+            delay=$((30 * attempt))
+            echo "PyPI package not yet available (attempt ${attempt}); retrying in ${delay}s..."
+            sleep $delay
+          done
+          python -c "import specado; print(specado.__version__)"
+
+      - name: Verify crates.io package
+        if: ${{ needs.publish_crates.outputs.published == 'true' }}
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SPECADO_CLI_PKG: ${{ needs.prepare.outputs.specado_cli_pkg }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..5}; do
+            if cargo install "$SPECADO_CLI_PKG" --version "$VERSION" --locked --root "$PWD/verify-cargo" --force; then
+              break
+            fi
+            if [[ $attempt -eq 5 ]]; then
+              echo "crates.io package not available after retries" >&2
+              exit 1
+            fi
+            delay=$((30 * attempt))
+            echo "crates.io package not yet available (attempt ${attempt}); retrying in ${delay}s..."
+            sleep $delay
+          done
+          "$PWD/verify-cargo/bin/specado" --help >/dev/null
+
+      - name: Verify specado library crate
+        if: ${{ needs.publish_crates.outputs.published == 'true' }}
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SPECADO_PKG: ${{ needs.prepare.outputs.specado_pkg }}
+        run: |
+          set -euo pipefail
+          cargo new verify-lib --lib --quiet
+          cd verify-lib
+          cargo add "${SPECADO_PKG}@=${VERSION}" >/dev/null
+          cargo check >/dev/null
 
   github_release:
     name: Publish GitHub release
+    runs-on: ubuntu-latest
     needs:
       - prepare
-      - verify_all
-    if: needs.prepare.outputs.run_release == 'true' && needs.prepare.outputs.dry_run != 'true'
-    uses: ./.github/workflows/_reusable/github-release.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-      tag: ${{ needs.prepare.outputs.tag }}
-      is_prerelease: ${{ needs.prepare.outputs.is_prerelease }}
-      npm_dist_tag: ${{ needs.prepare.outputs.npm_dist_tag }}
-      specado_pkg: ${{ needs.prepare.outputs.specado_pkg }}
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - verify_testpypi
+      - publish_npm
+      - publish_crates
+      - publish_pypi
+      - verify_release
+    if: ${{ needs.prepare.outputs.run_release == 'true' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create or update GitHub Release
+        uses: actions/github-script@v7
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          IS_PRERELEASE: ${{ needs.prepare.outputs.is_prerelease }}
+          NPM_DIST_TAG: ${{ needs.prepare.outputs.npm_dist_tag }}
+          SPECADO_PKG: ${{ needs.prepare.outputs.specado_pkg }}
+        with:
+          script: |
+            const version = process.env.VERSION;
+            const tag = process.env.TAG;
+            const prerelease = process.env.IS_PRERELEASE === 'true';
+            const npmTag = process.env.NPM_DIST_TAG;
+            const rustPkg = process.env.SPECADO_PKG;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pythonInstall = prerelease
+              ? `pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple specado==${version}`
+              : `pip install specado==${version}`;
+            const bodyLines = [
+              '## Installation',
+              '',
+              `**npm (${npmTag} dist-tag)**`,
+              '```bash',
+              `npm install specado@${version}`,
+              '```',
+              '',
+              `**Python${prerelease ? ' (Test PyPI)' : ''}**`,
+              '```bash',
+              pythonInstall,
+              '```',
+              '',
+              '**Rust**',
+              '```toml',
+              `${rustPkg} = "${version}"`,
+              '```',
+              '',
+              'Artifacts for this tag (npm tarball, Python wheels/sdist, CLI tarball, and SHA256 manifest) are attached to the workflow run and available from the respective registries.'
+            ];
+            const body = bodyLines.join('\n');
+
+            async function createOrUpdateRelease() {
+              try {
+                const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+                await github.rest.repos.updateRelease({
+                  owner,
+                  repo,
+                  release_id: release.data.id,
+                  tag_name: tag,
+                  name: prerelease ? `Pre-release ${tag}` : `Release ${tag}`,
+                  body,
+                  prerelease
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  await github.rest.repos.createRelease({
+                    owner,
+                    repo,
+                    tag_name: tag,
+                    name: prerelease ? `Pre-release ${tag}` : `Release ${tag}`,
+                    body,
+                    prerelease
+                  });
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+            await createOrUpdateRelease();
+
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: specado-release-${{ needs.prepare.outputs.version }}
+          path: artifacts
+
+      - name: Upload release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=()
+          if [[ -f artifacts/SHA256SUMS ]]; then
+            assets+=("artifacts/SHA256SUMS")
+          fi
+          for file in artifacts/cli/*.tar.gz; do
+            assets+=("$file")
+          done
+          for file in artifacts/cli/*.zip; do
+            assets+=("$file")
+          done
+          if [[ ${#assets[@]} -eq 0 ]]; then
+            echo "No release assets to upload."
+            exit 0
+          fi
+          gh release upload "$TAG" "${assets[@]}" --clobber
