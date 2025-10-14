@@ -11,7 +11,7 @@ capabilities:
   supports_custom_tools: true
   responses_api: true
   reasoning_controls: ["effort", "verbosity"]
-  supports_temperature: true
+  supports_temperature: false
   supports_top_p: true
 
 unsupported_parameters:
