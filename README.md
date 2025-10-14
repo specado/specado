@@ -11,9 +11,9 @@
   <a href="https://github.com/specado/specado/blob/master/LICENSE">
     <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-0A0A0A?label=license">
   </a>
-  <img alt="Crates.io" src="https://img.shields.io/badge/cargo-0.2.1-3B82F6?logo=rust">
-  <img alt="npm" src="https://img.shields.io/badge/npm-0.2.1-CB3837?logo=npm">
-  <img alt="PyPI" src="https://img.shields.io/badge/pypi-0.2.1-3776AB?logo=pypi">
+  <img alt="Crates.io" src="https://img.shields.io/badge/cargo-0.2.2-3B82F6?logo=rust">
+  <img alt="npm" src="https://img.shields.io/badge/npm-0.2.2-CB3837?logo=npm">
+  <img alt="PyPI" src="https://img.shields.io/badge/pypi-0.2.2-3776AB?logo=pypi">
 </p>
 
 ---
@@ -48,7 +48,7 @@ Specado replaces fragile prompt scripts with a spec-first workflow. Define your 
 - **Rust core**
   ```toml
   [dependencies]
-  specado = "0.2.1"
+  specado = "0.2.2"
   tokio = { version = "1", features = ["full"] }
   ```
 

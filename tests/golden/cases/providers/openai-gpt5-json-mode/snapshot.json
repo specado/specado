@@ -23,9 +23,22 @@
     }
   },
   "lossiness": {
-    "is_lossy": false,
+    "is_lossy": true,
     "strict_mode": "Warn",
-    "entries": [],
+    "entries": [
+      {
+        "code": "Unsupported",
+        "level": "warn",
+        "path": "$.sampling.temperature",
+        "reason": "Parameter '$.sampling.temperature' is unsupported by this provider",
+        "suggested_fix": "Remove the parameter or choose a provider that supports it",
+        "details": {
+          "examples": [
+            0.0
+          ]
+        }
+      }
+    ],
     "omissions": []
   }
 }

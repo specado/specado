@@ -16,7 +16,7 @@
   "author": "Specado Team",
   "license": "Apache-2.0",
   "dependencies": {
-    "specado": "^0.2.1"
+    "specado": "^0.2.2"
   },
   "engines": {
     "node": ">=18.0.0"

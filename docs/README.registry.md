@@ -127,7 +127,7 @@ The package bundles YAML support, so `.yaml` prompts work out of the box.
 
 ```toml
 [dependencies]
-specado = "0.2.1"
+specado = "0.2.2"
 tokio = { version = "1", features = ["full"] }
 ```
 

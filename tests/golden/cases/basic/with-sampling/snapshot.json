@@ -28,6 +28,18 @@
       {
         "code": "Unsupported",
         "level": "warn",
+        "path": "$.sampling.temperature",
+        "reason": "Parameter '$.sampling.temperature' is unsupported by this provider",
+        "suggested_fix": "Remove the parameter or choose a provider that supports it",
+        "details": {
+          "examples": [
+            0.8
+          ]
+        }
+      },
+      {
+        "code": "Unsupported",
+        "level": "warn",
         "path": "$.sampling.frequency_penalty",
         "reason": "Parameter '$.sampling.frequency_penalty' is unsupported by this provider",
         "suggested_fix": "Remove the parameter or choose a provider that supports it",

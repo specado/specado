@@ -218,7 +218,7 @@ main().catch((error) => {
 **Install:**
 ```toml
 [dependencies]
-specado = "0.2.1"
+specado = "0.2.2"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -405,7 +405,7 @@ If you have more time:
   - CLI: `cargo install specado-cli-temp`
   - Python: `pip install specado`
   - Node: `npm install specado`
-  - Rust: `specado = "0.2.1"`
+  - Rust: `specado = "0.2.2"`
 
 ---
 
