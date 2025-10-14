@@ -28,7 +28,7 @@
     "build:debug": "napi build --platform",
     "bundle:providers": "node ./scripts/copy-providers.mjs",
     "clean:providers": "node ./scripts/clean-providers.mjs",
-    "prepack": "npm run bundle:providers && napi prepublish -t npm",
+    "prepack": "npm run bundle:providers && npx --yes @napi-rs/cli@2.18.4 prepublish -t npm",
     "test": "node --test"
   },
   "dependencies": {
