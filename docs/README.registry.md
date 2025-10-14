@@ -30,7 +30,7 @@ specado ask \
   --model gpt-5
 
 # Execute against an explicit provider YAML (skip friendly lookup)
-specado run --prompt spec.yaml --provider crates/specado-providers/providers/openai/gpt-5/base.yaml
+specado run --prompt spec.yaml --provider openai
 ```
 
 - Populate `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` in `~/.config/specado/.env` (or the platform equivalent) or export them before running.
@@ -49,7 +49,11 @@ pip install specado
 ### Usage
 
 ```python
-from specado import Client, Message, PromptSpec
+from specado import Client, Message, PromptSpec, load_prompt
+
+client = Client("openai", model="gpt-5")
+result = client.complete_file("prompts/summarize_article.yaml")
+print(result["content"])
 
 prompt = PromptSpec(
     messages=[
@@ -59,19 +63,18 @@ prompt = PromptSpec(
     sampling={"temperature": 0.4, "seed": 7},
 )
 
-client = Client("openai", model="gpt-5")
-result = client.complete(prompt)
-
-print(result["content"])
-
 # Bypass the resolver with an explicit provider catalog
-direct = Client("crates/specado-providers/providers/openai/gpt-5/base.yaml")
+from importlib import resources
+
+catalog = resources.files("specado") / "providers" / "openai/gpt-5/base.yaml"
+direct = Client(str(catalog))
 print(direct.complete(prompt)["content"])
 ```
 
 - `Client(provider, *, model=None, providers_dir=None, watch=None, audit_config=None)` accepts friendly names or explicit paths.
 - Providers are bundled with the wheel. Override `providers_dir` to point to your own catalog.
 - `complete` accepts either the `PromptSpec` helper or a raw prompt dictionary.
+- YAML support ships with the package; no extra install steps required.
 
 ---
 
@@ -86,27 +89,25 @@ npm install specado
 ### Usage
 
 ```ts
-import { Client } from "specado";
-
-const prompt = {
-  version: "1" as const,
-  messages: [
-    { role: "system", content: "You qualify inbound leads." },
-    { role: "user", content: "We're evaluating your enterprise platform." },
-  ],
-  sampling: { temperature: 0.6, seed: 11 },
-  response: { format: "text" as const },
-};
+const { Client, simplePrompt } = require("specado");
 
 async function main() {
   const client = new Client("openai", { model: "gpt-5" });
+
+  const quick = await client.completeText(
+    "Qualify this inbound lead for our enterprise plan.",
+    { system: "You are a sales engineer." }
+  );
+  console.log(quick.content);
+
+  const prompt = simplePrompt({
+    user: "Summarize the lead background in two bullet points.",
+    system: "Keep it concise and actionable.",
+    temperature: 0.3,
+  });
+
   const result = await client.complete(prompt);
   console.log(result.content);
-
-  // Explicit provider spec path (skip resolver and bundled catalog)
-  const direct = new Client("crates/specado-providers/providers/openai/gpt-5/base.yaml");
-  const directResult = await direct.complete(prompt);
-  console.log(directResult.content);
 }
 
 main().catch((err) => {
@@ -116,6 +117,7 @@ main().catch((err) => {
 ```
 
 The constructor accepts either a friendly provider name or a spec path. Optional fields on `ClientOptions` include `model`, `providersDir`, `watch`, and `audit`.
+The package bundles YAML support, so `.yaml` prompts work out of the box.
 
 ---
 
@@ -125,7 +127,7 @@ The constructor accepts either a friendly provider name or a spec path. Optional
 
 ```toml
 [dependencies]
-specado = "0.2.0"
+specado = "0.2.1"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -133,8 +135,10 @@ tokio = { version = "1", features = ["full"] }
 
 ```rust
 use specado::{
-    execute, execute_from_path, ExecuteOptions, Message, MessageRole, PromptSpec, Result, SamplingConfig, StrictMode,
+    execute, execute_from_path, load_prompt_from_path, ExecuteOptions, Message, MessageRole, PromptSpec, Result,
+    SamplingConfig, StrictMode,
 };
+use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -164,18 +168,13 @@ async fn main() -> Result<()> {
     println!("{}", response.content);
 
     // Or run against an explicit provider spec path
+    let prompt_from_file = load_prompt_from_path("prompts/summarize_article.yaml")?;
+
     let direct = execute_from_path(
-        PromptSpec {
-            version: "1".into(),
-            messages: vec![
-                Message { role: MessageRole::System, content: "Respond with QUALIFIED or NOT_QUALIFIED.".into() },
-                Message { role: MessageRole::User, content: "We're expanding our enterprise GTM team.".into() },
-            ],
-            sampling: SamplingConfig { temperature: Some(0.5), seed: Some(19), ..Default::default() },
-            strict_mode: StrictMode::Warn,
-            ..Default::default()
-        },
-        "crates/specado-providers/providers/openai/gpt-5/base.yaml",
+        prompt_from_file,
+        std::env::var("SPECADO_PROVIDERS_DIR")
+            .map(|dir| PathBuf::from(dir).join("openai/gpt-5/base.yaml"))
+            .expect("Set SPECADO_PROVIDERS_DIR when using explicit provider paths"),
         None,
     )
     .await?;

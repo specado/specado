@@ -1,0 +1,24 @@
+{
+  "name": "specado-node-examples",
+  "version": "0.1.0",
+  "description": "Examples for using Specado with Node.js",
+  "scripts": {
+    "from-spec": "node from_spec.js",
+    "in-code": "node in_code.js",
+    "demo": "npm run from-spec && npm run in-code"
+  },
+  "keywords": [
+    "specado",
+    "llm",
+    "ai",
+    "examples"
+  ],
+  "author": "Specado Team",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "specado": "^0.2.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -20,5 +20,3 @@ node_modules/
 /*.sh
 
 # Generated provider bundles for packaging
-crates/specado-node/providers/
-python/specado/providers/

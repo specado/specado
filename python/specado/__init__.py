@@ -2,11 +2,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from ._native import Client as _NativeClient
+from ._native import (
+    Client as _NativeClient,
+    create_prompt as _native_create_prompt,
+    load_prompt as _native_load_prompt,
+    simple_prompt as _native_simple_prompt,
+)
 
-__all__ = ["Client", "PromptSpec", "Message", "__version__"]
+__all__ = [
+    "Client",
+    "PromptSpec",
+    "Message",
+    "__version__",
+    "load_prompt",
+    "build_prompt",
+    "create_prompt",
+]
 
 try:  # pragma: no cover - exercised during packaging verification
     from importlib import metadata as _metadata
@@ -52,6 +65,53 @@ for _candidate in _catalog_candidates:
 
 del _metadata
 del _detect_version
+
+
+def load_prompt(path: Union[str, Path]) -> Dict[str, Any]:
+    """Load a prompt specification from JSON or YAML.
+
+    Args:
+        path: Path to a `.json`, `.yaml`, or `.yml` prompt file.
+
+    Returns:
+        A dictionary ready to pass to ``Client.complete``.
+
+    Raises:
+        RuntimeError: If the file cannot be read or parsed.
+    """
+
+    resolved = Path(path).expanduser().resolve()
+    if not resolved.exists():
+        raise RuntimeError(f"Prompt file not found: {resolved}")
+
+    return _native_load_prompt(str(resolved))
+
+
+def create_prompt(options: Dict[str, Any]) -> Dict[str, Any]:
+    """Construct a prompt specification from a builder dictionary."""
+
+    return _native_create_prompt(dict(options))
+
+
+def build_prompt(
+    user_message: str,
+    *,
+    system_message: Optional[str] = None,
+    temperature: Optional[float] = None,
+    sampling: Optional[Dict[str, Any]] = None,
+    strict_mode: str = "Warn",
+) -> Dict[str, Any]:
+    """Create a minimal prompt spec from high-level arguments."""
+
+    options: Dict[str, Any] = {"message": user_message, "strict_mode": strict_mode}
+    if system_message:
+        options["system"] = system_message
+    if sampling:
+        options["sampling"] = dict(sampling)
+    if temperature is not None:
+        options["temperature"] = temperature
+
+    return _native_simple_prompt(options)
 
 
 @dataclass
@@ -125,6 +185,33 @@ class Client:
         else:
             payload = prompt
         return self._client.complete(payload)
+
+    def complete_file(self, path: Union[str, Path]) -> Dict[str, Any]:
+        """Load a prompt from disk and execute it."""
+
+        resolved = Path(path).expanduser().resolve()
+        return self._client.complete_file(str(resolved))
+
+    def complete_text(
+        self,
+        user_message: str,
+        *,
+        system_message: Optional[str] = None,
+        temperature: Optional[float] = None,
+        sampling: Optional[Dict[str, Any]] = None,
+        strict_mode: str = "Warn",
+    ) -> Dict[str, Any]:
+        """Execute a simple text prompt without constructing a full spec."""
+
+        options: Dict[str, Any] = {"strict_mode": strict_mode}
+        if system_message is not None:
+            options["system"] = system_message
+        if sampling is not None:
+            options["sampling"] = dict(sampling)
+        if temperature is not None:
+            options["temperature"] = temperature
+
+        return self._client.complete_text(user_message, options=options)
 
     async def acomplete(self, prompt: PromptSpec | Dict[str, Any]) -> Dict[str, Any]:
         from asyncio import get_running_loop

@@ -133,20 +133,38 @@ python examples/python_basic.py \
 The script demonstrates both the native `Client` and the OpenAI compatibility layer. Swap the provider path or prompt spec as needed for Anthropic fixtures.
 
 ## 4. Node.js quickstart
-The Node binding under `crates/specado-node` is built with napi-rs. After installing dependencies and compiling the native module, you can execute `examples/node_basic.mjs`.
+The Node binding under `crates/specado-node` is built with napi-rs. After installing dependencies you can run the standalone examples or wire the helper directly:
 
 ```sh
 # install dependencies and build
 (cd crates/specado-node && npm install && npm run build)
 
-# run the example using the transpiled JavaScript entrypoint
+# run the examples
 OPENAI_API_KEY=sk-your-key \
-node examples/node_basic.mjs \
-  --provider crates/specado-providers/providers/openai/gpt-5/base.yaml \
-  --prompt examples/prompts/basic_chat.json
+  (cd examples/node && npm install && npm run demo)
 ```
 
-By default the sample logs the normalized response. Pass `--audit` to enable the audit logging stub described in the script.
+The helper API mirrors the patterns in the examples:
+
+```js
+const { Client } = require("specado");
+
+async function main() {
+  const client = new Client("openai");
+
+  const quick = await client.completeText(
+    "Give me two bullet points about closures.",
+    { system: "Keep it concise.", temperature: 0.4 }
+  );
+
+  console.log(quick.content);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+```
 
 ## 5. Validate the environment
 Before contributing changes upstream, run the standard quality gates:

@@ -1,0 +1,22 @@
+inherits: ../_base-responses.yaml
+
+models:
+  - id: gpt-5
+  - id: gpt-5-mini
+  - id: gpt-5-nano
+
+capabilities:
+  context_window: 256000
+  supports_tools: true
+  supports_custom_tools: true
+  responses_api: true
+  reasoning_controls: ["effort", "verbosity"]
+  supports_temperature: true
+  supports_top_p: true
+
+unsupported_parameters:
+  - "$.sampling.top_k"
+  - "$.sampling.frequency_penalty"
+  - "$.sampling.presence_penalty"
+  - "$.sampling.logit_bias"
+  - "$.sampling.n"

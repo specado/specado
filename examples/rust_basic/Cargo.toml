@@ -1,0 +1,10 @@
+[package]
+name = "specado-rust-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+specado = { path = "../../crates/specado", package = "specado-temp" }
+tokio = { version = "1", features = ["full"] }
+
+[workspace]

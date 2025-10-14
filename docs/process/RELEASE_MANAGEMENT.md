@@ -291,7 +291,7 @@ Run the example scripts to verify end-to-end functionality:
 ./examples/cli_preview.sh
 
 # Test Node.js examples
-node examples/node_basic.mjs
+node examples/node/from_spec.js
 
 # Test Python examples
 python examples/python_basic.py

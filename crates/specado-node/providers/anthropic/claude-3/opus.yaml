@@ -1,0 +1,21 @@
+inherits: ../_base.yaml
+
+models:
+  - id: claude-3-opus-20240229
+
+capabilities:
+  context_window: 200000
+  supports_tools: true
+  supports_image_input: true
+  supports_temperature: true
+  supports_top_p: true
+  supports_top_k: true
+
+unsupported_parameters:
+  - "$.sampling.frequency_penalty"
+  - "$.sampling.presence_penalty"
+  - "$.sampling.logit_bias"
+  - "$.sampling.logprobs"
+  - "$.sampling.n"
+  - "$.response[?(@.format != 'text')].format"
+  - "$.seed"
