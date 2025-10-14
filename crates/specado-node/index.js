@@ -310,23 +310,9 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { Client: NativeClient } = nativeBinding
-const PROVIDER_DIR_CANDIDATES = [
-  join(__dirname, 'providers'),
-  join(__dirname, '../specado-providers/providers')
-]
+const { loadPrompt, createPrompt, simplePrompt, Client } = nativeBinding
 
-class Client extends NativeClient {
-  constructor(provider, options = null) {
-    const normalized = options ? { ...options } : {}
-    if (normalized.providersDir === undefined) {
-      const detected = PROVIDER_DIR_CANDIDATES.find((dir) => existsSync(dir))
-      if (detected) {
-        normalized.providersDir = detected
-      }
-    }
-    super(provider, normalized)
-  }
-}
-
+module.exports.loadPrompt = loadPrompt
+module.exports.createPrompt = createPrompt
+module.exports.simplePrompt = simplePrompt
 module.exports.Client = Client

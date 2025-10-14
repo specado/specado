@@ -1,0 +1,45 @@
+provider: openai
+interface: text.generate
+contract_version: "1.0.0"
+
+auth:
+  type: bearer
+  token_env: OPENAI_API_KEY
+
+endpoints:
+  chat:
+    method: POST
+    url: https://api.openai.com/v1/responses
+    headers:
+      Content-Type: application/json
+
+mappings:
+  request:
+    - from: "$.metadata.openai_model"
+      to: "$.model"
+    - from: "$.metadata.openai_max_output_tokens"
+      to: "$.max_output_tokens"
+    - from: "$.metadata.reasoning.effort"
+      to: "$.reasoning.effort"
+    - from: "$.metadata.reasoning.budget_tokens"
+      to: "$.reasoning.budget_tokens"
+    - from: "$.metadata.openai_reasoning_effort"
+      to: "$.reasoning.effort"
+    - from: "$.metadata.openai_text_verbosity"
+      to: "$.text.verbosity"
+    - from: "$.sampling.seed"
+      to: "$.seed"
+    - from: "$.messages"
+      to: "$.messages"
+  response:
+    - from: "$.output_text[0]"
+      to: "content"
+    - from: "$.output[?(@.type=='message')].content[*].text"
+      to: "content"
+    - from: "$.output[?(@.type=='message')].stop_reason"
+      to: "finish_reason"
+
+constraints:
+  supports:
+    json_mode: true
+    tools: true

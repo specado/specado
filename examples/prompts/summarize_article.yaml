@@ -1,0 +1,20 @@
+version: "1"
+
+messages:
+  - role: system
+    content: "You are a helpful assistant that specializes in creating clear, concise summaries."
+
+  - role: user
+    content: |
+      Please summarize the following article in 2-3 sentences:
+
+      Artificial intelligence has made remarkable progress in recent years, with large language models
+      demonstrating impressive capabilities across diverse tasks. These models can now engage in natural
+      conversations, assist with coding, analyze documents, and even generate creative content. However,
+      challenges remain around reliability, factual accuracy, and responsible deployment of these powerful
+      technologies.
+
+sampling:
+  temperature: 0.3
+
+strict_mode: Warn

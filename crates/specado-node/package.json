@@ -1,9 +1,11 @@
 {
   "name": "specado",
-  "version": "0.2.0",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "version": "0.2.1",
+  "main": "lib.js",
+  "types": "lib.d.ts",
   "files": [
+    "lib.d.ts",
+    "lib.js",
     "index.js",
     "index.d.ts",
     "*.node",
@@ -26,11 +28,12 @@
     "build:debug": "napi build --platform",
     "bundle:providers": "node ./scripts/copy-providers.mjs",
     "clean:providers": "node ./scripts/clean-providers.mjs",
-    "prepublishOnly": "npm run bundle:providers && napi prepublish -t npm && npm run clean:providers",
+    "prepack": "npm run bundle:providers && napi prepublish -t npm",
     "test": "node --test"
   },
   "dependencies": {
-    "@napi-rs/cli": "^2.18.4"
+    "@napi-rs/cli": "^2.18.4",
+    "yaml": "^2.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2"
@@ -39,11 +42,22 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "specado-win32-x64-msvc": "0.2.0",
-    "specado-darwin-x64": "0.2.0",
-    "specado-linux-x64-gnu": "0.2.0",
-    "specado-darwin-arm64": "0.2.0",
-    "specado-linux-arm64-gnu": "0.2.0",
-    "specado-linux-x64-musl": "0.2.0"
+    "specado-win32-x64-msvc": "0.2.1",
+    "specado-darwin-x64": "0.2.1",
+    "specado-linux-x64-gnu": "0.2.1",
+    "specado-darwin-arm64": "0.2.1",
+    "specado-linux-arm64-gnu": "0.2.1",
+    "specado-linux-x64-musl": "0.2.1"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./lib.d.ts",
+      "default": "./lib.js"
+    },
+    "./index.js": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
   }
 }

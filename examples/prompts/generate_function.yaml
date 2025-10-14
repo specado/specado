@@ -1,0 +1,24 @@
+version: "1"
+
+messages:
+  - role: system
+    content: |
+      You are a code generation assistant. Generate functions according to the user's specifications.
+      Always respond with valid JSON containing the function name, parameters, and implementation.
+
+  - role: user
+    content: |
+      Generate a Python function that checks if a string is a palindrome.
+      The function should:
+      - Be named "is_palindrome"
+      - Accept a single string parameter
+      - Return a boolean
+      - Ignore case and whitespace
+
+response:
+  format: json
+
+sampling:
+  temperature: 0.2
+
+strict_mode: Warn

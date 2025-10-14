@@ -1,0 +1,37 @@
+provider: openai
+interface: conversational.generate
+contract_version: "1.0.0"
+
+auth:
+  type: bearer
+  token_env: OPENAI_API_KEY
+
+endpoints:
+  chat:
+    method: POST
+    url: https://api.openai.com/v1/chat/completions
+    headers:
+      Content-Type: application/json
+
+mappings:
+  request:
+    - from: "$.metadata.openai_model"
+      to: "$.model"
+    - from: "$.messages"
+      to: "$.messages"
+    - from: "$.sampling.temperature"
+      to: "$.temperature"
+    - from: "$.sampling.top_p"
+      to: "$.top_p"
+    - from: "$.metadata.openai_max_output_tokens"
+      to: "$.max_tokens"
+  response:
+    - from: "$.choices[0].message.content"
+      to: "content"
+    - from: "$.choices[0].finish_reason"
+      to: "finish_reason"
+
+constraints:
+  supports:
+    json_mode: true
+    tools: true

@@ -5,8 +5,43 @@ use napi_derive::napi;
 use serde::Deserialize;
 #[cfg(feature = "audit-logging")]
 use specado::audit::{AuditConfig, AuditContext, AuditTarget};
-use specado::{execute, ExecuteOptions, PromptSpec, UniformResponse};
+use specado::{
+    create_prompt as core_create_prompt, execute, load_prompt_from_path,
+    simple_prompt as core_simple_prompt, ExecuteOptions, PromptBuilder, PromptSpec,
+    SimplePromptOptions, UniformResponse,
+};
 use std::path::PathBuf;
+
+#[napi]
+pub fn load_prompt(path: String) -> Result<serde_json::Value> {
+    let prompt = load_prompt_from_path(&path).map_err(|e| Error::from_reason(e.to_string()))?;
+    serde_json::to_value(&prompt)
+        .map_err(|e| Error::from_reason(format!("Serialization failed: {e}")))
+}
+
+#[napi]
+pub fn create_prompt(options: serde_json::Value) -> Result<serde_json::Value> {
+    let builder: PromptBuilder = serde_json::from_value(options)
+        .map_err(|e| Error::from_reason(format!("Invalid prompt options: {e}")))?;
+    let prompt = core_create_prompt(builder);
+    serde_json::to_value(&prompt)
+        .map_err(|e| Error::from_reason(format!("Serialization failed: {e}")))
+}
+
+#[napi]
+pub fn simple_prompt(options: Option<serde_json::Value>) -> Result<serde_json::Value> {
+    let opts: SimplePromptOptions = options
+        .map(|value| {
+            serde_json::from_value(value)
+                .map_err(|e| Error::from_reason(format!("Invalid prompt options: {e}")))
+        })
+        .transpose()?
+        .unwrap_or_default();
+
+    let prompt = core_simple_prompt(opts).map_err(|e| Error::from_reason(e.to_string()))?;
+    serde_json::to_value(&prompt)
+        .map_err(|e| Error::from_reason(format!("Serialization failed: {e}")))
+}
 
 #[napi]
 pub struct Client {
@@ -54,7 +89,40 @@ impl Client {
     pub async fn complete(&self, prompt: serde_json::Value) -> Result<serde_json::Value> {
         let prompt_spec: PromptSpec = serde_json::from_value(prompt)
             .map_err(|e| Error::from_reason(format!("Invalid prompt spec: {e}")))?;
+        self.execute_prompt(prompt_spec).await
+    }
 
+    #[napi]
+    pub async fn complete_file(&self, path: String) -> Result<serde_json::Value> {
+        let prompt = load_prompt_from_path(&path).map_err(|e| Error::from_reason(e.to_string()))?;
+        self.execute_prompt(prompt).await
+    }
+
+    #[napi]
+    pub async fn complete_text(
+        &self,
+        message: String,
+        options: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value> {
+        let mut opts: SimplePromptOptions = options
+            .map(|value| {
+                serde_json::from_value(value)
+                    .map_err(|e| Error::from_reason(format!("Invalid prompt options: {e}")))
+            })
+            .transpose()?
+            .unwrap_or_default();
+
+        if opts.message.is_none() && opts.user.is_none() {
+            opts.message = Some(message);
+        }
+
+        let prompt = core_simple_prompt(opts).map_err(|e| Error::from_reason(e.to_string()))?;
+        self.execute_prompt(prompt).await
+    }
+}
+
+impl Client {
+    async fn execute_prompt(&self, prompt_spec: PromptSpec) -> Result<serde_json::Value> {
         #[cfg(feature = "audit-logging")]
         let audit_context = self.audit_config.clone().map(AuditContext::new);
 

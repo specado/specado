@@ -1,0 +1,50 @@
+provider: anthropic
+interface: conversational.generate
+contract_version: "1.0.0"
+
+auth:
+  type: apikey
+  header: x-api-key
+  key_env: ANTHROPIC_API_KEY
+
+endpoints:
+  chat:
+    method: POST
+    url: https://api.anthropic.com/v1/messages
+    headers:
+      Content-Type: application/json
+      anthropic-version: "2023-06-01"
+
+mappings:
+  request:
+    - from: "$.metadata.anthropic_model"
+      to: "$.model"
+    - from: "$.metadata.anthropic_max_tokens"
+      to: "$.max_tokens"
+    - from: "$.metadata.thinking.budget_tokens"
+      to: "$.thinking.budget_tokens"
+    - from: "$.metadata.thinking.type"
+      to: "$.thinking.type"
+    - from: "$.metadata.anthropic_thinking_budget"
+      to: "$.thinking.budget_tokens"
+    - from: "$.metadata.anthropic_thinking_type"
+      to: "$.thinking.type"
+    - from: "$.messages[?(@.role=='system')].content"
+      to: "$.system"
+      code: Relocate
+    - from: "$.messages[?(@.role!='system')]"
+      to: "$.messages"
+    - from: "$.sampling.temperature"
+      to: "$.temperature"
+      clamp: [0.0, 1.0]
+      code: Clamp
+  response:
+    - from: "$.content[?(@.type=='text')].text"
+      to: "content"
+    - from: "$.stop_reason"
+      to: "finish_reason"
+
+constraints:
+  supports:
+    json_mode: false
+    tools: true

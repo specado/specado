@@ -1,0 +1,22 @@
+inherits: ../_base.yaml
+
+models:
+  - id: claude-3.5-sonnet-20240620
+
+capabilities:
+  context_window: 200000
+  supports_tools: true
+  supports_image_input: true
+  supports_extended_thinking: true
+  supports_top_p: true
+
+unsupported_parameters:
+  - "$.sampling.top_k" # thinking enabled forces 1.0
+  - "$.sampling.temperature" # thinking enabled forces 1.0
+  - "$.sampling.frequency_penalty"
+  - "$.sampling.presence_penalty"
+  - "$.sampling.logit_bias"
+  - "$.sampling.logprobs"
+  - "$.sampling.n"
+  - "$.response[?(@.format != 'text')].format"
+  - "$.seed"
