@@ -15,6 +15,7 @@ capabilities:
   supports_top_p: true
 
 unsupported_parameters:
+  - "$.sampling.temperature"
   - "$.sampling.top_k"
   - "$.sampling.frequency_penalty"
   - "$.sampling.presence_penalty"
